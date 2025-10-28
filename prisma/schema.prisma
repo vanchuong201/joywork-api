@@ -149,30 +149,35 @@ enum PostVisibility {
 
 // Job model - Job postings
 model Job {
-  id          String     @id @default(cuid())
-  companyId   String
-  title       String
-  description String
-  requirements String[]
-  benefits    String[]
-  location    String?
-  workType    WorkType  @default(FULL_TIME)
-  salaryMin   Int?
-  salaryMax   Int?
-  currency    String    @default("VND")
-  deadline    DateTime?
-  status      JobStatus @default(ACTIVE)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                  String           @id @default(cuid())
+  companyId           String
+  title               String
+  description         String
+  requirements        String?
+  responsibilities    String?
+  benefits           String?
+  location           String?
+  remote             Boolean          @default(false)
+  salaryMin          Int?
+  salaryMax          Int?
+  currency           String           @default("VND")
+  employmentType     EmploymentType   @default(FULL_TIME)
+  experienceLevel    ExperienceLevel @default(MID)
+  skills             String[]
+  tags               String[]
+  applicationDeadline DateTime?
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   // Relations
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   applications Application[]
 
   @@map("jobs")
 }
 
-enum WorkType {
+enum EmploymentType {
   FULL_TIME
   PART_TIME
   CONTRACT
@@ -180,39 +185,49 @@ enum WorkType {
   FREELANCE
 }
 
-enum JobStatus {
-  ACTIVE
-  DRAFT
-  CLOSED
-  PAUSED
+enum ExperienceLevel {
+  ENTRY
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+  EXECUTIVE
 }
 
 // Application model - Job applications
 model Application {
-  id        String            @id @default(cuid())
-  jobId     String
-  userId    String
-  message   String?
-  cvUrl     String?
-  status    ApplicationStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id          String            @id @default(cuid())
+  jobId       String
+  userId      String
+  status      ApplicationStatus @default(PENDING)
+  coverLetter String?
+  resumeUrl   String?
+  notes       String?
+  appliedAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   // Relations
   job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages Message[]
 
-  @@unique([jobId, userId])
+  @@unique([userId, jobId])
   @@map("applications")
 }
 
 enum ApplicationStatus {
   PENDING
-  REVIEWED
-  INTERVIEWED
-  ACCEPTED
+  REVIEWING
+  SHORTLISTED
   REJECTED
+  HIRED
+}
+
+// Message types for inbox
+enum MessageType {
+  TEXT
+  FILE
+  IMAGE
 }
 
 // Message model - Inbox messages
@@ -221,7 +236,11 @@ model Message {
   applicationId String
   senderId      String
   content       String
+  messageType   MessageType @default(TEXT)
+  fileUrl       String?
+  isRead        Boolean  @default(false)
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)

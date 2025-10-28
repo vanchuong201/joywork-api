@@ -1,7 +1,449 @@
 import { FastifyInstance } from 'fastify';
+import { CompaniesController } from './companies.controller';
+import { CompaniesService } from './companies.service';
+import { AuthMiddleware } from '@/modules/auth/auth.middleware';
+import { AuthService } from '@/modules/auth/auth.service';
 
 export async function companiesRoutes(fastify: FastifyInstance) {
-  fastify.get('/test', async () => {
-    return { message: 'Companies routes working' };
-  });
+  const authService = new AuthService();
+  const companiesService = new CompaniesService();
+  const companiesController = new CompaniesController(companiesService);
+  const authMiddleware = new AuthMiddleware(authService);
+
+  // Create company
+  fastify.post('/', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Create a new company',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['name', 'slug'],
+        properties: {
+          name: { type: 'string', minLength: 2, description: 'Company name' },
+          slug: { type: 'string', minLength: 2, pattern: '^[a-z0-9-]+$', description: 'URL-friendly slug' },
+          tagline: { type: 'string', maxLength: 100, description: 'Company tagline' },
+          description: { type: 'string', maxLength: 1000, description: 'Company description' },
+          logoUrl: { type: 'string', format: 'uri', description: 'Company logo URL' },
+          coverUrl: { type: 'string', format: 'uri', description: 'Company cover image URL' },
+          website: { type: 'string', format: 'uri', description: 'Company website URL' },
+          location: { type: 'string', maxLength: 100, description: 'Company location' },
+          industry: { type: 'string', maxLength: 50, description: 'Company industry' },
+          size: { 
+            type: 'string', 
+            enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
+            description: 'Company size'
+          },
+          foundedYear: { 
+            type: 'number', 
+            minimum: 1800, 
+            maximum: 2025,
+            description: 'Year company was founded'
+          },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    slug: { type: 'string' },
+                    tagline: { type: 'string', nullable: true },
+                    description: { type: 'string', nullable: true },
+                    logoUrl: { type: 'string', nullable: true },
+                    coverUrl: { type: 'string', nullable: true },
+                    website: { type: 'string', nullable: true },
+                    location: { type: 'string', nullable: true },
+                    industry: { type: 'string', nullable: true },
+                    size: { type: 'string', nullable: true },
+                    foundedYear: { type: 'number', nullable: true },
+                    isVerified: { type: 'boolean' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.createCompany.bind(companiesController));
+
+  // Get company by slug
+  fastify.get('/:slug', {
+    schema: {
+      description: 'Get company by slug',
+      tags: ['Companies'],
+      params: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'Company slug' },
+        },
+        required: ['slug'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    slug: { type: 'string' },
+                    tagline: { type: 'string', nullable: true },
+                    description: { type: 'string', nullable: true },
+                    logoUrl: { type: 'string', nullable: true },
+                    coverUrl: { type: 'string', nullable: true },
+                    website: { type: 'string', nullable: true },
+                    location: { type: 'string', nullable: true },
+                    industry: { type: 'string', nullable: true },
+                    size: { type: 'string', nullable: true },
+                    foundedYear: { type: 'number', nullable: true },
+                    isVerified: { type: 'boolean' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' },
+                    members: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          userId: { type: 'string' },
+                          role: { type: 'string' },
+                          joinedAt: { type: 'string', format: 'date-time' },
+                          user: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string' },
+                              email: { type: 'string' },
+                              name: { type: 'string', nullable: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getCompany.bind(companiesController));
+
+  // Search companies
+  fastify.get('/', {
+    schema: {
+      description: 'Search companies',
+      tags: ['Companies'],
+      querystring: {
+        type: 'object',
+        properties: {
+          q: { type: 'string', description: 'Search query' },
+          industry: { type: 'string', description: 'Filter by industry' },
+          location: { type: 'string', description: 'Filter by location' },
+          size: { 
+            type: 'string', 
+            enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
+            description: 'Filter by company size'
+          },
+          page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
+          limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                companies: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      name: { type: 'string' },
+                      slug: { type: 'string' },
+                      tagline: { type: 'string', nullable: true },
+                      description: { type: 'string', nullable: true },
+                      logoUrl: { type: 'string', nullable: true },
+                      coverUrl: { type: 'string', nullable: true },
+                      website: { type: 'string', nullable: true },
+                      location: { type: 'string', nullable: true },
+                      industry: { type: 'string', nullable: true },
+                      size: { type: 'string', nullable: true },
+                      foundedYear: { type: 'number', nullable: true },
+                      isVerified: { type: 'boolean' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.searchCompanies.bind(companiesController));
+
+  // Get user's companies
+  fastify.get('/me/companies', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Get current user companies',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                companies: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      name: { type: 'string' },
+                      slug: { type: 'string' },
+                      tagline: { type: 'string', nullable: true },
+                      description: { type: 'string', nullable: true },
+                      logoUrl: { type: 'string', nullable: true },
+                      coverUrl: { type: 'string', nullable: true },
+                      website: { type: 'string', nullable: true },
+                      location: { type: 'string', nullable: true },
+                      industry: { type: 'string', nullable: true },
+                      size: { type: 'string', nullable: true },
+                      foundedYear: { type: 'number', nullable: true },
+                      isVerified: { type: 'boolean' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getMyCompanies.bind(companiesController));
+
+  // Update company
+  fastify.patch('/:companyId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Update company',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 2, description: 'Company name' },
+          slug: { type: 'string', minLength: 2, pattern: '^[a-z0-9-]+$', description: 'URL-friendly slug' },
+          tagline: { type: 'string', maxLength: 100, description: 'Company tagline' },
+          description: { type: 'string', maxLength: 1000, description: 'Company description' },
+          logoUrl: { type: 'string', format: 'uri', description: 'Company logo URL' },
+          coverUrl: { type: 'string', format: 'uri', description: 'Company cover image URL' },
+          website: { type: 'string', format: 'uri', description: 'Company website URL' },
+          location: { type: 'string', maxLength: 100, description: 'Company location' },
+          industry: { type: 'string', maxLength: 50, description: 'Company industry' },
+          size: { 
+            type: 'string', 
+            enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
+            description: 'Company size'
+          },
+          foundedYear: { 
+            type: 'number', 
+            minimum: 1800, 
+            maximum: 2025,
+            description: 'Year company was founded'
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    slug: { type: 'string' },
+                    tagline: { type: 'string', nullable: true },
+                    description: { type: 'string', nullable: true },
+                    logoUrl: { type: 'string', nullable: true },
+                    coverUrl: { type: 'string', nullable: true },
+                    website: { type: 'string', nullable: true },
+                    location: { type: 'string', nullable: true },
+                    industry: { type: 'string', nullable: true },
+                    size: { type: 'string', nullable: true },
+                    foundedYear: { type: 'number', nullable: true },
+                    isVerified: { type: 'boolean' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.updateCompany.bind(companiesController));
+
+  // Add company member
+  fastify.post('/:companyId/members', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Add company member',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      body: {
+        type: 'object',
+        required: ['userId'],
+        properties: {
+          userId: { type: 'string', description: 'User ID to add as member' },
+          role: { 
+            type: 'string', 
+            enum: ['OWNER', 'ADMIN', 'MEMBER'],
+            default: 'MEMBER',
+            description: 'Member role'
+          },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.addCompanyMember.bind(companiesController));
+
+  // Update company member role
+  fastify.patch('/:companyId/members/:memberId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Update company member role',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+          memberId: { type: 'string', description: 'Member ID' },
+        },
+        required: ['companyId', 'memberId'],
+      },
+      body: {
+        type: 'object',
+        required: ['role'],
+        properties: {
+          role: { 
+            type: 'string', 
+            enum: ['OWNER', 'ADMIN', 'MEMBER'],
+            description: 'New member role'
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.updateCompanyMemberRole.bind(companiesController));
+
+  // Remove company member
+  fastify.delete('/:companyId/members/:memberId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Remove company member',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+          memberId: { type: 'string', description: 'Member ID' },
+        },
+        required: ['companyId', 'memberId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.removeCompanyMember.bind(companiesController));
 }

@@ -4,6 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import cookie from '@fastify/cookie';
 
 import { config } from '@/config/env';
 import { errorHandler } from '@/shared/errors/errorHandler';
@@ -16,20 +17,24 @@ import { inboxRoutes } from '@/modules/inbox/inbox.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: {
+    logger: config.NODE_ENV === 'development' ? {
       level: config.LOG_LEVEL,
-      transport: config.NODE_ENV === 'development' ? {
+      transport: {
         target: 'pino-pretty',
         options: {
           colorize: true,
           translateTime: 'HH:MM:ss Z',
           ignore: 'pid,hostname',
         },
-      } : undefined,
+      },
+    } : {
+      level: config.LOG_LEVEL,
     },
   });
 
   // Register plugins
+  await app.register(cookie);
+  
   await app.register(cors, {
     origin: config.FRONTEND_ORIGIN,
     credentials: true,
@@ -77,16 +82,16 @@ export async function createApp(): Promise<FastifyInstance> {
       deepLinking: false,
     },
     uiHooks: {
-      onRequest: function (request, reply, next) {
+      onRequest: function (_request, _reply, next) {
         next();
       },
-      preHandler: function (request, reply, next) {
+      preHandler: function (_request, _reply, next) {
         next();
       },
     },
     staticCSP: true,
     transformStaticCSP: (header) => header,
-    transformSpecification: (swaggerObject, request, reply) => {
+    transformSpecification: (swaggerObject, _request, _reply) => {
       return swaggerObject;
     },
     transformSpecificationClone: true,
