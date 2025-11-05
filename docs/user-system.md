@@ -1,5 +1,7 @@
 # JoyWork User System Documentation
 
+> Lưu ý phạm vi: JoyWork KHÔNG quản lý nhân sự (HR). Vai trò công ty trong hệ thống chỉ nhằm quản trị trang công ty (xuất bản Story, đăng Job, trao đổi qua Inbox). Bình luận bị tắt; chỉ công ty được đăng bài. Tài liệu Roles & UI/Flow (không HR) xem thêm tại: `docs/roles-ui.md`.
+
 ## 📋 Tổng quan
 
 JoyWork có **2 nhóm người dùng chính**:

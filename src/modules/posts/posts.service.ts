@@ -18,6 +18,7 @@ export interface Post {
   title: string;
   content: string;
   excerpt?: string;
+  coverUrl?: string;
   type: string;
   visibility: string;
   publishedAt?: Date;
@@ -29,6 +30,7 @@ export interface Post {
     slug: string;
     logoUrl?: string;
   };
+  images?: Array<{ id: string; url: string; width?: number | null; height?: number | null; order: number }>;
   likes: Array<{
     id: string;
     userId: string;
@@ -78,6 +80,10 @@ export class PostsService {
             logoUrl: true,
           },
         },
+        images: {
+          select: { id: true, url: true, width: true, height: true, order: true },
+          orderBy: { order: 'asc' },
+        },
         likes: {
           include: {
             user: {
@@ -102,12 +108,14 @@ export class PostsService {
       title: post.title,
       content: post.content,
       excerpt: post.excerpt,
+      coverUrl: (post as any).coverUrl,
       type: post.type,
       visibility: post.visibility,
       publishedAt: post.publishedAt,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
       company: post.company,
+      images: (post as any).images,
       likes: post.likes.map(like => ({
         id: like.id,
         userId: like.userId,
@@ -163,6 +171,10 @@ export class PostsService {
             logoUrl: true,
           },
         },
+        images: {
+          select: { id: true, url: true, width: true, height: true, order: true },
+          orderBy: { order: 'asc' },
+        },
         likes: {
           include: {
             user: {
@@ -187,12 +199,14 @@ export class PostsService {
       title: updatedPost.title,
       content: updatedPost.content,
       excerpt: updatedPost.excerpt,
+      coverUrl: (updatedPost as any).coverUrl,
       type: updatedPost.type,
       visibility: updatedPost.visibility,
       publishedAt: updatedPost.publishedAt,
       createdAt: updatedPost.createdAt,
       updatedAt: updatedPost.updatedAt,
       company: updatedPost.company,
+      images: (updatedPost as any).images,
       likes: updatedPost.likes.map(like => ({
         id: like.id,
         userId: like.userId,
@@ -217,6 +231,10 @@ export class PostsService {
             slug: true,
             logoUrl: true,
           },
+        },
+        images: {
+          select: { id: true, url: true, width: true, height: true, order: true },
+          orderBy: { order: 'asc' },
         },
         likes: {
           include: {
@@ -260,12 +278,14 @@ export class PostsService {
       title: post.title,
       content: post.content,
       excerpt: post.excerpt,
+      coverUrl: (post as any).coverUrl,
       type: post.type,
       visibility: post.visibility,
       publishedAt: post.publishedAt,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
       company: post.company,
+      images: (post as any).images,
       likes: post.likes.map(like => ({
         id: like.id,
         userId: like.userId,
@@ -319,6 +339,10 @@ export class PostsService {
               logoUrl: true,
             },
           },
+          images: {
+            select: { id: true, url: true, width: true, height: true, order: true },
+            orderBy: { order: 'asc' },
+          },
           likes: {
             include: {
               user: {
@@ -363,12 +387,14 @@ export class PostsService {
         title: post.title,
         content: post.content,
         excerpt: post.excerpt,
+        coverUrl: (post as any).coverUrl,
         type: post.type,
         visibility: post.visibility,
         publishedAt: post.publishedAt,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         company: post.company,
+        images: (post as any).images,
         likes: post.likes.map(like => ({
           id: like.id,
           userId: like.userId,
@@ -436,6 +462,10 @@ export class PostsService {
               logoUrl: true,
             },
           },
+          images: {
+            select: { id: true, url: true, width: true, height: true, order: true },
+            orderBy: { order: 'asc' },
+          },
           likes: {
             include: {
               user: {
@@ -480,12 +510,14 @@ export class PostsService {
         title: post.title,
         content: post.content,
         excerpt: post.excerpt,
+        coverUrl: (post as any).coverUrl,
         type: post.type,
         visibility: post.visibility,
         publishedAt: post.publishedAt,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         company: post.company,
+        images: (post as any).images,
         likes: post.likes.map(like => ({
           id: like.id,
           userId: like.userId,

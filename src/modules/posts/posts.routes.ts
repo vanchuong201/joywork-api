@@ -61,11 +61,25 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     title: { type: 'string' },
                     content: { type: 'string' },
                     excerpt: { type: 'string', nullable: true },
+                    coverUrl: { type: 'string', nullable: true },
                     type: { type: 'string' },
                     visibility: { type: 'string' },
                     publishedAt: { type: 'string', format: 'date-time', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                    images: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          url: { type: 'string' },
+                          width: { type: 'number', nullable: true },
+                          height: { type: 'number', nullable: true },
+                          order: { type: 'number' },
+                        },
+                      },
+                    },
                     company: {
                       type: 'object',
                       properties: {
@@ -136,11 +150,25 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     title: { type: 'string' },
                     content: { type: 'string' },
                     excerpt: { type: 'string', nullable: true },
+                    coverUrl: { type: 'string', nullable: true },
                     type: { type: 'string' },
                     visibility: { type: 'string' },
                     publishedAt: { type: 'string', format: 'date-time', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                    images: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          url: { type: 'string' },
+                          width: { type: 'number', nullable: true },
+                          height: { type: 'number', nullable: true },
+                          order: { type: 'number' },
+                        },
+                      },
+                    },
                     company: {
                       type: 'object',
                       properties: {
@@ -231,11 +259,25 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       title: { type: 'string' },
                       content: { type: 'string' },
                       excerpt: { type: 'string', nullable: true },
+                      coverUrl: { type: 'string', nullable: true },
                       type: { type: 'string' },
                       visibility: { type: 'string' },
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      images: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            url: { type: 'string' },
+                            width: { type: 'number', nullable: true },
+                            height: { type: 'number', nullable: true },
+                            order: { type: 'number' },
+                          },
+                        },
+                      },
                       company: {
                         type: 'object',
                         properties: {
@@ -325,11 +367,25 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       title: { type: 'string' },
                       content: { type: 'string' },
                       excerpt: { type: 'string', nullable: true },
+                      coverUrl: { type: 'string', nullable: true },
                       type: { type: 'string' },
                       visibility: { type: 'string' },
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      images: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            url: { type: 'string' },
+                            width: { type: 'number', nullable: true },
+                            height: { type: 'number', nullable: true },
+                            order: { type: 'number' },
+                          },
+                        },
+                      },
                       company: {
                         type: 'object',
                         properties: {
@@ -431,11 +487,25 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     title: { type: 'string' },
                     content: { type: 'string' },
                     excerpt: { type: 'string', nullable: true },
+                    coverUrl: { type: 'string', nullable: true },
                     type: { type: 'string' },
                     visibility: { type: 'string' },
                     publishedAt: { type: 'string', format: 'date-time', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                    images: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          url: { type: 'string' },
+                          width: { type: 'number', nullable: true },
+                          height: { type: 'number', nullable: true },
+                          order: { type: 'number' },
+                        },
+                      },
+                    },
                     company: {
                       type: 'object',
                       properties: {

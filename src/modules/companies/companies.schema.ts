@@ -37,7 +37,13 @@ export const getCompanySchema = z.object({
 
 // Search companies schema
 export const searchCompaniesSchema = z.object({
-  q: z.string().min(1, 'Search query is required').optional(),
+  q: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      return trimmed === '' ? undefined : trimmed;
+    }
+    return val;
+  }, z.string().min(1, 'Search query is required').optional()),
   industry: z.string().optional(),
   location: z.string().optional(),
   size: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']).optional(),

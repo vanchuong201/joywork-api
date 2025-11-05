@@ -72,10 +72,10 @@ export class CompaniesController {
   async getMyCompanies(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     
-    const companies = await this.companiesService.getUserCompanies(userId);
+    const memberships = await this.companiesService.getUserCompanies(userId);
     
     return reply.send({
-      data: { companies },
+      data: { memberships },
     });
   }
 

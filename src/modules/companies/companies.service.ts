@@ -56,6 +56,12 @@ export interface CompanyWithMembers {
   }>;
 }
 
+export interface CompanyMembershipSummary {
+  membershipId: string;
+  role: string;
+  company: Company;
+}
+
 export class CompaniesService {
   // Create company
   async createCompany(userId: string, data: CreateCompanyInput): Promise<Company> {
@@ -290,7 +296,7 @@ export class CompaniesService {
   }
 
   // Get user's companies
-  async getUserCompanies(userId: string): Promise<Company[]> {
+  async getUserCompanies(userId: string): Promise<CompanyMembershipSummary[]> {
     const memberships = await prisma.companyMember.findMany({
       where: { userId },
       include: {
@@ -300,21 +306,25 @@ export class CompaniesService {
     });
 
     return memberships.map(membership => ({
-      id: membership.company.id,
-      name: membership.company.name,
-      slug: membership.company.slug,
-      tagline: membership.company.tagline,
-      description: membership.company.description,
-      logoUrl: membership.company.logoUrl,
-      coverUrl: membership.company.coverUrl,
-      website: membership.company.website,
-      location: membership.company.location,
-      industry: membership.company.industry,
-      size: membership.company.size,
-      foundedYear: membership.company.foundedYear,
-      isVerified: membership.company.isVerified,
-      createdAt: membership.company.createdAt,
-      updatedAt: membership.company.updatedAt,
+      membershipId: membership.id,
+      role: membership.role,
+      company: {
+        id: membership.company.id,
+        name: membership.company.name,
+        slug: membership.company.slug,
+        tagline: membership.company.tagline,
+        description: membership.company.description,
+        logoUrl: membership.company.logoUrl,
+        coverUrl: membership.company.coverUrl,
+        website: membership.company.website,
+        location: membership.company.location,
+        industry: membership.company.industry,
+        size: membership.company.size,
+        foundedYear: membership.company.foundedYear,
+        isVerified: membership.company.isVerified,
+        createdAt: membership.company.createdAt,
+        updatedAt: membership.company.updatedAt,
+      },
     }));
   }
 
