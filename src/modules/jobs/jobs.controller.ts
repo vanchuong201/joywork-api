@@ -9,6 +9,7 @@ import {
   getApplicationsSchema,
   updateApplicationStatusSchema,
   getMyApplicationsSchema,
+  getMyFavoritesSchema,
 } from './jobs.schema';
 
 export class JobsController {
@@ -124,6 +125,18 @@ export class JobsController {
     
     const result = await this.jobsService.getMyApplications(userId, data);
     
+    return reply.send({
+      data: result,
+    });
+  }
+
+  // Get my saved jobs
+  async getMyFavorites(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const data = getMyFavoritesSchema.parse(request.query);
+
+    const result = await this.jobsService.getMyFavorites(userId, data);
+
     return reply.send({
       data: result,
     });

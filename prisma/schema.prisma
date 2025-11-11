@@ -27,6 +27,9 @@ model User {
   messages    Message[]
   follows     Follow[]
   likes       Like[]
+  jobFavorites JobFavorite[]
+  posts       Post[]
+  postAuditLogs PostAuditLog[]
 
   @@map("users")
 }
@@ -72,6 +75,11 @@ model Company {
   industry    String?
   size        CompanySize?
   foundedYear Int?
+  headcount   Int?
+  headcountNote String?
+  metrics     Json?
+  profileStory Json?
+  highlights  Json?
   isVerified  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -119,6 +127,7 @@ enum CompanyMemberRole {
 model Post {
   id          String      @id @default(cuid())
   companyId   String
+  createdById String?
   title       String
   content     String
   excerpt     String?
@@ -131,8 +140,10 @@ model Post {
 
   // Relations
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
   likes   Like[]
   images  PostImage[]
+  auditLogs PostAuditLog[]
 
   @@map("posts")
 }
@@ -142,6 +153,7 @@ model PostImage {
   id      String  @id @default(cuid())
   postId  String
   url     String
+  storageKey String?
   width   Int?
   height  Int?
   order   Int     @default(0)
@@ -151,6 +163,28 @@ model PostImage {
 
   @@index([postId])
   @@map("post_images")
+}
+
+model PostAuditLog {
+  id        String          @id @default(cuid())
+  postId    String?
+  actorId   String?
+  action    PostAuditAction
+  metadata  Json?
+  createdAt DateTime        @default(now())
+
+  post  Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@map("post_audit_logs")
+}
+
+enum PostAuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  PUBLISH
+  UNPUBLISH
 }
 
 enum PostType {
@@ -191,8 +225,23 @@ model Job {
   // Relations
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   applications Application[]
+  favorites    JobFavorite[]
 
   @@map("jobs")
+}
+
+// Job favorites - Saved jobs
+model JobFavorite {
+  id     String @id @default(cuid())
+  userId String
+  jobId  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@map("job_favorites")
 }
 
 enum EmploymentType {

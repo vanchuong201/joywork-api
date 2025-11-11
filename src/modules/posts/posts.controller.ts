@@ -66,7 +66,7 @@ export class PostsController {
   async getCompanyPosts(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { companyId } = request.params as { companyId: string };
-    const queryData = getCompanyPostsSchema.parse(request.query);
+    const queryData = getCompanyPostsSchema.omit({ companyId: true }).parse(request.query);
     
     const result = await this.postsService.getCompanyPosts(
       { ...queryData, companyId },

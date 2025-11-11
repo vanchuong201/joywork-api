@@ -32,6 +32,7 @@ async function main() {
     prisma.message.deleteMany({}),
     prisma.application.deleteMany({}),
     prisma.like.deleteMany({}),
+    prisma.jobFavorite.deleteMany({}),
     prisma.follow.deleteMany({}),
     prisma.job.deleteMany({}),
     prisma.post.deleteMany({}),
@@ -59,6 +60,7 @@ async function main() {
   // Create users
   const passwordHash = await bcrypt.hash("password123", 10);
   const users = [] as { id: string; email: string }[];
+  const companyMembersMap: Record<string, { userId: string; role: CompanyMemberRole }[]> = {};
   // Named test accounts
   const namedUsers = [
     { email: "admin@joywork.dev", role: UserRole.ADMIN, name: "System Admin" },
@@ -165,13 +167,17 @@ async function main() {
     const memberCount = randInt(1, 4);
     const members = [owner, admin, ...pool.slice(2, 2 + memberCount)];
     for (const [idx, m] of members.entries()) {
-      await prisma.companyMember.create({
+      const role = idx === 0 ? CompanyMemberRole.OWNER : idx === 1 ? CompanyMemberRole.ADMIN : CompanyMemberRole.MEMBER;
+      const membership = await prisma.companyMember.create({
         data: {
           userId: m.id,
           companyId: c.id,
-          role: idx === 0 ? CompanyMemberRole.OWNER : idx === 1 ? CompanyMemberRole.ADMIN : CompanyMemberRole.MEMBER,
+          role,
         },
+        select: { userId: true, role: true },
       });
+      companyMembersMap[c.id] = companyMembersMap[c.id] ?? [];
+      companyMembersMap[c.id].push(membership);
     }
   }
 
@@ -181,9 +187,12 @@ async function main() {
     const postCount = randInt(6, 10);
     for (let i = 0; i < postCount; i++) {
       const type = sample([PostType.STORY, PostType.ANNOUNCEMENT, PostType.EVENT]);
+      const companyMembers = companyMembersMap[c.id] ?? [];
+      const createdBy = companyMembers.length ? sample(companyMembers) : null;
       const p = await prisma.post.create({
         data: {
           companyId: c.id,
+          createdById: createdBy?.userId,
           title: `${type === PostType.STORY ? "Story" : type === PostType.ANNOUNCEMENT ? "Announcement" : "Event"} #${i + 1}`,
           content: "This is a sample post content to test card layout, line clamp and actions.",
           excerpt: Math.random() < 0.5 ? "Short excerpt for SEO and previews." : null,
@@ -200,12 +209,23 @@ async function main() {
         const data = Array.from({ length: imgCount }).map((_, k) => ({
           postId: p.id,
           url: `https://picsum.photos/seed/${c.slug}-p${i + 1}-${k + 1}/1200/675`,
+          storageKey: null,
           width: 1200,
           height: 675,
           order: k,
         }));
         await prisma.postImage.createMany({ data });
       }
+      await prisma.postAuditLog.create({
+        data: {
+          postId: p.id,
+          actorId: createdBy?.userId,
+          action: "CREATE",
+          metadata: {
+            seeded: true,
+          },
+        },
+      });
       allPosts.push(p);
     }
   }
@@ -249,6 +269,19 @@ async function main() {
         select: { id: true, companyId: true },
       });
       allJobs.push(j);
+    }
+  }
+
+  // Job favorites (saved jobs)
+  for (const u of users) {
+    const favoriteJobs = [...allJobs].sort(() => 0.5 - Math.random()).slice(0, randInt(1, 5));
+    for (const j of favoriteJobs) {
+      await prisma.jobFavorite.create({
+        data: {
+          userId: u.id,
+          jobId: j.id,
+        },
+      });
     }
   }
 

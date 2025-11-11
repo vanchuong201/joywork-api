@@ -552,6 +552,78 @@ export async function jobsRoutes(fastify: FastifyInstance) {
     },
   }, jobsController.getMyApplications.bind(jobsController));
 
+  // Get my saved jobs
+  fastify.get('/me/favorites', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Get my saved jobs',
+      tags: ['Jobs'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
+          limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                favorites: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      jobId: { type: 'string' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      job: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          title: { type: 'string' },
+                          location: { type: 'string', nullable: true },
+                          remote: { type: 'boolean' },
+                          employmentType: { type: 'string' },
+                          experienceLevel: { type: 'string' },
+                          salaryMin: { type: 'number', nullable: true },
+                          salaryMax: { type: 'number', nullable: true },
+                          currency: { type: 'string' },
+                          company: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string' },
+                              name: { type: 'string' },
+                              slug: { type: 'string' },
+                              logoUrl: { type: 'string', nullable: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, jobsController.getMyFavorites.bind(jobsController));
+
   // Update job
   fastify.patch('/:jobId', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],

@@ -79,6 +79,17 @@ export class CompaniesController {
     });
   }
 
+  // Get user follows
+  async getMyFollows(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+
+    const follows = await this.companiesService.getUserFollows(userId);
+
+    return reply.send({
+      data: { follows },
+    });
+  }
+
   // Add company member
   async addCompanyMember(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;

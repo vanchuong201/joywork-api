@@ -135,6 +135,15 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                         },
                       },
                     },
+                    stats: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        posts: { type: 'number' },
+                        jobs: { type: 'number' },
+                        followers: { type: 'number' },
+                      },
+                    },
                   },
                 },
               },
@@ -263,6 +272,58 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
     },
   }, companiesController.getMyCompanies.bind(companiesController));
+
+  // Get companies the user follows
+  fastify.get('/me/follows', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Get companies the current user follows',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                follows: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      followId: { type: 'string' },
+                      followedAt: { type: 'string', format: 'date-time' },
+                      company: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          name: { type: 'string' },
+                          slug: { type: 'string' },
+                          tagline: { type: 'string', nullable: true },
+                          description: { type: 'string', nullable: true },
+                          logoUrl: { type: 'string', nullable: true },
+                          coverUrl: { type: 'string', nullable: true },
+                          website: { type: 'string', nullable: true },
+                          location: { type: 'string', nullable: true },
+                          industry: { type: 'string', nullable: true },
+                          size: { type: 'string', nullable: true },
+                          foundedYear: { type: 'number', nullable: true },
+                          isVerified: { type: 'boolean' },
+                          createdAt: { type: 'string', format: 'date-time' },
+                          updatedAt: { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getMyFollows.bind(companiesController));
 
   // Update company
   fastify.patch('/:companyId', {

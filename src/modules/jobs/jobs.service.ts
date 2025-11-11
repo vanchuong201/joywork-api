@@ -9,6 +9,7 @@ import {
   GetApplicationsInput,
   UpdateApplicationStatusInput,
   GetMyApplicationsInput,
+  GetMyFavoritesInput,
 } from './jobs.schema';
 
 export interface Job {
@@ -76,6 +77,29 @@ export interface Application {
       headline?: string;
       avatar?: string;
       cvUrl?: string;
+    };
+  };
+}
+
+export interface JobFavorite {
+  id: string;
+  jobId: string;
+  createdAt: Date;
+  job: {
+    id: string;
+    title: string;
+    location?: string | null;
+    remote: boolean;
+    employmentType: string;
+    experienceLevel: string;
+    salaryMin?: number | null;
+    salaryMax?: number | null;
+    currency: string;
+    company: {
+      id: string;
+      name: string;
+      slug: string;
+      logoUrl?: string | null;
     };
   };
 }
@@ -711,6 +735,72 @@ export class JobsService {
           name: app.user.name,
           email: app.user.email,
           profile: app.user.profile,
+        },
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  // Get my saved jobs
+  async getMyFavorites(userId: string, data: GetMyFavoritesInput): Promise<{
+    favorites: JobFavorite[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const { page, limit } = data;
+    const skip = (page - 1) * limit;
+
+    const [favorites, total] = await Promise.all([
+      prisma.jobFavorite.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          job: {
+            include: {
+              company: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  logoUrl: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.jobFavorite.count({ where: { userId } }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      favorites: favorites.map(fav => ({
+        id: fav.id,
+        jobId: fav.jobId,
+        createdAt: fav.createdAt,
+        job: {
+          id: fav.job.id,
+          title: fav.job.title,
+          location: fav.job.location,
+          remote: fav.job.remote,
+          employmentType: fav.job.employmentType,
+          experienceLevel: fav.job.experienceLevel,
+          salaryMin: fav.job.salaryMin,
+          salaryMax: fav.job.salaryMax,
+          currency: fav.job.currency,
+          company: fav.job.company,
         },
       })),
       pagination: {

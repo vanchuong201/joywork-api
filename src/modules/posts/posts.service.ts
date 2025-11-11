@@ -1,5 +1,7 @@
+import { PostAuditAction } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { deleteS3Objects } from '@/shared/storage/s3';
 import {
   CreatePostInput,
   UpdatePostInput,
@@ -24,6 +26,11 @@ export interface Post {
   publishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  createdBy?: {
+    id: string;
+    email: string;
+    name?: string | null;
+  } | null;
   company: {
     id: string;
     name: string;
@@ -48,15 +55,58 @@ export interface PostWithLikes extends Post {
   isLiked: boolean;
 }
 
+function mapPostEntity(post: any): Post {
+  return {
+    id: post.id,
+    companyId: post.companyId,
+    title: post.title,
+    content: post.content,
+    excerpt: post.excerpt ?? undefined,
+    coverUrl: post.coverUrl ?? undefined,
+    type: post.type,
+    visibility: post.visibility,
+    publishedAt: post.publishedAt ?? undefined,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    createdBy: post.createdBy
+      ? {
+          id: post.createdBy.id,
+          email: post.createdBy.email,
+          name: post.createdBy.name ?? undefined,
+        }
+      : null,
+    company: post.company,
+    images: post.images
+      ? post.images.map((image: any) => ({
+          id: image.id,
+          url: image.url,
+          width: image.width ?? undefined,
+          height: image.height ?? undefined,
+          order: image.order ?? undefined,
+        }))
+      : undefined,
+    likes: post.likes.map((like: any) => ({
+      id: like.id,
+      userId: like.userId,
+      user: {
+        id: like.user.id,
+        name: like.user.name,
+      },
+    })),
+    _count: post._count,
+  };
+}
+
 export class PostsService {
   // Create post
   async createPost(companyId: string, userId: string, data: CreatePostInput): Promise<Post> {
-    // Check if user is member of company
+    const { images, publishNow, publishedAt, ...postData } = data;
+
     const membership = await prisma.companyMember.findFirst({
       where: {
         userId,
         companyId,
-        role: { in: ['OWNER', 'ADMIN', 'MEMBER'] },
+        role: { in: ['OWNER', 'ADMIN'] },
       },
     });
 
@@ -64,12 +114,32 @@ export class PostsService {
       throw new AppError('You do not have permission to create posts for this company', 403, 'FORBIDDEN');
     }
 
-    // Create post
+    const normalizedImages = images?.map((image, index) => ({
+      url: image.url,
+      storageKey: image.key,
+      width: image.width ?? null,
+      height: image.height ?? null,
+      order: image.order ?? index,
+    }));
+
+    const resolvedPublishedAt = publishedAt
+      ? new Date(publishedAt)
+      : publishNow
+      ? new Date()
+      : null;
+
     const post = await prisma.post.create({
       data: {
-        ...data,
+        ...postData,
         companyId,
-        publishedAt: data.publishedAt ? new Date(data.publishedAt) : null,
+        createdById: userId,
+        coverUrl: normalizedImages && normalizedImages.length > 0 ? normalizedImages[0].url : null,
+        publishedAt: resolvedPublishedAt,
+        images: normalizedImages && normalizedImages.length
+          ? {
+              create: normalizedImages,
+            }
+          : undefined,
       },
       include: {
         company: {
@@ -80,8 +150,15 @@ export class PostsService {
             logoUrl: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
         images: {
-          select: { id: true, url: true, width: true, height: true, order: true },
+          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
           orderBy: { order: 'asc' },
         },
         likes: {
@@ -102,30 +179,21 @@ export class PostsService {
       },
     });
 
-    return {
-      id: post.id,
-      companyId: post.companyId,
-      title: post.title,
-      content: post.content,
-      excerpt: post.excerpt,
-      coverUrl: (post as any).coverUrl,
-      type: post.type,
-      visibility: post.visibility,
-      publishedAt: post.publishedAt,
-      createdAt: post.createdAt,
-      updatedAt: post.updatedAt,
-      company: post.company,
-      images: (post as any).images,
-      likes: post.likes.map(like => ({
-        id: like.id,
-        userId: like.userId,
-        user: {
-          id: like.user.id,
-          name: like.user.name,
+    await prisma.postAuditLog.create({
+      data: {
+        postId: post.id,
+        actorId: userId,
+        action: PostAuditAction.CREATE,
+        metadata: {
+          postId: post.id,
+          imageCount: normalizedImages?.length ?? 0,
+          visibility: post.visibility,
+          type: post.type,
         },
-      })),
-      _count: post._count,
-    };
+      },
+    });
+
+    return mapPostEntity(post);
   }
 
   // Update post
@@ -141,6 +209,11 @@ export class PostsService {
             },
           },
         },
+        images: {
+          select: {
+            storageKey: true,
+          },
+        },
       },
     });
 
@@ -150,7 +223,7 @@ export class PostsService {
 
     // Check if user is member of company
     const membership = post.company.members[0];
-    if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
+    if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
       throw new AppError('You do not have permission to update this post', 403, 'FORBIDDEN');
     }
 
@@ -171,8 +244,15 @@ export class PostsService {
             logoUrl: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
         images: {
-          select: { id: true, url: true, width: true, height: true, order: true },
+          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
           orderBy: { order: 'asc' },
         },
         likes: {
@@ -193,30 +273,19 @@ export class PostsService {
       },
     });
 
-    return {
-      id: updatedPost.id,
-      companyId: updatedPost.companyId,
-      title: updatedPost.title,
-      content: updatedPost.content,
-      excerpt: updatedPost.excerpt,
-      coverUrl: (updatedPost as any).coverUrl,
-      type: updatedPost.type,
-      visibility: updatedPost.visibility,
-      publishedAt: updatedPost.publishedAt,
-      createdAt: updatedPost.createdAt,
-      updatedAt: updatedPost.updatedAt,
-      company: updatedPost.company,
-      images: (updatedPost as any).images,
-      likes: updatedPost.likes.map(like => ({
-        id: like.id,
-        userId: like.userId,
-        user: {
-          id: like.user.id,
-          name: like.user.name,
+    await prisma.postAuditLog.create({
+      data: {
+        postId,
+        actorId: userId,
+        action: PostAuditAction.UPDATE,
+        metadata: {
+          postId,
+          fields: Object.keys(data),
         },
-      })),
-      _count: updatedPost._count,
-    };
+      },
+    });
+
+    return mapPostEntity(updatedPost);
   }
 
   // Get post by ID
@@ -232,8 +301,15 @@ export class PostsService {
             logoUrl: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
         images: {
-          select: { id: true, url: true, width: true, height: true, order: true },
+          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
           orderBy: { order: 'asc' },
         },
         likes: {
@@ -272,29 +348,9 @@ export class PostsService {
       isLiked = !!like;
     }
 
+    const base = mapPostEntity(post);
     return {
-      id: post.id,
-      companyId: post.companyId,
-      title: post.title,
-      content: post.content,
-      excerpt: post.excerpt,
-      coverUrl: (post as any).coverUrl,
-      type: post.type,
-      visibility: post.visibility,
-      publishedAt: post.publishedAt,
-      createdAt: post.createdAt,
-      updatedAt: post.updatedAt,
-      company: post.company,
-      images: (post as any).images,
-      likes: post.likes.map(like => ({
-        id: like.id,
-        userId: like.userId,
-        user: {
-          id: like.user.id,
-          name: like.user.name,
-        },
-      })),
-      _count: post._count,
+      ...base,
       isLiked,
     };
   }
@@ -339,8 +395,15 @@ export class PostsService {
               logoUrl: true,
             },
           },
+          createdBy: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
           images: {
-            select: { id: true, url: true, width: true, height: true, order: true },
+            select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
             orderBy: { order: 'asc' },
           },
           likes: {
@@ -382,28 +445,7 @@ export class PostsService {
       }
 
       postsWithLikes.push({
-        id: post.id,
-        companyId: post.companyId,
-        title: post.title,
-        content: post.content,
-        excerpt: post.excerpt,
-        coverUrl: (post as any).coverUrl,
-        type: post.type,
-        visibility: post.visibility,
-        publishedAt: post.publishedAt,
-        createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
-        company: post.company,
-        images: (post as any).images,
-        likes: post.likes.map(like => ({
-          id: like.id,
-          userId: like.userId,
-          user: {
-            id: like.user.id,
-            name: like.user.name,
-          },
-        })),
-        _count: post._count,
+        ...mapPostEntity(post),
         isLiked,
       });
     }
@@ -462,8 +504,15 @@ export class PostsService {
               logoUrl: true,
             },
           },
+          createdBy: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
           images: {
-            select: { id: true, url: true, width: true, height: true, order: true },
+            select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
             orderBy: { order: 'asc' },
           },
           likes: {
@@ -505,28 +554,7 @@ export class PostsService {
       }
 
       postsWithLikes.push({
-        id: post.id,
-        companyId: post.companyId,
-        title: post.title,
-        content: post.content,
-        excerpt: post.excerpt,
-        coverUrl: (post as any).coverUrl,
-        type: post.type,
-        visibility: post.visibility,
-        publishedAt: post.publishedAt,
-        createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
-        company: post.company,
-        images: (post as any).images,
-        likes: post.likes.map(like => ({
-          id: like.id,
-          userId: like.userId,
-          user: {
-            id: like.user.id,
-            name: like.user.name,
-          },
-        })),
-        _count: post._count,
+        ...mapPostEntity(post),
         isLiked,
       });
     }
@@ -625,7 +653,7 @@ export class PostsService {
 
     // Check if user is member of company
     const membership = post.company.members[0];
-    if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
+    if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
       throw new AppError('You do not have permission to publish this post', 403, 'FORBIDDEN');
     }
 
@@ -634,6 +662,17 @@ export class PostsService {
       where: { id: postId },
       data: {
         publishedAt: new Date(),
+      },
+    });
+
+    await prisma.postAuditLog.create({
+      data: {
+        postId,
+        actorId: userId,
+        action: PostAuditAction.PUBLISH,
+        metadata: {
+          postId,
+        },
       },
     });
   }
@@ -660,7 +699,7 @@ export class PostsService {
 
     // Check if user is member of company
     const membership = post.company.members[0];
-    if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
+    if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
       throw new AppError('You do not have permission to unpublish this post', 403, 'FORBIDDEN');
     }
 
@@ -669,6 +708,17 @@ export class PostsService {
       where: { id: postId },
       data: {
         publishedAt: null,
+      },
+    });
+
+    await prisma.postAuditLog.create({
+      data: {
+        postId,
+        actorId: userId,
+        action: PostAuditAction.UNPUBLISH,
+        metadata: {
+          postId,
+        },
       },
     });
   }
@@ -699,7 +749,28 @@ export class PostsService {
       throw new AppError('You do not have permission to delete this post', 403, 'FORBIDDEN');
     }
 
-    // Delete post
+    const imageKeys = post.images
+      .map((image) => image.storageKey)
+      .filter((key): key is string => Boolean(key));
+
+    if (imageKeys.length) {
+      await deleteS3Objects(imageKeys);
+    }
+
+    await prisma.postAuditLog.create({
+      data: {
+        postId,
+        actorId: userId,
+        action: PostAuditAction.DELETE,
+        metadata: {
+          postId,
+          title: post.title,
+          companyId: post.companyId,
+          imageCount: imageKeys.length,
+        },
+      },
+    });
+
     await prisma.post.delete({
       where: { id: postId },
     });

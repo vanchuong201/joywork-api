@@ -44,6 +44,22 @@ export async function postsRoutes(fastify: FastifyInstance) {
             description: 'Post visibility'
           },
           publishedAt: { type: 'string', format: 'date-time', description: 'Publish date (optional)' },
+          publishNow: { type: 'boolean', default: true, description: 'Publish immediately if true (ignored when publishedAt provided)' },
+          images: {
+            type: 'array',
+            description: 'Optional gallery images (max 8)',
+            items: {
+              type: 'object',
+              required: ['key', 'url'],
+              properties: {
+                key: { type: 'string', description: 'S3 object key returned from presign API' },
+                url: { type: 'string', description: 'Public accessible URL of the uploaded image' },
+                width: { type: 'number', description: 'Image width in px' },
+                height: { type: 'number', description: 'Image height in px' },
+                order: { type: 'number', description: 'Display order in gallery' },
+              },
+            },
+          },
         },
       },
       response: {
@@ -67,6 +83,15 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     publishedAt: { type: 'string', format: 'date-time', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                    createdBy: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        id: { type: 'string' },
+                        email: { type: 'string' },
+                        name: { type: 'string', nullable: true },
+                      },
+                    },
                     images: {
                       type: 'array',
                       items: {
@@ -156,6 +181,15 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     publishedAt: { type: 'string', format: 'date-time', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                    createdBy: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        id: { type: 'string' },
+                        email: { type: 'string' },
+                        name: { type: 'string', nullable: true },
+                      },
+                    },
                     images: {
                       type: 'array',
                       items: {
@@ -265,6 +299,15 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      createdBy: {
+                        type: 'object',
+                        nullable: true,
+                        properties: {
+                          id: { type: 'string' },
+                          email: { type: 'string' },
+                          name: { type: 'string', nullable: true },
+                        },
+                      },
                       images: {
                         type: 'array',
                         items: {
@@ -373,6 +416,15 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      createdBy: {
+                        type: 'object',
+                        nullable: true,
+                        properties: {
+                          id: { type: 'string' },
+                          email: { type: 'string' },
+                          name: { type: 'string', nullable: true },
+                        },
+                      },
                       images: {
                         type: 'array',
                         items: {
@@ -493,6 +545,15 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     publishedAt: { type: 'string', format: 'date-time', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                    createdBy: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        id: { type: 'string' },
+                        email: { type: 'string' },
+                        name: { type: 'string', nullable: true },
+                      },
+                    },
                     images: {
                       type: 'array',
                       items: {

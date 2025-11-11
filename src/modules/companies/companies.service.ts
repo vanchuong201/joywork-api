@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import {
@@ -22,9 +23,53 @@ export interface Company {
   industry?: string;
   size?: string;
   foundedYear?: number;
+  headcount?: number;
+  headcountNote?: string;
+  metrics?: CompanyMetric[];
+  profileStory?: CompanyStoryBlock[];
+  highlights?: CompanyHighlight[];
   isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CompanyMetric {
+  label: string;
+  value: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface CompanyStoryStat {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface CompanyStoryMediaItem {
+  url: string;
+  caption?: string;
+}
+
+export interface CompanyStoryBlock {
+  id?: string;
+  type: 'text' | 'list' | 'quote' | 'stats' | 'media';
+  title?: string;
+  subtitle?: string;
+  body?: string;
+  items?: string[];
+  stats?: CompanyStoryStat[];
+  quote?: {
+    text: string;
+    author?: string;
+    role?: string;
+  };
+  media?: CompanyStoryMediaItem[];
+}
+
+export interface CompanyHighlight {
+  label: string;
+  description?: string;
 }
 
 export interface CompanyWithMembers {
@@ -40,6 +85,11 @@ export interface CompanyWithMembers {
   industry?: string;
   size?: string;
   foundedYear?: number;
+  headcount?: number;
+  headcountNote?: string;
+  metrics?: CompanyMetric[];
+  profileStory?: CompanyStoryBlock[];
+  highlights?: CompanyHighlight[];
   isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -54,11 +104,22 @@ export interface CompanyWithMembers {
       name?: string;
     };
   }>;
+  stats?: {
+    posts: number;
+    jobs: number;
+    followers: number;
+  };
 }
 
 export interface CompanyMembershipSummary {
   membershipId: string;
   role: string;
+  company: Company;
+}
+
+export interface CompanyFollowSummary {
+  followId: string;
+  followedAt: Date;
   company: Company;
 }
 
@@ -75,9 +136,14 @@ export class CompaniesService {
     }
 
     // Create company
+    const { metrics, profileStory, highlights, ...rest } = data;
+
     const company = await prisma.company.create({
       data: {
-        ...data,
+        ...rest,
+        metrics: metrics ? (metrics as Prisma.InputJsonValue) : undefined,
+        profileStory: profileStory ? (profileStory as Prisma.InputJsonValue) : undefined,
+        highlights: highlights ? (highlights as Prisma.InputJsonValue) : undefined,
       },
     });
 
@@ -103,6 +169,11 @@ export class CompaniesService {
       industry: company.industry,
       size: company.size,
       foundedYear: company.foundedYear,
+      headcount: company.headcount ?? undefined,
+      headcountNote: company.headcountNote ?? undefined,
+      metrics: (company.metrics as CompanyMetric[] | null) ?? undefined,
+      profileStory: (company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
+      highlights: (company.highlights as CompanyHighlight[] | null) ?? undefined,
       isVerified: company.isVerified,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
@@ -139,10 +210,15 @@ export class CompaniesService {
     }
 
     // Update company
+    const { metrics, profileStory, highlights, ...rest } = data;
+
     const company = await prisma.company.update({
       where: { id: companyId },
       data: {
-        ...data,
+        ...rest,
+        metrics: metrics === undefined ? undefined : (metrics as Prisma.InputJsonValue),
+        profileStory: profileStory === undefined ? undefined : (profileStory as Prisma.InputJsonValue),
+        highlights: highlights === undefined ? undefined : (highlights as Prisma.InputJsonValue),
         updatedAt: new Date(),
       },
     });
@@ -160,6 +236,11 @@ export class CompaniesService {
       industry: company.industry,
       size: company.size,
       foundedYear: company.foundedYear,
+      headcount: company.headcount ?? undefined,
+      headcountNote: company.headcountNote ?? undefined,
+      metrics: (company.metrics as CompanyMetric[] | null) ?? undefined,
+      profileStory: (company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
+      highlights: (company.highlights as CompanyHighlight[] | null) ?? undefined,
       isVerified: company.isVerified,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
@@ -182,6 +263,13 @@ export class CompaniesService {
             },
           },
         },
+        _count: {
+          select: {
+            posts: true,
+            jobs: true,
+            follows: true,
+          },
+        },
       },
     });
 
@@ -202,6 +290,11 @@ export class CompaniesService {
       industry: company.industry,
       size: company.size,
       foundedYear: company.foundedYear,
+      headcount: company.headcount ?? undefined,
+      headcountNote: company.headcountNote ?? undefined,
+      metrics: (company.metrics as CompanyMetric[] | null) ?? undefined,
+      profileStory: (company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
+      highlights: (company.highlights as CompanyHighlight[] | null) ?? undefined,
       isVerified: company.isVerified,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
@@ -216,6 +309,11 @@ export class CompaniesService {
           name: member.user.name,
         },
       })),
+      stats: company._count ? {
+        posts: company._count.posts,
+        jobs: company._count.jobs,
+        followers: company._count.follows,
+      } : undefined,
     };
   }
 
@@ -321,9 +419,52 @@ export class CompaniesService {
         industry: membership.company.industry,
         size: membership.company.size,
         foundedYear: membership.company.foundedYear,
+        headcount: membership.company.headcount ?? undefined,
+        headcountNote: membership.company.headcountNote ?? undefined,
+        metrics: (membership.company.metrics as CompanyMetric[] | null) ?? undefined,
+        profileStory: (membership.company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
+        highlights: (membership.company.highlights as CompanyHighlight[] | null) ?? undefined,
         isVerified: membership.company.isVerified,
         createdAt: membership.company.createdAt,
         updatedAt: membership.company.updatedAt,
+      },
+    }));
+  }
+
+  // Get companies the user follows
+  async getUserFollows(userId: string): Promise<CompanyFollowSummary[]> {
+    const follows = await prisma.follow.findMany({
+      where: { userId },
+      include: {
+        company: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return follows.map(follow => ({
+      followId: follow.id,
+      followedAt: follow.createdAt,
+      company: {
+        id: follow.company.id,
+        name: follow.company.name,
+        slug: follow.company.slug,
+        tagline: follow.company.tagline,
+        description: follow.company.description,
+        logoUrl: follow.company.logoUrl,
+        coverUrl: follow.company.coverUrl,
+        website: follow.company.website,
+        location: follow.company.location,
+        industry: follow.company.industry,
+        size: follow.company.size,
+        foundedYear: follow.company.foundedYear,
+        headcount: follow.company.headcount ?? undefined,
+        headcountNote: follow.company.headcountNote ?? undefined,
+        metrics: (follow.company.metrics as CompanyMetric[] | null) ?? undefined,
+        profileStory: (follow.company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
+        highlights: (follow.company.highlights as CompanyHighlight[] | null) ?? undefined,
+        isVerified: follow.company.isVerified,
+        createdAt: follow.company.createdAt,
+        updatedAt: follow.company.updatedAt,
       },
     }));
   }

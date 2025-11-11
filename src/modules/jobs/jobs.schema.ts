@@ -90,6 +90,12 @@ export const getMyApplicationsSchema = z.object({
   limit: z.coerce.number().min(1).max(50).default(20),
 });
 
+// Get my saved jobs schema
+export const getMyFavoritesSchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(50).default(20),
+});
+
 // Types
 export type CreateJobInput = z.infer<typeof createJobSchema>;
 export type UpdateJobInput = z.infer<typeof updateJobSchema>;
@@ -99,3 +105,4 @@ export type ApplyJobInput = z.infer<typeof applyJobSchema>;
 export type GetApplicationsInput = z.infer<typeof getApplicationsSchema>;
 export type UpdateApplicationStatusInput = z.infer<typeof updateApplicationStatusSchema>;
 export type GetMyApplicationsInput = z.infer<typeof getMyApplicationsSchema>;
+export type GetMyFavoritesInput = z.infer<typeof getMyFavoritesSchema>;

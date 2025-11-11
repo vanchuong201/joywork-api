@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+const postImageInputSchema = z.object({
+  key: z.string().min(1, 'Image key is required'),
+  url: z.string().url('Image URL must be valid'),
+  width: z.number().int().min(1).max(10000).optional(),
+  height: z.number().int().min(1).max(10000).optional(),
+  order: z.number().int().min(0).max(99).optional(),
+});
+
 // Create post schema
 export const createPostSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
@@ -8,6 +16,8 @@ export const createPostSchema = z.object({
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).default('STORY'),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
   publishedAt: z.string().datetime().optional(),
+  publishNow: z.boolean().default(true),
+  images: z.array(postImageInputSchema).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
 });
 
 // Update post schema
@@ -72,3 +82,4 @@ export type LikePostInput = z.infer<typeof likePostSchema>;
 export type UnlikePostInput = z.infer<typeof unlikePostSchema>;
 export type PublishPostInput = z.infer<typeof publishPostSchema>;
 export type UnpublishPostInput = z.infer<typeof unpublishPostSchema>;
+export type PostImageInput = z.infer<typeof postImageInputSchema>;
