@@ -10,37 +10,40 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
   const uploadsService = new UploadsService();
   const uploadsController = new UploadsController(uploadsService);
 
-  fastify.post('/presign', {
-    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
-    schema: {
-      description: 'Tạo presigned URL để tải ảnh lên S3',
-      tags: ['Uploads'],
-      security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['companyId', 'fileName', 'fileType', 'fileSize'],
-        properties: {
-          companyId: { type: 'string', description: 'ID của công ty', minLength: 1 },
-          fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
-          fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
-          fileSize: { type: 'number', description: 'Kích thước tệp (bytes)', minimum: 1 },
-        },
-      },
-      response: {
-        201: {
+  fastify.post(
+    '/presign',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tạo presigned URL để tải ảnh lên S3',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
           type: 'object',
+          required: ['companyId', 'fileName', 'fileType', 'fileSize'],
           properties: {
-            data: {
-              type: 'object',
-              properties: {
-                key: { type: 'string' },
-                uploadUrl: { type: 'string' },
-                assetUrl: { type: 'string' },
-                expiresIn: { type: 'number' },
-                maxFileSize: { type: 'number' },
-                allowedTypes: {
-                  type: 'array',
-                  items: { type: 'string' },
+            companyId: { type: 'string', description: 'ID của công ty', minLength: 1 },
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileSize: { type: 'number', description: 'Kích thước tệp (bytes)', minimum: 1 },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  uploadUrl: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                  expiresIn: { type: 'number' },
+                  maxFileSize: { type: 'number' },
+                  allowedTypes: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
                 },
               },
             },
@@ -48,7 +51,88 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
         },
       },
     },
-  }, uploadsController.createPresign.bind(uploadsController));
+    uploadsController.createPresign.bind(uploadsController),
+  );
+
+  fastify.post(
+    '/profile/avatar/presign',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tạo presigned URL để tải ảnh đại diện người dùng',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['fileName', 'fileType', 'fileSize'],
+          properties: {
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileSize: { type: 'number', description: 'Kích thước tệp (bytes)', minimum: 1 },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  uploadUrl: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                  expiresIn: { type: 'number' },
+                  maxFileSize: { type: 'number' },
+                  allowedTypes: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.createProfileAvatarPresign.bind(uploadsController),
+  );
+
+  fastify.post(
+    '/profile/avatar',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tải ảnh đại diện người dùng trực tiếp lên S3 thông qua máy chủ',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['fileName', 'fileType', 'fileData'],
+          properties: {
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileData: { type: 'string', description: 'Dữ liệu ảnh dạng base64' },
+            previousKey: { type: 'string' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadProfileAvatar.bind(uploadsController),
+  );
 
   fastify.delete('/object', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],

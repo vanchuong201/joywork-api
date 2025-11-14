@@ -121,6 +121,66 @@ export async function jobsRoutes(fastify: FastifyInstance) {
     },
   }, jobsController.createJob.bind(jobsController));
 
+  // Save job to favorites
+  fastify.post('/:jobId/favorite', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Save a job to favorites',
+      tags: ['Jobs'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['jobId'],
+        properties: {
+          jobId: { type: 'string', description: 'Job ID' },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, jobsController.saveJob.bind(jobsController));
+
+  // Remove job from favorites
+  fastify.delete('/:jobId/favorite', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Remove a job from favorites',
+      tags: ['Jobs'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['jobId'],
+        properties: {
+          jobId: { type: 'string', description: 'Job ID' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, jobsController.removeFavorite.bind(jobsController));
+
   // Get job by ID
   fastify.get('/:jobId', {
     preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
@@ -563,7 +623,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         type: 'object',
         properties: {
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
-          limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
+          limit: { type: 'number', minimum: 1, maximum: 200, default: 20, description: 'Items per page' },
         },
       },
       response: {

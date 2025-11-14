@@ -70,7 +70,7 @@ export class UsersService {
   }
 
   // Update user profile
-  async updateProfile(userId: string, data: UpdateProfileInput): Promise<UserProfile> {
+  async updateProfile(userId: string, data: UpdateProfileInput): Promise<UserWithProfile> {
     // Check if user exists
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -80,34 +80,35 @@ export class UsersService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
+    const { name, ...profileInput } = data;
+
+    if (typeof name === 'string') {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { name },
+      });
+    }
+
     // Update or create profile
     const profile = await prisma.userProfile.upsert({
       where: { userId },
       update: {
-        ...data,
+        ...profileInput,
         updatedAt: new Date(),
       },
       create: {
         userId,
-        ...data,
+        ...profileInput,
       },
     });
 
-    return {
-      id: profile.id,
-      userId: profile.userId,
-      avatar: profile.avatar,
-      headline: profile.headline,
-      bio: profile.bio,
-      skills: profile.skills,
-      cvUrl: profile.cvUrl,
-      location: profile.location,
-      website: profile.website,
-      linkedin: profile.linkedin,
-      github: profile.github,
-      createdAt: profile.createdAt,
-      updatedAt: profile.updatedAt,
-    };
+    const updated = await this.getUserProfile(userId);
+
+    if (!updated) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    return updated;
   }
 
   // Search users

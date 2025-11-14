@@ -4,7 +4,6 @@ import { AppError } from '@/shared/errors/errorHandler';
 import {
   CreateCompanyInput,
   UpdateCompanyInput,
-  GetCompanyInput,
   SearchCompaniesInput,
   AddCompanyMemberInput,
   UpdateCompanyMemberInput,
@@ -138,12 +137,17 @@ export class CompaniesService {
     // Create company
     const { metrics, profileStory, highlights, ...rest } = data;
 
+    // Omit undefined properties to satisfy exactOptionalPropertyTypes
+    const baseData = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== undefined)
+    );
+
     const company = await prisma.company.create({
       data: {
-        ...rest,
-        metrics: metrics ? (metrics as Prisma.InputJsonValue) : undefined,
-        profileStory: profileStory ? (profileStory as Prisma.InputJsonValue) : undefined,
-        highlights: highlights ? (highlights as Prisma.InputJsonValue) : undefined,
+        ...(baseData as any),
+        ...(metrics !== undefined ? { metrics: metrics as Prisma.InputJsonValue } : {}),
+        ...(profileStory !== undefined ? { profileStory: profileStory as Prisma.InputJsonValue } : {}),
+        ...(highlights !== undefined ? { highlights: highlights as Prisma.InputJsonValue } : {}),
       },
     });
 
@@ -160,20 +164,20 @@ export class CompaniesService {
       id: company.id,
       name: company.name,
       slug: company.slug,
-      tagline: company.tagline,
-      description: company.description,
-      logoUrl: company.logoUrl,
-      coverUrl: company.coverUrl,
-      website: company.website,
-      location: company.location,
-      industry: company.industry,
-      size: company.size,
-      foundedYear: company.foundedYear,
-      headcount: company.headcount ?? undefined,
-      headcountNote: company.headcountNote ?? undefined,
-      metrics: (company.metrics as CompanyMetric[] | null) ?? undefined,
-      profileStory: (company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
-      highlights: (company.highlights as CompanyHighlight[] | null) ?? undefined,
+      ...(company.tagline != null ? { tagline: company.tagline } : {}),
+      ...(company.description != null ? { description: company.description } : {}),
+      ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+      ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
+      ...(company.website != null ? { website: company.website } : {}),
+      ...(company.location != null ? { location: company.location } : {}),
+      ...(company.industry != null ? { industry: company.industry } : {}),
+      ...(company.size != null ? { size: company.size } : {}),
+      ...(company.foundedYear != null ? { foundedYear: company.foundedYear } : {}),
+      ...(company.headcount != null ? { headcount: company.headcount } : {}),
+      ...(company.headcountNote != null ? { headcountNote: company.headcountNote } : {}),
+      ...(company.metrics != null ? { metrics: company.metrics as unknown as CompanyMetric[] } : {}),
+      ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
+      ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
@@ -196,10 +200,10 @@ export class CompaniesService {
     }
 
     // Check if new slug conflicts (if provided)
-    if (data.slug) {
+    if (data['slug']) {
       const existingCompany = await prisma.company.findFirst({
         where: {
-          slug: data.slug,
+          slug: data['slug'],
           id: { not: companyId },
         },
       });
@@ -212,13 +216,18 @@ export class CompaniesService {
     // Update company
     const { metrics, profileStory, highlights, ...rest } = data;
 
+    // Omit undefined properties to satisfy exactOptionalPropertyTypes
+    const updateBase = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== undefined)
+    );
+
     const company = await prisma.company.update({
       where: { id: companyId },
       data: {
-        ...rest,
-        metrics: metrics === undefined ? undefined : (metrics as Prisma.InputJsonValue),
-        profileStory: profileStory === undefined ? undefined : (profileStory as Prisma.InputJsonValue),
-        highlights: highlights === undefined ? undefined : (highlights as Prisma.InputJsonValue),
+        ...(updateBase as any),
+        ...(metrics !== undefined ? { metrics: metrics as Prisma.InputJsonValue } : {}),
+        ...(profileStory !== undefined ? { profileStory: profileStory as Prisma.InputJsonValue } : {}),
+        ...(highlights !== undefined ? { highlights: highlights as Prisma.InputJsonValue } : {}),
         updatedAt: new Date(),
       },
     });
@@ -227,20 +236,20 @@ export class CompaniesService {
       id: company.id,
       name: company.name,
       slug: company.slug,
-      tagline: company.tagline,
-      description: company.description,
-      logoUrl: company.logoUrl,
-      coverUrl: company.coverUrl,
-      website: company.website,
-      location: company.location,
-      industry: company.industry,
-      size: company.size,
-      foundedYear: company.foundedYear,
-      headcount: company.headcount ?? undefined,
-      headcountNote: company.headcountNote ?? undefined,
-      metrics: (company.metrics as CompanyMetric[] | null) ?? undefined,
-      profileStory: (company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
-      highlights: (company.highlights as CompanyHighlight[] | null) ?? undefined,
+      ...(company.tagline != null ? { tagline: company.tagline } : {}),
+      ...(company.description != null ? { description: company.description } : {}),
+      ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+      ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
+      ...(company.website != null ? { website: company.website } : {}),
+      ...(company.location != null ? { location: company.location } : {}),
+      ...(company.industry != null ? { industry: company.industry } : {}),
+      ...(company.size != null ? { size: company.size } : {}),
+      ...(company.foundedYear != null ? { foundedYear: company.foundedYear } : {}),
+      ...(company.headcount != null ? { headcount: company.headcount } : {}),
+      ...(company.headcountNote != null ? { headcountNote: company.headcountNote } : {}),
+      ...(company.metrics != null ? { metrics: company.metrics as unknown as CompanyMetric[] } : {}),
+      ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
+      ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
@@ -281,20 +290,20 @@ export class CompaniesService {
       id: company.id,
       name: company.name,
       slug: company.slug,
-      tagline: company.tagline,
-      description: company.description,
-      logoUrl: company.logoUrl,
-      coverUrl: company.coverUrl,
-      website: company.website,
-      location: company.location,
-      industry: company.industry,
-      size: company.size,
-      foundedYear: company.foundedYear,
-      headcount: company.headcount ?? undefined,
-      headcountNote: company.headcountNote ?? undefined,
-      metrics: (company.metrics as CompanyMetric[] | null) ?? undefined,
-      profileStory: (company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
-      highlights: (company.highlights as CompanyHighlight[] | null) ?? undefined,
+      ...(company.tagline != null ? { tagline: company.tagline } : {}),
+      ...(company.description != null ? { description: company.description } : {}),
+      ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+      ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
+      ...(company.website != null ? { website: company.website } : {}),
+      ...(company.location != null ? { location: company.location } : {}),
+      ...(company.industry != null ? { industry: company.industry } : {}),
+      ...(company.size != null ? { size: company.size } : {}),
+      ...(company.foundedYear != null ? { foundedYear: company.foundedYear } : {}),
+      ...(company.headcount != null ? { headcount: company.headcount } : {}),
+      ...(company.headcountNote != null ? { headcountNote: company.headcountNote } : {}),
+      ...(company.metrics != null ? { metrics: company.metrics as unknown as CompanyMetric[] } : {}),
+      ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
+      ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
@@ -306,14 +315,16 @@ export class CompaniesService {
         user: {
           id: member.user.id,
           email: member.user.email,
-          name: member.user.name,
+          ...(member.user.name != null ? { name: member.user.name } : {}),
         },
       })),
-      stats: company._count ? {
+      ...(company._count ? {
+        stats: {
         posts: company._count.posts,
         jobs: company._count.jobs,
         followers: company._count.follows,
-      } : undefined,
+        },
+      } : {}),
     };
   }
 
@@ -371,15 +382,15 @@ export class CompaniesService {
         id: company.id,
         name: company.name,
         slug: company.slug,
-        tagline: company.tagline,
-        description: company.description,
-        logoUrl: company.logoUrl,
-        coverUrl: company.coverUrl,
-        website: company.website,
-        location: company.location,
-        industry: company.industry,
-        size: company.size,
-        foundedYear: company.foundedYear,
+        ...(company.tagline != null ? { tagline: company.tagline } : {}),
+        ...(company.description != null ? { description: company.description } : {}),
+        ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+        ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
+        ...(company.website != null ? { website: company.website } : {}),
+        ...(company.location != null ? { location: company.location } : {}),
+        ...(company.industry != null ? { industry: company.industry } : {}),
+        ...(company.size != null ? { size: company.size } : {}),
+        ...(company.foundedYear != null ? { foundedYear: company.foundedYear } : {}),
         isVerified: company.isVerified,
         createdAt: company.createdAt,
         updatedAt: company.updatedAt,
@@ -410,20 +421,20 @@ export class CompaniesService {
         id: membership.company.id,
         name: membership.company.name,
         slug: membership.company.slug,
-        tagline: membership.company.tagline,
-        description: membership.company.description,
-        logoUrl: membership.company.logoUrl,
-        coverUrl: membership.company.coverUrl,
-        website: membership.company.website,
-        location: membership.company.location,
-        industry: membership.company.industry,
-        size: membership.company.size,
-        foundedYear: membership.company.foundedYear,
-        headcount: membership.company.headcount ?? undefined,
-        headcountNote: membership.company.headcountNote ?? undefined,
-        metrics: (membership.company.metrics as CompanyMetric[] | null) ?? undefined,
-        profileStory: (membership.company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
-        highlights: (membership.company.highlights as CompanyHighlight[] | null) ?? undefined,
+        ...(membership.company.tagline != null ? { tagline: membership.company.tagline } : {}),
+        ...(membership.company.description != null ? { description: membership.company.description } : {}),
+        ...(membership.company.logoUrl != null ? { logoUrl: membership.company.logoUrl } : {}),
+        ...(membership.company.coverUrl != null ? { coverUrl: membership.company.coverUrl } : {}),
+        ...(membership.company.website != null ? { website: membership.company.website } : {}),
+        ...(membership.company.location != null ? { location: membership.company.location } : {}),
+        ...(membership.company.industry != null ? { industry: membership.company.industry } : {}),
+        ...(membership.company.size != null ? { size: membership.company.size } : {}),
+        ...(membership.company.foundedYear != null ? { foundedYear: membership.company.foundedYear } : {}),
+        ...(membership.company.headcount != null ? { headcount: membership.company.headcount } : {}),
+        ...(membership.company.headcountNote != null ? { headcountNote: membership.company.headcountNote } : {}),
+        ...(membership.company.metrics != null ? { metrics: membership.company.metrics as unknown as CompanyMetric[] } : {}),
+        ...(membership.company.profileStory != null ? { profileStory: membership.company.profileStory as unknown as CompanyStoryBlock[] } : {}),
+        ...(membership.company.highlights != null ? { highlights: membership.company.highlights as unknown as CompanyHighlight[] } : {}),
         isVerified: membership.company.isVerified,
         createdAt: membership.company.createdAt,
         updatedAt: membership.company.updatedAt,
@@ -448,20 +459,20 @@ export class CompaniesService {
         id: follow.company.id,
         name: follow.company.name,
         slug: follow.company.slug,
-        tagline: follow.company.tagline,
-        description: follow.company.description,
-        logoUrl: follow.company.logoUrl,
-        coverUrl: follow.company.coverUrl,
-        website: follow.company.website,
-        location: follow.company.location,
-        industry: follow.company.industry,
-        size: follow.company.size,
-        foundedYear: follow.company.foundedYear,
-        headcount: follow.company.headcount ?? undefined,
-        headcountNote: follow.company.headcountNote ?? undefined,
-        metrics: (follow.company.metrics as CompanyMetric[] | null) ?? undefined,
-        profileStory: (follow.company.profileStory as CompanyStoryBlock[] | null) ?? undefined,
-        highlights: (follow.company.highlights as CompanyHighlight[] | null) ?? undefined,
+        ...(follow.company.tagline != null ? { tagline: follow.company.tagline } : {}),
+        ...(follow.company.description != null ? { description: follow.company.description } : {}),
+        ...(follow.company.logoUrl != null ? { logoUrl: follow.company.logoUrl } : {}),
+        ...(follow.company.coverUrl != null ? { coverUrl: follow.company.coverUrl } : {}),
+        ...(follow.company.website != null ? { website: follow.company.website } : {}),
+        ...(follow.company.location != null ? { location: follow.company.location } : {}),
+        ...(follow.company.industry != null ? { industry: follow.company.industry } : {}),
+        ...(follow.company.size != null ? { size: follow.company.size } : {}),
+        ...(follow.company.foundedYear != null ? { foundedYear: follow.company.foundedYear } : {}),
+        ...(follow.company.headcount != null ? { headcount: follow.company.headcount } : {}),
+        ...(follow.company.headcountNote != null ? { headcountNote: follow.company.headcountNote } : {}),
+        ...(follow.company.metrics != null ? { metrics: follow.company.metrics as unknown as CompanyMetric[] } : {}),
+        ...(follow.company.profileStory != null ? { profileStory: follow.company.profileStory as unknown as CompanyStoryBlock[] } : {}),
+        ...(follow.company.highlights != null ? { highlights: follow.company.highlights as unknown as CompanyHighlight[] } : {}),
         isVerified: follow.company.isVerified,
         createdAt: follow.company.createdAt,
         updatedAt: follow.company.updatedAt,
@@ -548,6 +559,52 @@ export class CompaniesService {
     // Remove member
     await prisma.companyMember.delete({
       where: { id: memberId },
+    });
+  }
+
+  async followCompany(companyId: string, userId: string): Promise<void> {
+    const company = await prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const existing = await prisma.follow.findUnique({
+      where: {
+        userId_companyId: {
+          userId,
+          companyId,
+        },
+      },
+    });
+
+    if (existing) {
+      throw new AppError('Already following this company', 409, 'ALREADY_FOLLOWING');
+    }
+
+    await prisma.follow.create({
+      data: {
+        userId,
+        companyId,
+      },
+    });
+  }
+
+  async unfollowCompany(companyId: string, userId: string): Promise<void> {
+    const follow = await prisma.follow.findUnique({
+      where: {
+        userId_companyId: {
+          userId,
+          companyId,
+        },
+      },
+    });
+
+    if (!follow) {
+      throw new AppError('You are not following this company', 404, 'FOLLOW_NOT_FOUND');
+    }
+
+    await prisma.follow.delete({
+      where: { id: follow.id },
     });
   }
 }

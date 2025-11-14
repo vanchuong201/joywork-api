@@ -10,6 +10,7 @@ import {
   updateApplicationStatusSchema,
   getMyApplicationsSchema,
   getMyFavoritesSchema,
+  jobIdParamsSchema,
 } from './jobs.schema';
 
 export class JobsController {
@@ -139,6 +140,28 @@ export class JobsController {
 
     return reply.send({
       data: result,
+    });
+  }
+
+  async saveJob(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { jobId } = jobIdParamsSchema.parse(request.params);
+
+    await this.jobsService.addFavorite(jobId, userId);
+
+    return reply.status(201).send({
+      data: { success: true },
+    });
+  }
+
+  async removeFavorite(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { jobId } = jobIdParamsSchema.parse(request.params);
+
+    await this.jobsService.removeFavorite(jobId, userId);
+
+    return reply.send({
+      data: { success: true },
     });
   }
 

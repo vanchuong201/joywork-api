@@ -34,10 +34,10 @@ export class UsersController {
     const userId = (request as any).user?.userId;
     const data = updateProfileSchema.parse(request.body);
     
-    const profile = await this.usersService.updateProfile(userId, data);
+    const user = await this.usersService.updateProfile(userId, data);
     
     return reply.send({
-      data: { profile },
+      data: { user },
     });
   }
 

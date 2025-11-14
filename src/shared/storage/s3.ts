@@ -52,3 +52,5 @@ export async function deleteS3Objects(keys: string[]): Promise<void> {
   );
 }
 
+export { s3Client };
+

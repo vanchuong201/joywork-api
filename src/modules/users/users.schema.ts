@@ -3,14 +3,19 @@ import { z } from 'zod';
 // Update profile schema
 export const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
-  headline: z.string().max(100, 'Headline must be less than 100 characters').optional(),
-  bio: z.string().max(500, 'Bio must be less than 500 characters').optional(),
+  avatar: z
+    .string()
+    .url('Invalid avatar URL')
+    .optional()
+    .nullable(),
+  headline: z.string().max(100, 'Headline must be less than 100 characters').optional().nullable(),
+  bio: z.string().max(500, 'Bio must be less than 500 characters').optional().nullable(),
   skills: z.array(z.string()).max(10, 'Maximum 10 skills allowed').optional(),
-  cvUrl: z.string().url('Invalid CV URL').optional(),
-  location: z.string().max(100, 'Location must be less than 100 characters').optional(),
-  website: z.string().url('Invalid website URL').optional(),
-  linkedin: z.string().url('Invalid LinkedIn URL').optional(),
-  github: z.string().url('Invalid GitHub URL').optional(),
+  cvUrl: z.string().url('Invalid CV URL').optional().nullable(),
+  location: z.string().max(100, 'Location must be less than 100 characters').optional().nullable(),
+  website: z.string().url('Invalid website URL').optional().nullable(),
+  linkedin: z.string().url('Invalid LinkedIn URL').optional().nullable(),
+  github: z.string().url('Invalid GitHub URL').optional().nullable(),
 });
 
 // Get user profile schema

@@ -1,10 +1,17 @@
 import { randomUUID } from 'crypto';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { buildS3ObjectUrl, createPresignedUploadUrl, deleteS3Objects } from '@/shared/storage/s3';
-import { CreatePresignInput, DeleteObjectInput } from './uploads.schema';
+import { buildS3ObjectUrl, createPresignedUploadUrl, deleteS3Objects, getS3BucketName, s3Client } from '@/shared/storage/s3';
+import {
+  CreatePresignInput,
+  DeleteObjectInput,
+  CreateProfileAvatarPresignInput,
+  UploadProfileAvatarInput,
+} from './uploads.schema';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+const AVATAR_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function getExtensionFromMime(mime: string): string | null {
@@ -26,7 +33,7 @@ function extractCompanyIdFromKey(key: string): string | null {
   if (parts[0] !== 'companies') {
     return null;
   }
-  return parts[1];
+  return parts[1] ?? null;
 }
 
 export class UploadsService {
@@ -80,6 +87,44 @@ export class UploadsService {
     };
   }
 
+  async createProfileAvatarPresignedUrl(userId: string, input: CreateProfileAvatarPresignInput) {
+    const { fileName, fileType, fileSize } = input;
+
+    if (fileSize > AVATAR_MAX_FILE_SIZE) {
+      throw new AppError('Kích thước ảnh đại diện tối đa 4MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    if (!ALLOWED_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng ảnh đại diện không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const extFromMime = getExtensionFromMime(fileType);
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `users/${userId}/avatar/${randomUUID()}${extension}`;
+
+    const uploadUrl = await createPresignedUploadUrl({
+      key,
+      contentType: fileType,
+      contentLength: fileSize,
+      expiresIn: 300,
+    });
+
+    return {
+      key,
+      uploadUrl,
+      assetUrl: buildS3ObjectUrl(key),
+      expiresIn: 300,
+      maxFileSize: AVATAR_MAX_FILE_SIZE,
+      allowedTypes: Array.from(ALLOWED_MIME_TYPES),
+    };
+  }
+
   async deleteObject(userId: string, input: DeleteObjectInput) {
     const { key } = input;
     const companyId = extractCompanyIdFromKey(key);
@@ -101,6 +146,61 @@ export class UploadsService {
     }
 
     await deleteS3Objects([key]);
+  }
+
+  async uploadProfileAvatar(userId: string, input: UploadProfileAvatarInput) {
+    const { fileName, fileType, fileData, previousKey } = input;
+
+    if (!ALLOWED_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng ảnh đại diện không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+
+    if (!buffer.length) {
+      throw new AppError('Ảnh đại diện không được rỗng', 400, 'EMPTY_FILE');
+    }
+
+    if (buffer.length > AVATAR_MAX_FILE_SIZE) {
+      throw new AppError('Kích thước ảnh đại diện tối đa 4MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const extFromMime = getExtensionFromMime(fileType);
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `users/${userId}/avatar/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: getS3BucketName(),
+        Key: key,
+        Body: buffer,
+        ContentType: fileType,
+        ContentLength: buffer.length,
+      }));
+    } catch (error) {
+      console.error('Failed to upload avatar to S3', error);
+      throw new AppError('Không thể tải ảnh đại diện, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    if (previousKey && previousKey.startsWith(`users/${userId}/avatar/`)) {
+      try {
+        await deleteS3Objects([previousKey]);
+      } catch (error) {
+        // ignore deletion errors to avoid blocking upload success
+        console.error('Failed to delete previous avatar', error);
+      }
+    }
+
+    return {
+      key,
+      assetUrl: buildS3ObjectUrl(key),
+    };
   }
 }
 

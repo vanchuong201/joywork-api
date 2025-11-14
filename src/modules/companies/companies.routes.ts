@@ -514,4 +514,64 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
     },
   }, companiesController.removeCompanyMember.bind(companiesController));
+
+  // Follow company
+  fastify.post('/:companyId/follow', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Follow a company',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                followed: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.followCompany.bind(companiesController));
+
+  // Unfollow company
+  fastify.delete('/:companyId/follow', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Unfollow a company',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                followed: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.unfollowCompany.bind(companiesController));
 }

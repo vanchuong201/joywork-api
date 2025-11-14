@@ -812,6 +812,48 @@ export class JobsService {
     };
   }
 
+  async addFavorite(jobId: string, userId: string): Promise<void> {
+    const job = await prisma.job.findUnique({ where: { id: jobId } });
+    if (!job) {
+      throw new AppError('Job not found', 404, 'JOB_NOT_FOUND');
+    }
+
+    const existing = await prisma.jobFavorite.findUnique({
+      where: {
+        userId_jobId: { userId, jobId },
+      },
+    });
+
+    if (existing) {
+      return;
+    }
+
+    await prisma.jobFavorite.create({
+      data: {
+        userId,
+        jobId,
+      },
+    });
+  }
+
+  async removeFavorite(jobId: string, userId: string): Promise<void> {
+    const existing = await prisma.jobFavorite.findUnique({
+      where: {
+        userId_jobId: { userId, jobId },
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('Job not saved', 404, 'JOB_NOT_SAVED');
+    }
+
+    await prisma.jobFavorite.delete({
+      where: {
+        userId_jobId: { userId, jobId },
+      },
+    });
+  }
+
   // Delete job
   async deleteJob(jobId: string, userId: string): Promise<void> {
     // Get job with company info

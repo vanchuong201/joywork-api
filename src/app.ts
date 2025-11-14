@@ -19,6 +19,7 @@ import { uploadsRoutes } from '@/modules/uploads/uploads.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
+    bodyLimit: 10 * 1024 * 1024, // allow up to 10MB payloads (base64 avatar uploads)
     logger: config.NODE_ENV === 'development' ? {
       level: config.LOG_LEVEL,
       transport: {
@@ -40,6 +41,8 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: config.FRONTEND_ORIGIN,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
   });
 
   await app.register(helmet, {

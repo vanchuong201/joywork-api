@@ -133,4 +133,30 @@ export class CompaniesController {
       },
     });
   }
+
+  async followCompany(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+
+    await this.companiesService.followCompany(companyId, userId);
+
+    return reply.status(201).send({
+      data: {
+        followed: true,
+      },
+    });
+  }
+
+  async unfollowCompany(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+
+    await this.companiesService.unfollowCompany(companyId, userId);
+
+    return reply.send({
+      data: {
+        followed: false,
+      },
+    });
+  }
 }
