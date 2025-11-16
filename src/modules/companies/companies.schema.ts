@@ -51,7 +51,7 @@ const baseCompanySchema = {
   name: z.string().min(2, 'Company name must be at least 2 characters'),
   slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
   tagline: z.string().max(150, 'Tagline must be less than 150 characters').optional(),
-  description: z.string().max(2000, 'Description must be less than 2000 characters').optional(),
+  description: z.string().max(10000, 'Description must be less than 10000 characters').optional(),
   logoUrl: z.string().url('Invalid logo URL').optional(),
   coverUrl: z.string().url('Invalid cover URL').optional(),
   website: z.string().url('Invalid website URL').optional(),

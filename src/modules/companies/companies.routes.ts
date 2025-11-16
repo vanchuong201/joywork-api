@@ -23,13 +23,13 @@ export async function companiesRoutes(fastify: FastifyInstance) {
         properties: {
           name: { type: 'string', minLength: 2, description: 'Company name' },
           slug: { type: 'string', minLength: 2, pattern: '^[a-z0-9-]+$', description: 'URL-friendly slug' },
-          tagline: { type: 'string', maxLength: 100, description: 'Company tagline' },
-          description: { type: 'string', maxLength: 1000, description: 'Company description' },
+          tagline: { type: 'string', maxLength: 150, description: 'Company tagline' },
+          description: { type: 'string', maxLength: 10000, description: 'Company description (HTML allowed, sanitized server-side)' },
           logoUrl: { type: 'string', format: 'uri', description: 'Company logo URL' },
           coverUrl: { type: 'string', format: 'uri', description: 'Company cover image URL' },
           website: { type: 'string', format: 'uri', description: 'Company website URL' },
-          location: { type: 'string', maxLength: 100, description: 'Company location' },
-          industry: { type: 'string', maxLength: 50, description: 'Company industry' },
+          location: { type: 'string', maxLength: 120, description: 'Company location' },
+          industry: { type: 'string', maxLength: 80, description: 'Company industry' },
           size: { 
             type: 'string', 
             enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
@@ -40,6 +40,98 @@ export async function companiesRoutes(fastify: FastifyInstance) {
             minimum: 1800, 
             maximum: 2025,
             description: 'Year company was founded'
+          },
+          headcount: {
+            type: 'number',
+            minimum: 1,
+            maximum: 200000,
+            description: 'Approximate headcount',
+          },
+          headcountNote: {
+            type: 'string',
+            maxLength: 200,
+            description: 'Additional note for headcount',
+          },
+          metrics: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['label', 'value'],
+              properties: {
+                id: { type: 'string' },
+                label: { type: 'string' },
+                value: { type: 'string' },
+                description: { type: 'string' },
+                icon: { type: 'string' },
+              },
+            },
+            description: 'Company metrics displayed internally',
+          },
+          profileStory: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['type'],
+              properties: {
+                id: { type: 'string' },
+                type: { type: 'string', enum: ['text', 'list', 'quote', 'stats', 'media'] },
+                title: { type: 'string' },
+                subtitle: { type: 'string' },
+                body: { type: 'string' },
+                items: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+                stats: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    required: ['label', 'value'],
+                    properties: {
+                      id: { type: 'string' },
+                      label: { type: 'string' },
+                      value: { type: 'string' },
+                      description: { type: 'string' },
+                    },
+                  },
+                },
+                quote: {
+                  type: 'object',
+                  required: ['text'],
+                  properties: {
+                    text: { type: 'string' },
+                    author: { type: 'string' },
+                    role: { type: 'string' },
+                  },
+                },
+                media: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    required: ['url'],
+                    properties: {
+                      id: { type: 'string' },
+                      url: { type: 'string', format: 'uri' },
+                      caption: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            description: 'Structured story blocks for company profile',
+          },
+          highlights: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['label'],
+              properties: {
+                id: { type: 'string' },
+                label: { type: 'string' },
+                description: { type: 'string' },
+              },
+            },
+            description: 'Key highlights about the company',
           },
         },
       },
@@ -65,6 +157,87 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                     industry: { type: 'string', nullable: true },
                     size: { type: 'string', nullable: true },
                     foundedYear: { type: 'number', nullable: true },
+                    headcount: { type: 'number', nullable: true },
+                    headcountNote: { type: 'string', nullable: true },
+                    metrics: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          label: { type: 'string' },
+                          value: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                          icon: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
+                    profileStory: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          type: { type: 'string', enum: ['text', 'list', 'quote', 'stats', 'media'] },
+                          title: { type: 'string', nullable: true },
+                          subtitle: { type: 'string', nullable: true },
+                          body: { type: 'string', nullable: true },
+                          items: {
+                            type: 'array',
+                            nullable: true,
+                            items: { type: 'string' },
+                          },
+                          stats: {
+                            type: 'array',
+                            nullable: true,
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', nullable: true },
+                                label: { type: 'string' },
+                                value: { type: 'string' },
+                                description: { type: 'string', nullable: true },
+                              },
+                            },
+                          },
+                          quote: {
+                            type: 'object',
+                            nullable: true,
+                            properties: {
+                              text: { type: 'string' },
+                              author: { type: 'string', nullable: true },
+                              role: { type: 'string', nullable: true },
+                            },
+                          },
+                          media: {
+                            type: 'array',
+                            nullable: true,
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', nullable: true },
+                                url: { type: 'string' },
+                                caption: { type: 'string', nullable: true },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    highlights: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          label: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
                     isVerified: { type: 'boolean' },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
@@ -112,6 +285,87 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                     industry: { type: 'string', nullable: true },
                     size: { type: 'string', nullable: true },
                     foundedYear: { type: 'number', nullable: true },
+                    headcount: { type: 'number', nullable: true },
+                    headcountNote: { type: 'string', nullable: true },
+                    metrics: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          label: { type: 'string' },
+                          value: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                          icon: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
+                    profileStory: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          type: { type: 'string', enum: ['text', 'list', 'quote', 'stats', 'media'] },
+                          title: { type: 'string', nullable: true },
+                          subtitle: { type: 'string', nullable: true },
+                          body: { type: 'string', nullable: true },
+                          items: {
+                            type: 'array',
+                            nullable: true,
+                            items: { type: 'string' },
+                          },
+                          stats: {
+                            type: 'array',
+                            nullable: true,
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', nullable: true },
+                                label: { type: 'string' },
+                                value: { type: 'string' },
+                                description: { type: 'string', nullable: true },
+                              },
+                            },
+                          },
+                          quote: {
+                            type: 'object',
+                            nullable: true,
+                            properties: {
+                              text: { type: 'string' },
+                              author: { type: 'string', nullable: true },
+                              role: { type: 'string', nullable: true },
+                            },
+                          },
+                          media: {
+                            type: 'array',
+                            nullable: true,
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', nullable: true },
+                                url: { type: 'string' },
+                                caption: { type: 'string', nullable: true },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    highlights: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          label: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
                     isVerified: { type: 'boolean' },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
@@ -344,13 +598,13 @@ export async function companiesRoutes(fastify: FastifyInstance) {
         properties: {
           name: { type: 'string', minLength: 2, description: 'Company name' },
           slug: { type: 'string', minLength: 2, pattern: '^[a-z0-9-]+$', description: 'URL-friendly slug' },
-          tagline: { type: 'string', maxLength: 100, description: 'Company tagline' },
-          description: { type: 'string', maxLength: 1000, description: 'Company description' },
+          tagline: { type: 'string', maxLength: 150, description: 'Company tagline' },
+          description: { type: 'string', maxLength: 10000, description: 'Company description (HTML allowed, sanitized server-side)' },
           logoUrl: { type: 'string', format: 'uri', description: 'Company logo URL' },
           coverUrl: { type: 'string', format: 'uri', description: 'Company cover image URL' },
           website: { type: 'string', format: 'uri', description: 'Company website URL' },
-          location: { type: 'string', maxLength: 100, description: 'Company location' },
-          industry: { type: 'string', maxLength: 50, description: 'Company industry' },
+          location: { type: 'string', maxLength: 120, description: 'Company location' },
+          industry: { type: 'string', maxLength: 80, description: 'Company industry' },
           size: { 
             type: 'string', 
             enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
@@ -386,6 +640,87 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                     industry: { type: 'string', nullable: true },
                     size: { type: 'string', nullable: true },
                     foundedYear: { type: 'number', nullable: true },
+                    headcount: { type: 'number', nullable: true },
+                    headcountNote: { type: 'string', nullable: true },
+                    metrics: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          label: { type: 'string' },
+                          value: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                          icon: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
+                    profileStory: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          type: { type: 'string', enum: ['text', 'list', 'quote', 'stats', 'media'] },
+                          title: { type: 'string', nullable: true },
+                          subtitle: { type: 'string', nullable: true },
+                          body: { type: 'string', nullable: true },
+                          items: {
+                            type: 'array',
+                            nullable: true,
+                            items: { type: 'string' },
+                          },
+                          stats: {
+                            type: 'array',
+                            nullable: true,
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', nullable: true },
+                                label: { type: 'string' },
+                                value: { type: 'string' },
+                                description: { type: 'string', nullable: true },
+                              },
+                            },
+                          },
+                          quote: {
+                            type: 'object',
+                            nullable: true,
+                            properties: {
+                              text: { type: 'string' },
+                              author: { type: 'string', nullable: true },
+                              role: { type: 'string', nullable: true },
+                            },
+                          },
+                          media: {
+                            type: 'array',
+                            nullable: true,
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', nullable: true },
+                                url: { type: 'string' },
+                                caption: { type: 'string', nullable: true },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    highlights: {
+                      type: 'array',
+                      nullable: true,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', nullable: true },
+                          label: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
                     isVerified: { type: 'boolean' },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
