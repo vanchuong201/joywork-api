@@ -129,8 +129,8 @@ export class InboxService {
         senderId: userId,
         content: data.content,
         // Let DB defaults apply when not provided
-        messageType: data.messageType ?? undefined,
-        fileUrl: data.fileUrl ?? undefined,
+        messageType: data.messageType ?? 'TEXT',
+        fileUrl: data.fileUrl ?? null,
         isRead: false,
       },
       include: {
@@ -176,24 +176,41 @@ export class InboxService {
       senderId: message.senderId,
       content: message.content,
       messageType: message.messageType,
-      fileUrl: message.fileUrl,
+      ...(message.fileUrl ? { fileUrl: message.fileUrl } : {}),
       isRead: message.isRead,
       createdAt: message.createdAt,
       updatedAt: message.updatedAt,
-      sender: {
-        id: message.sender.id,
-        name: message.sender.name,
-        email: message.sender.email,
-        profile: message.sender.profile,
-      },
+      sender: (() => {
+        const sender: any = {
+          id: message.sender.id,
+          email: message.sender.email,
+        };
+        if (message.sender.name) sender.name = message.sender.name;
+        if (message.sender.profile) {
+          sender.profile = {
+            id: message.sender.profile.id,
+          };
+          if (message.sender.profile.avatar) sender.profile.avatar = message.sender.profile.avatar;
+        }
+        return sender;
+      })(),
       application: {
         id: message.application.id,
         job: {
           id: message.application.job.id,
           title: message.application.job.title,
-          company: message.application.job.company,
+          company: {
+            id: message.application.job.company.id,
+            name: message.application.job.company.name,
+            slug: message.application.job.company.slug,
+            ...(message.application.job.company.logoUrl ? { logoUrl: message.application.job.company.logoUrl } : {}),
+          },
         },
-        user: message.application.user,
+        user: {
+          id: message.application.user.id,
+          email: message.application.user.email,
+          ...(message.application.user.name ? { name: message.application.user.name } : {}),
+        },
       },
     };
   }
@@ -291,30 +308,42 @@ export class InboxService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      messages: messages.map(message => ({
+      messages: messages.map((message): any => ({
         id: message.id,
         applicationId: message.applicationId,
         senderId: message.senderId,
         content: message.content,
         messageType: message.messageType,
-        fileUrl: message.fileUrl,
+        ...(message.fileUrl ? { fileUrl: message.fileUrl } : {}),
         isRead: message.isRead,
         createdAt: message.createdAt,
         updatedAt: message.updatedAt,
         sender: {
           id: message.sender.id,
-          name: message.sender.name,
           email: message.sender.email,
-          profile: message.sender.profile,
+          ...(message.sender.name ? { name: message.sender.name } : {}),
+          profile: message.sender.profile ? {
+            id: message.sender.profile.id,
+            avatar: message.sender.profile.avatar ?? undefined,
+          } : undefined,
         },
         application: {
           id: message.application.id,
           job: {
             id: message.application.job.id,
             title: message.application.job.title,
-            company: message.application.job.company,
+            company: {
+              id: message.application.job.company.id,
+              name: message.application.job.company.name,
+              slug: message.application.job.company.slug,
+              ...(message.application.job.company.logoUrl ? { logoUrl: message.application.job.company.logoUrl } : {}),
+            },
           },
-          user: message.application.user,
+          user: {
+            id: message.application.user.id,
+            name: message.application.user.name ?? undefined,
+            email: message.application.user.email,
+          },
         },
       })),
       pagination: {
@@ -426,19 +455,21 @@ export class InboxService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      conversations: applications.map(app => ({
+      conversations: applications.map((app): any => ({
         id: app.id,
         applicationId: app.id,
-        lastMessage: app.messages[0] ? {
-          id: app.messages[0].id,
-          content: app.messages[0].content,
-          messageType: app.messages[0].messageType,
-          createdAt: app.messages[0].createdAt,
-          sender: {
-            id: app.messages[0].sender.id,
-            name: app.messages[0].sender.name,
+        ...(app.messages[0] ? {
+          lastMessage: {
+            id: app.messages[0].id,
+            content: app.messages[0].content,
+            messageType: app.messages[0].messageType,
+            createdAt: app.messages[0].createdAt,
+            sender: {
+              id: app.messages[0].sender.id,
+              ...(app.messages[0].sender.name ? { name: app.messages[0].sender.name } : {}),
+            },
           },
-        } : undefined,
+        } : {}),
         unreadCount: app._count.messages,
         job: {
           id: app.job.id,

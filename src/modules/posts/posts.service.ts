@@ -5,13 +5,8 @@ import { deleteS3Objects } from '@/shared/storage/s3';
 import {
   CreatePostInput,
   UpdatePostInput,
-  GetPostInput,
   GetCompanyPostsInput,
   GetFeedPostsInput,
-  LikePostInput,
-  UnlikePostInput,
-  PublishPostInput,
-  UnpublishPostInput,
 } from './posts.schema';
 
 export interface Post {
@@ -128,19 +123,26 @@ export class PostsService {
       ? new Date()
       : null;
 
+    const postDataToCreate: any = {
+      companyId,
+      createdById: userId,
+      title: postData.title,
+      content: postData.content,
+      type: postData.type,
+      visibility: postData.visibility,
+      coverUrl: (normalizedImages && normalizedImages.length > 0) ? normalizedImages[0]!.url : null,
+      publishedAt: resolvedPublishedAt,
+      excerpt: ((postData as any).excerpt !== undefined && (postData as any).excerpt !== null) ? (postData as any).excerpt : null,
+    };
+    
+    if (normalizedImages && normalizedImages.length > 0) {
+      postDataToCreate.images = {
+        create: normalizedImages,
+      };
+    }
+    
     const post = await prisma.post.create({
-      data: {
-        ...postData,
-        companyId,
-        createdById: userId,
-        coverUrl: normalizedImages && normalizedImages.length > 0 ? normalizedImages[0].url : null,
-        publishedAt: resolvedPublishedAt,
-        images: normalizedImages && normalizedImages.length
-          ? {
-              create: normalizedImages,
-            }
-          : undefined,
-      },
+      data: postDataToCreate,
       include: {
         company: {
           select: {
@@ -228,13 +230,20 @@ export class PostsService {
     }
 
     // Update post
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.content !== undefined) updateData.content = data.content;
+    if (data.excerpt !== undefined) updateData.excerpt = data.excerpt ?? null;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.visibility !== undefined) updateData.visibility = data.visibility;
+    if (data.publishedAt !== undefined) updateData.publishedAt = data.publishedAt ? new Date(data.publishedAt) : null;
+    
     const updatedPost = await prisma.post.update({
       where: { id: postId },
-      data: {
-        ...data,
-        publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
-        updatedAt: new Date(),
-      },
+      data: updateData,
       include: {
         company: {
           select: {
@@ -749,9 +758,9 @@ export class PostsService {
       throw new AppError('You do not have permission to delete this post', 403, 'FORBIDDEN');
     }
 
-    const imageKeys = post.images
-      .map((image) => image.storageKey)
-      .filter((key): key is string => Boolean(key));
+    const imageKeys = ((post as any).images || [])
+      .map((image: any) => image.storageKey)
+      .filter((key: any): key is string => Boolean(key));
 
     if (imageKeys.length) {
       await deleteS3Objects(imageKeys);

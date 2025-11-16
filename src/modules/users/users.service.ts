@@ -2,7 +2,6 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import {
   UpdateProfileInput,
-  GetUserProfileInput,
   SearchUsersInput,
 } from './users.schema';
 
@@ -45,28 +44,33 @@ export class UsersService {
       return null;
     }
 
-    return {
+    const result: any = {
       id: user.id,
       email: user.email,
-      name: user.name,
       role: user.role,
       createdAt: user.createdAt,
-      profile: user.profile ? {
+    };
+    
+    if (user.name) result.name = user.name;
+    if (user.profile) {
+      result.profile = {
         id: user.profile.id,
         userId: user.profile.userId,
-        avatar: user.profile.avatar,
-        headline: user.profile.headline,
-        bio: user.profile.bio,
         skills: user.profile.skills,
-        cvUrl: user.profile.cvUrl,
-        location: user.profile.location,
-        website: user.profile.website,
-        linkedin: user.profile.linkedin,
-        github: user.profile.github,
         createdAt: user.profile.createdAt,
         updatedAt: user.profile.updatedAt,
-      } : undefined,
-    };
+      };
+      if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
+      if (user.profile.headline) result.profile.headline = user.profile.headline;
+      if (user.profile.bio) result.profile.bio = user.profile.bio;
+      if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
+      if (user.profile.location) result.profile.location = user.profile.location;
+      if (user.profile.website) result.profile.website = user.profile.website;
+      if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
+      if (user.profile.github) result.profile.github = user.profile.github;
+    }
+    
+    return result;
   }
 
   // Update user profile
@@ -90,15 +94,26 @@ export class UsersService {
     }
 
     // Update or create profile
-    const profile = await prisma.userProfile.upsert({
+    const profileData: any = {
+      updatedAt: new Date(),
+    };
+    
+    if (profileInput.avatar !== undefined) profileData.avatar = profileInput.avatar ?? null;
+    if (profileInput.headline !== undefined) profileData.headline = profileInput.headline ?? null;
+    if (profileInput.bio !== undefined) profileData.bio = profileInput.bio ?? null;
+    if (profileInput.skills !== undefined) profileData.skills = profileInput.skills;
+    if (profileInput.cvUrl !== undefined) profileData.cvUrl = profileInput.cvUrl ?? null;
+    if (profileInput.location !== undefined) profileData.location = profileInput.location ?? null;
+    if (profileInput.website !== undefined) profileData.website = profileInput.website ?? null;
+    if (profileInput.linkedin !== undefined) profileData.linkedin = profileInput.linkedin ?? null;
+    if (profileInput.github !== undefined) profileData.github = profileInput.github ?? null;
+    
+    await prisma.userProfile.upsert({
       where: { userId },
-      update: {
-        ...profileInput,
-        updatedAt: new Date(),
-      },
+      update: profileData,
       create: {
         userId,
-        ...profileInput,
+        ...profileData,
       },
     });
 
@@ -170,28 +185,33 @@ export class UsersService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      users: users.map(user => ({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        createdAt: user.createdAt,
-        profile: user.profile ? {
-          id: user.profile.id,
-          userId: user.profile.userId,
-          avatar: user.profile.avatar,
-          headline: user.profile.headline,
-          bio: user.profile.bio,
-          skills: user.profile.skills,
-          cvUrl: user.profile.cvUrl,
-          location: user.profile.location,
-          website: user.profile.website,
-          linkedin: user.profile.linkedin,
-          github: user.profile.github,
-          createdAt: user.profile.createdAt,
-          updatedAt: user.profile.updatedAt,
-        } : undefined,
-      })),
+      users: users.map(user => {
+        const result: any = {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt,
+        };
+        if (user.name) result.name = user.name;
+        if (user.profile) {
+          result.profile = {
+            id: user.profile.id,
+            userId: user.profile.userId,
+            skills: user.profile.skills,
+            createdAt: user.profile.createdAt,
+            updatedAt: user.profile.updatedAt,
+          };
+          if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
+          if (user.profile.headline) result.profile.headline = user.profile.headline;
+          if (user.profile.bio) result.profile.bio = user.profile.bio;
+          if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
+          if (user.profile.location) result.profile.location = user.profile.location;
+          if (user.profile.website) result.profile.website = user.profile.website;
+          if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
+          if (user.profile.github) result.profile.github = user.profile.github;
+        }
+        return result;
+      }),
       pagination: {
         page,
         limit,
@@ -214,27 +234,32 @@ export class UsersService {
       return null;
     }
 
-    return {
+    const result: any = {
       id: user.id,
       email: user.email,
-      name: user.name,
       role: user.role,
       createdAt: user.createdAt,
-      profile: user.profile ? {
+    };
+    
+    if (user.name) result.name = user.name;
+    if (user.profile) {
+      result.profile = {
         id: user.profile.id,
         userId: user.profile.userId,
-        avatar: user.profile.avatar,
-        headline: user.profile.headline,
-        bio: user.profile.bio,
         skills: user.profile.skills,
-        cvUrl: user.profile.cvUrl,
-        location: user.profile.location,
-        website: user.profile.website,
-        linkedin: user.profile.linkedin,
-        github: user.profile.github,
         createdAt: user.profile.createdAt,
         updatedAt: user.profile.updatedAt,
-      } : undefined,
-    };
+      };
+      if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
+      if (user.profile.headline) result.profile.headline = user.profile.headline;
+      if (user.profile.bio) result.profile.bio = user.profile.bio;
+      if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
+      if (user.profile.location) result.profile.location = user.profile.location;
+      if (user.profile.website) result.profile.website = user.profile.website;
+      if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
+      if (user.profile.github) result.profile.github = user.profile.github;
+    }
+    
+    return result;
   }
 }

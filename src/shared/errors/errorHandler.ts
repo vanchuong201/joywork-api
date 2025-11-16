@@ -50,7 +50,7 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Validation failed',
-        details: error.errors,
+        details: error.issues,
       },
     });
   }

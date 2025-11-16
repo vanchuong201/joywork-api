@@ -5,6 +5,9 @@ import {
   deleteObjectSchema,
   createProfileAvatarPresignSchema,
   uploadProfileAvatarSchema,
+  uploadCompanyPostImageSchema,
+  uploadCompanyLogoSchema,
+  uploadCompanyCoverSchema,
 } from './uploads.schema';
 
 export class UploadsController {
@@ -42,6 +45,33 @@ export class UploadsController {
     const payload = uploadProfileAvatarSchema.parse(request.body);
 
     const data = await this.uploadsService.uploadProfileAvatar(userId, payload);
+
+    return reply.status(201).send({ data });
+  }
+
+  async uploadCompanyPostImage(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const payload = uploadCompanyPostImageSchema.parse(request.body);
+
+    const data = await this.uploadsService.uploadCompanyPostImage(userId, payload);
+
+    return reply.status(201).send({ data });
+  }
+
+  async uploadCompanyLogo(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const payload = uploadCompanyLogoSchema.parse(request.body);
+
+    const data = await this.uploadsService.uploadCompanyLogo(userId, payload);
+
+    return reply.status(201).send({ data });
+  }
+
+  async uploadCompanyCover(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const payload = uploadCompanyCoverSchema.parse(request.body);
+
+    const data = await this.uploadsService.uploadCompanyCover(userId, payload);
 
     return reply.status(201).send({ data });
   }

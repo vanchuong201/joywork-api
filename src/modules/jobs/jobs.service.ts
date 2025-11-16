@@ -3,7 +3,6 @@ import { AppError } from '@/shared/errors/errorHandler';
 import {
   CreateJobInput,
   UpdateJobInput,
-  GetJobInput,
   SearchJobsInput,
   ApplyJobInput,
   GetApplicationsInput,
@@ -121,12 +120,28 @@ export class JobsService {
     }
 
     // Create job
+    const jobData: any = {
+      companyId,
+      title: data.title,
+      description: data.description,
+      remote: data.remote,
+      currency: data.currency,
+      employmentType: data.employmentType,
+      experienceLevel: data.experienceLevel,
+      skills: data.skills,
+      isActive: data.isActive ?? true,
+      applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
+      requirements: data.requirements ?? null,
+      responsibilities: data.responsibilities ?? null,
+      benefits: data.benefits ?? null,
+      location: data.location ?? null,
+      salaryMin: data.salaryMin ?? null,
+      salaryMax: data.salaryMax ?? null,
+      tags: data.tags ?? [],
+    };
+    
     const job = await prisma.job.create({
-      data: {
-        ...data,
-        companyId,
-        applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
-      },
+      data: jobData,
       include: {
         company: {
           select: {
@@ -144,30 +159,38 @@ export class JobsService {
       },
     });
 
-    return {
+    const result: any = {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
       description: job.description,
-      requirements: job.requirements,
-      responsibilities: job.responsibilities,
-      benefits: job.benefits,
-      location: job.location,
       remote: job.remote,
-      salaryMin: job.salaryMin,
-      salaryMax: job.salaryMax,
       currency: job.currency,
       employmentType: job.employmentType,
       experienceLevel: job.experienceLevel,
       skills: job.skills,
       tags: job.tags,
-      applicationDeadline: job.applicationDeadline,
       isActive: job.isActive,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
-      company: job.company,
+      company: {
+        id: job.company.id,
+        name: job.company.name,
+        slug: job.company.slug,
+      },
       _count: job._count,
     };
+    
+    if (job.requirements) result.requirements = job.requirements;
+    if (job.responsibilities) result.responsibilities = job.responsibilities;
+    if (job.benefits) result.benefits = job.benefits;
+    if (job.location) result.location = job.location;
+    if (job.salaryMin !== null) result.salaryMin = job.salaryMin;
+    if (job.salaryMax !== null) result.salaryMax = job.salaryMax;
+    if (job.applicationDeadline) result.applicationDeadline = job.applicationDeadline;
+    if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
+    
+    return result;
   }
 
   // Update job
@@ -197,13 +220,30 @@ export class JobsService {
     }
 
     // Update job
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.requirements !== undefined) updateData.requirements = data.requirements ?? null;
+    if (data.responsibilities !== undefined) updateData.responsibilities = data.responsibilities ?? null;
+    if (data.benefits !== undefined) updateData.benefits = data.benefits ?? null;
+    if (data.location !== undefined) updateData.location = data.location ?? null;
+    if (data.remote !== undefined) updateData.remote = data.remote;
+    if (data.salaryMin !== undefined) updateData.salaryMin = data.salaryMin ?? null;
+    if (data.salaryMax !== undefined) updateData.salaryMax = data.salaryMax ?? null;
+    if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.employmentType !== undefined) updateData.employmentType = data.employmentType;
+    if (data.experienceLevel !== undefined) updateData.experienceLevel = data.experienceLevel;
+    if (data.skills !== undefined) updateData.skills = data.skills;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.applicationDeadline !== undefined) updateData.applicationDeadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
-      data: {
-        ...data,
-        applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : undefined,
-        updatedAt: new Date(),
-      },
+      data: updateData,
       include: {
         company: {
           select: {
@@ -221,30 +261,38 @@ export class JobsService {
       },
     });
 
-    return {
+    const result: any = {
       id: updatedJob.id,
       companyId: updatedJob.companyId,
       title: updatedJob.title,
       description: updatedJob.description,
-      requirements: updatedJob.requirements,
-      responsibilities: updatedJob.responsibilities,
-      benefits: updatedJob.benefits,
-      location: updatedJob.location,
       remote: updatedJob.remote,
-      salaryMin: updatedJob.salaryMin,
-      salaryMax: updatedJob.salaryMax,
       currency: updatedJob.currency,
       employmentType: updatedJob.employmentType,
       experienceLevel: updatedJob.experienceLevel,
       skills: updatedJob.skills,
       tags: updatedJob.tags,
-      applicationDeadline: updatedJob.applicationDeadline,
       isActive: updatedJob.isActive,
       createdAt: updatedJob.createdAt,
       updatedAt: updatedJob.updatedAt,
-      company: updatedJob.company,
+      company: {
+        id: updatedJob.company.id,
+        name: updatedJob.company.name,
+        slug: updatedJob.company.slug,
+      },
       _count: updatedJob._count,
     };
+    
+    if (updatedJob.requirements) result.requirements = updatedJob.requirements;
+    if (updatedJob.responsibilities) result.responsibilities = updatedJob.responsibilities;
+    if (updatedJob.benefits) result.benefits = updatedJob.benefits;
+    if (updatedJob.location) result.location = updatedJob.location;
+    if (updatedJob.salaryMin !== null) result.salaryMin = updatedJob.salaryMin;
+    if (updatedJob.salaryMax !== null) result.salaryMax = updatedJob.salaryMax;
+    if (updatedJob.applicationDeadline) result.applicationDeadline = updatedJob.applicationDeadline;
+    if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
+    
+    return result;
   }
 
   // Get job by ID
@@ -286,31 +334,39 @@ export class JobsService {
       hasApplied = !!application;
     }
 
-    return {
+    const result: any = {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
       description: job.description,
-      requirements: job.requirements,
-      responsibilities: job.responsibilities,
-      benefits: job.benefits,
-      location: job.location,
       remote: job.remote,
-      salaryMin: job.salaryMin,
-      salaryMax: job.salaryMax,
       currency: job.currency,
       employmentType: job.employmentType,
       experienceLevel: job.experienceLevel,
       skills: job.skills,
       tags: job.tags,
-      applicationDeadline: job.applicationDeadline,
       isActive: job.isActive,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
-      company: job.company,
+      company: {
+        id: job.company.id,
+        name: job.company.name,
+        slug: job.company.slug,
+      },
       _count: job._count,
       hasApplied,
     };
+    
+    if (job.requirements) result.requirements = job.requirements;
+    if (job.responsibilities) result.responsibilities = job.responsibilities;
+    if (job.benefits) result.benefits = job.benefits;
+    if (job.location) result.location = job.location;
+    if (job.salaryMin !== null) result.salaryMin = job.salaryMin;
+    if (job.salaryMax !== null) result.salaryMax = job.salaryMax;
+    if (job.applicationDeadline) result.applicationDeadline = job.applicationDeadline;
+    if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
+    
+    return result;
   }
 
   // Search jobs
@@ -416,31 +472,39 @@ export class JobsService {
         hasApplied = !!application;
       }
 
-      jobsWithApplications.push({
+      const jobResult: any = {
         id: job.id,
         companyId: job.companyId,
         title: job.title,
         description: job.description,
-        requirements: job.requirements,
-        responsibilities: job.responsibilities,
-        benefits: job.benefits,
-        location: job.location,
         remote: job.remote,
-        salaryMin: job.salaryMin,
-        salaryMax: job.salaryMax,
         currency: job.currency,
         employmentType: job.employmentType,
         experienceLevel: job.experienceLevel,
         skills: job.skills,
         tags: job.tags,
-        applicationDeadline: job.applicationDeadline,
         isActive: job.isActive,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
-        company: job.company,
+        company: {
+          id: job.company.id,
+          name: job.company.name,
+          slug: job.company.slug,
+        },
         _count: job._count,
         hasApplied,
-      });
+      };
+      
+      if (job.requirements) jobResult.requirements = job.requirements;
+      if (job.responsibilities) jobResult.responsibilities = job.responsibilities;
+      if (job.benefits) jobResult.benefits = job.benefits;
+      if (job.location) jobResult.location = job.location;
+      if (job.salaryMin !== null) jobResult.salaryMin = job.salaryMin;
+      if (job.salaryMax !== null) jobResult.salaryMax = job.salaryMax;
+      if (job.applicationDeadline) jobResult.applicationDeadline = job.applicationDeadline;
+      if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
+      
+      jobsWithApplications.push(jobResult);
     }
 
     return {
@@ -493,8 +557,8 @@ export class JobsService {
       data: {
         userId,
         jobId: data.jobId,
-        coverLetter: data.coverLetter,
-        resumeUrl: data.resumeUrl,
+        coverLetter: data.coverLetter ?? null,
+        resumeUrl: data.resumeUrl ?? null,
         status: 'PENDING',
       },
     });
@@ -583,26 +647,36 @@ export class JobsService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      applications: applications.map(app => ({
+      applications: applications.map((app): any => ({
         id: app.id,
         jobId: app.jobId,
         userId: app.userId,
         status: app.status,
-        coverLetter: app.coverLetter,
-        resumeUrl: app.resumeUrl,
-        notes: app.notes,
+        ...(app.coverLetter ? { coverLetter: app.coverLetter } : {}),
+        ...(app.resumeUrl ? { resumeUrl: app.resumeUrl } : {}),
+        ...(app.notes ? { notes: app.notes } : {}),
         appliedAt: app.appliedAt,
         updatedAt: app.updatedAt,
         job: {
           id: app.job.id,
           title: app.job.title,
-          company: app.job.company,
+          company: {
+            id: app.job.company.id,
+            name: app.job.company.name,
+            slug: app.job.company.slug,
+            ...(app.job.company.logoUrl ? { logoUrl: app.job.company.logoUrl } : {}),
+          },
         },
         user: {
           id: app.user.id,
-          name: app.user.name,
+          name: app.user.name ?? undefined,
           email: app.user.email,
-          profile: app.user.profile,
+          profile: app.user.profile ? {
+            id: app.user.profile.id,
+            headline: app.user.profile.headline ?? undefined,
+            avatar: app.user.profile.avatar ?? undefined,
+            cvUrl: app.user.profile.cvUrl ?? undefined,
+          } : undefined,
         },
       })),
       pagination: {
@@ -649,7 +723,7 @@ export class JobsService {
       where: { id: data.applicationId },
       data: {
         status: data.status,
-        notes: data.notes,
+        notes: data.notes ?? null,
         updatedAt: new Date(),
       },
     });
@@ -715,26 +789,36 @@ export class JobsService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      applications: applications.map(app => ({
+      applications: applications.map((app): any => ({
         id: app.id,
         jobId: app.jobId,
         userId: app.userId,
         status: app.status,
-        coverLetter: app.coverLetter,
-        resumeUrl: app.resumeUrl,
-        notes: app.notes,
+        ...(app.coverLetter ? { coverLetter: app.coverLetter } : {}),
+        ...(app.resumeUrl ? { resumeUrl: app.resumeUrl } : {}),
+        ...(app.notes ? { notes: app.notes } : {}),
         appliedAt: app.appliedAt,
         updatedAt: app.updatedAt,
         job: {
           id: app.job.id,
           title: app.job.title,
-          company: app.job.company,
+          company: {
+            id: app.job.company.id,
+            name: app.job.company.name,
+            slug: app.job.company.slug,
+            ...(app.job.company.logoUrl ? { logoUrl: app.job.company.logoUrl } : {}),
+          },
         },
         user: {
           id: app.user.id,
-          name: app.user.name,
+          name: app.user.name ?? undefined,
           email: app.user.email,
-          profile: app.user.profile,
+          profile: app.user.profile ? {
+            id: app.user.profile.id,
+            headline: app.user.profile.headline ?? undefined,
+            avatar: app.user.profile.avatar ?? undefined,
+            cvUrl: app.user.profile.cvUrl ?? undefined,
+          } : undefined,
         },
       })),
       pagination: {
@@ -793,14 +877,19 @@ export class JobsService {
         job: {
           id: fav.job.id,
           title: fav.job.title,
-          location: fav.job.location,
+          ...(fav.job.location ? { location: fav.job.location } : {}),
           remote: fav.job.remote,
           employmentType: fav.job.employmentType,
           experienceLevel: fav.job.experienceLevel,
-          salaryMin: fav.job.salaryMin,
-          salaryMax: fav.job.salaryMax,
+          ...(fav.job.salaryMin !== null ? { salaryMin: fav.job.salaryMin } : {}),
+          ...(fav.job.salaryMax !== null ? { salaryMax: fav.job.salaryMax } : {}),
           currency: fav.job.currency,
-          company: fav.job.company,
+          company: {
+            id: fav.job.company.id,
+            name: fav.job.company.name,
+            slug: fav.job.company.slug,
+            ...(fav.job.company.logoUrl ? { logoUrl: fav.job.company.logoUrl } : {}),
+          },
         },
       })),
       pagination: {

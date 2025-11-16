@@ -134,6 +134,120 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
     uploadsController.uploadProfileAvatar.bind(uploadsController),
   );
 
+  fastify.post(
+    '/company/post-image',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tải ảnh bài đăng của doanh nghiệp thông qua máy chủ',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['companyId', 'fileName', 'fileType', 'fileData'],
+          properties: {
+            companyId: { type: 'string', description: 'ID của công ty', minLength: 1 },
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileData: { type: 'string', description: 'Dữ liệu ảnh dạng base64' },
+            previousKey: { type: 'string', description: 'Đường dẫn ảnh cũ cần xoá (nếu có)' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadCompanyPostImage.bind(uploadsController),
+  );
+
+  fastify.post(
+    '/company/logo',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tải logo công ty trực tiếp lên S3 thông qua máy chủ',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['companyId', 'fileName', 'fileType', 'fileData'],
+          properties: {
+            companyId: { type: 'string', description: 'ID của công ty', minLength: 1 },
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileData: { type: 'string', description: 'Dữ liệu ảnh dạng base64' },
+            previousKey: { type: 'string', description: 'Đường dẫn logo cũ cần xoá (nếu có)' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadCompanyLogo.bind(uploadsController),
+  );
+
+  fastify.post(
+    '/company/cover',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tải ảnh cover công ty trực tiếp lên S3 thông qua máy chủ',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['companyId', 'fileName', 'fileType', 'fileData'],
+          properties: {
+            companyId: { type: 'string', description: 'ID của công ty', minLength: 1 },
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileData: { type: 'string', description: 'Dữ liệu ảnh dạng base64' },
+            previousKey: { type: 'string', description: 'Đường dẫn cover cũ cần xoá (nếu có)' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadCompanyCover.bind(uploadsController),
+  );
+
   fastify.delete('/object', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
     schema: {

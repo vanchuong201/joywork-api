@@ -8,6 +8,9 @@ import {
   DeleteObjectInput,
   CreateProfileAvatarPresignInput,
   UploadProfileAvatarInput,
+  UploadCompanyPostImageInput,
+  UploadCompanyLogoInput,
+  UploadCompanyCoverInput,
 } from './uploads.schema';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
@@ -194,6 +197,204 @@ export class UploadsService {
       } catch (error) {
         // ignore deletion errors to avoid blocking upload success
         console.error('Failed to delete previous avatar', error);
+      }
+    }
+
+    return {
+      key,
+      assetUrl: buildS3ObjectUrl(key),
+    };
+  }
+
+  async uploadCompanyPostImage(userId: string, input: UploadCompanyPostImageInput) {
+    const { companyId, fileName, fileType, fileData, previousKey } = input;
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('Bạn không có quyền tải ảnh cho công ty này', 403, 'FORBIDDEN');
+    }
+
+    if (!ALLOWED_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+
+    if (!buffer.length) {
+      throw new AppError('Tệp không được rỗng', 400, 'EMPTY_FILE');
+    }
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      throw new AppError('Kích thước tệp vượt quá giới hạn 8MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const extFromMime = getExtensionFromMime(fileType);
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `companies/${companyId}/posts/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: getS3BucketName(),
+        Key: key,
+        Body: buffer,
+        ContentType: fileType,
+        ContentLength: buffer.length,
+      }));
+    } catch (error) {
+      console.error('Failed to upload company post image to S3', error);
+      throw new AppError('Không thể tải ảnh lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    if (previousKey && previousKey.startsWith(`companies/${companyId}/posts/`)) {
+      try {
+        await deleteS3Objects([previousKey]);
+      } catch (error) {
+        console.error('Failed to delete previous company post image', error);
+      }
+    }
+
+    return {
+      key,
+      assetUrl: buildS3ObjectUrl(key),
+    };
+  }
+
+  async uploadCompanyLogo(userId: string, input: UploadCompanyLogoInput) {
+    const { companyId, fileName, fileType, fileData, previousKey } = input;
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('Bạn không có quyền tải logo cho công ty này', 403, 'FORBIDDEN');
+    }
+
+    if (!ALLOWED_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+
+    if (!buffer.length) {
+      throw new AppError('Tệp không được rỗng', 400, 'EMPTY_FILE');
+    }
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      throw new AppError('Kích thước tệp vượt quá giới hạn 8MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const extFromMime = getExtensionFromMime(fileType);
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `companies/${companyId}/logo/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: getS3BucketName(),
+        Key: key,
+        Body: buffer,
+        ContentType: fileType,
+        ContentLength: buffer.length,
+      }));
+    } catch (error) {
+      console.error('Failed to upload company logo to S3', error);
+      throw new AppError('Không thể tải logo lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    if (previousKey && previousKey.startsWith(`companies/${companyId}/logo/`)) {
+      try {
+        await deleteS3Objects([previousKey]);
+      } catch (error) {
+        console.error('Failed to delete previous company logo', error);
+      }
+    }
+
+    return {
+      key,
+      assetUrl: buildS3ObjectUrl(key),
+    };
+  }
+
+  async uploadCompanyCover(userId: string, input: UploadCompanyCoverInput) {
+    const { companyId, fileName, fileType, fileData, previousKey } = input;
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('Bạn không có quyền tải ảnh cover cho công ty này', 403, 'FORBIDDEN');
+    }
+
+    if (!ALLOWED_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+
+    if (!buffer.length) {
+      throw new AppError('Tệp không được rỗng', 400, 'EMPTY_FILE');
+    }
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      throw new AppError('Kích thước tệp vượt quá giới hạn 8MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const extFromMime = getExtensionFromMime(fileType);
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `companies/${companyId}/cover/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: getS3BucketName(),
+        Key: key,
+        Body: buffer,
+        ContentType: fileType,
+        ContentLength: buffer.length,
+      }));
+    } catch (error) {
+      console.error('Failed to upload company cover to S3', error);
+      throw new AppError('Không thể tải ảnh cover lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    if (previousKey && previousKey.startsWith(`companies/${companyId}/cover/`)) {
+      try {
+        await deleteS3Objects([previousKey]);
+      } catch (error) {
+        console.error('Failed to delete previous company cover', error);
       }
     }
 

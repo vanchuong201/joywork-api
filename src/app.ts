@@ -19,7 +19,7 @@ import { uploadsRoutes } from '@/modules/uploads/uploads.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    bodyLimit: 10 * 1024 * 1024, // allow up to 10MB payloads (base64 avatar uploads)
+    bodyLimit: 16 * 1024 * 1024, // allow up to 16MB payloads (base64 uploads)
     logger: config.NODE_ENV === 'development' ? {
       level: config.LOG_LEVEL,
       transport: {

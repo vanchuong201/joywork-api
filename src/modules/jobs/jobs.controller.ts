@@ -101,12 +101,13 @@ export class JobsController {
     });
   }
 
-  // Update application status
+  // Update applicationStatus
   async updateApplicationStatus(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { applicationId } = request.params as { applicationId: string };
+    const body = request.body as any;
     const data = updateApplicationStatusSchema.parse({
-      ...request.body,
+      ...(body || {}),
       applicationId,
     });
     
