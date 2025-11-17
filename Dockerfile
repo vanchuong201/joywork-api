@@ -56,9 +56,14 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 # Copy Prisma schema for migrations
 COPY --from=builder /app/prisma ./prisma
+# Copy tsconfig.json for path resolution
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+# Copy src directory for tsx to run with path aliases
+COPY --from=builder /app/src ./src
 
 EXPOSE 4000
 
-CMD ["node", "dist/server.js"]
+# Use tsx from node_modules to run TypeScript source with path aliases
+CMD ["npx", "tsx", "src/server.ts"]
 
 

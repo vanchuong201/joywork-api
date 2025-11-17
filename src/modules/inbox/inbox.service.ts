@@ -182,8 +182,8 @@ export class InboxService {
       updatedAt: message.updatedAt,
       sender: (() => {
         const sender: any = {
-          id: message.sender.id,
-          email: message.sender.email,
+        id: message.sender.id,
+        email: message.sender.email,
         };
         if (message.sender.name) sender.name = message.sender.name;
         if (message.sender.profile) {
@@ -460,12 +460,12 @@ export class InboxService {
         applicationId: app.id,
         ...(app.messages[0] ? {
           lastMessage: {
-            id: app.messages[0].id,
-            content: app.messages[0].content,
-            messageType: app.messages[0].messageType,
-            createdAt: app.messages[0].createdAt,
-            sender: {
-              id: app.messages[0].sender.id,
+          id: app.messages[0].id,
+          content: app.messages[0].content,
+          messageType: app.messages[0].messageType,
+          createdAt: app.messages[0].createdAt,
+          sender: {
+            id: app.messages[0].sender.id,
               ...(app.messages[0].sender.name ? { name: app.messages[0].sender.name } : {}),
             },
           },

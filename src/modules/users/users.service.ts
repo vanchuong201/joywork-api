@@ -187,19 +187,19 @@ export class UsersService {
     return {
       users: users.map(user => {
         const result: any = {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          createdAt: user.createdAt,
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
         };
         if (user.name) result.name = user.name;
         if (user.profile) {
           result.profile = {
-            id: user.profile.id,
-            userId: user.profile.userId,
-            skills: user.profile.skills,
-            createdAt: user.profile.createdAt,
-            updatedAt: user.profile.updatedAt,
+          id: user.profile.id,
+          userId: user.profile.userId,
+          skills: user.profile.skills,
+          createdAt: user.profile.createdAt,
+          updatedAt: user.profile.updatedAt,
           };
           if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
           if (user.profile.headline) result.profile.headline = user.profile.headline;

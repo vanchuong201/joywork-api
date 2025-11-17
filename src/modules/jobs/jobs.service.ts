@@ -121,7 +121,7 @@ export class JobsService {
 
     // Create job
     const jobData: any = {
-      companyId,
+        companyId,
       title: data.title,
       description: data.description,
       remote: data.remote,
@@ -130,7 +130,7 @@ export class JobsService {
       experienceLevel: data.experienceLevel,
       skills: data.skills,
       isActive: data.isActive ?? true,
-      applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
+        applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
       requirements: data.requirements ?? null,
       responsibilities: data.responsibilities ?? null,
       benefits: data.benefits ?? null,

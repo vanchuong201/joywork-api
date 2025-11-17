@@ -124,22 +124,22 @@ export class PostsService {
       : null;
 
     const postDataToCreate: any = {
-      companyId,
-      createdById: userId,
+        companyId,
+        createdById: userId,
       title: postData.title,
       content: postData.content,
       type: postData.type,
       visibility: postData.visibility,
       coverUrl: (normalizedImages && normalizedImages.length > 0) ? normalizedImages[0]!.url : null,
-      publishedAt: resolvedPublishedAt,
+        publishedAt: resolvedPublishedAt,
       excerpt: ((postData as any).excerpt !== undefined && (postData as any).excerpt !== null) ? (postData as any).excerpt : null,
     };
     
     if (normalizedImages && normalizedImages.length > 0) {
       postDataToCreate.images = {
-        create: normalizedImages,
+              create: normalizedImages,
       };
-    }
+            }
     
     const post = await prisma.post.create({
       data: postDataToCreate,
