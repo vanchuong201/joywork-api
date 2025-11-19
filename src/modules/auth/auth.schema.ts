@@ -2,37 +2,42 @@ import { z } from 'zod';
 
 // Register schema
 export const registerSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+  email: z.string().email('Email không hợp lệ'),
+  password: z.string().min(8, 'Mật khẩu cần ít nhất 8 ký tự'),
+  name: z.string().min(2, 'Tên cần ít nhất 2 ký tự').optional(),
+  phone: z
+    .string()
+    .regex(/^[0-9]{10,11}$/, 'Số điện thoại phải gồm 10-11 chữ số')
+    .optional()
+    .or(z.literal('')),
 });
 
 // Login schema
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Email không hợp lệ'),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
 });
 
 // Refresh token schema
 export const refreshTokenSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
+  refreshToken: z.string().min(1, 'Refresh token là bắt buộc'),
 });
 
 // Change password schema
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+  currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+  newPassword: z.string().min(8, 'Mật khẩu mới cần ít nhất 8 ký tự'),
 });
 
 // Forgot password schema
 export const forgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string().email('Email không hợp lệ'),
 });
 
 // Reset password schema
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1, 'Reset token is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+  token: z.string().min(1, 'Mã xác thực là bắt buộc'),
+  newPassword: z.string().min(8, 'Mật khẩu mới cần ít nhất 8 ký tự'),
 });
 
 // Types

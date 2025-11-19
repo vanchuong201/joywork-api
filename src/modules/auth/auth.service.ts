@@ -25,7 +25,7 @@ export interface AuthUser {
 export class AuthService {
   // Register new user
   async register(data: RegisterInput): Promise<{ user: AuthUser; tokens: AuthTokens }> {
-    const { email, password, name } = data;
+    const { email, password, name, phone } = data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -33,7 +33,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new AppError('User with this email already exists', 409, 'USER_EXISTS');
+      throw new AppError('Email này đã được sử dụng', 409, 'USER_EXISTS');
     }
 
     // Hash password
@@ -45,6 +45,7 @@ export class AuthService {
         email,
         password: hashedPassword,
         name: name || null,
+        phone: phone || null,
       },
     });
 
@@ -72,13 +73,13 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+      throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+      throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
     }
 
     // Generate tokens
@@ -109,7 +110,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+        throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
       }
 
       // Generate new tokens
@@ -117,7 +118,7 @@ export class AuthService {
 
       return { tokens };
     } catch (error) {
-      throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
+      throw new AppError('Phiên đăng nhập đã hết hạn', 401, 'INVALID_REFRESH_TOKEN');
     }
   }
 
@@ -131,13 +132,13 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+      throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
     }
 
     // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
-      throw new AppError('Current password is incorrect', 400, 'INVALID_CURRENT_PASSWORD');
+      throw new AppError('Mật khẩu hiện tại không đúng', 400, 'INVALID_CURRENT_PASSWORD');
     }
 
     // Hash new password
@@ -188,7 +189,7 @@ export class AuthService {
       const payload = jwt.verify(token, config.JWT_SECRET) as { userId: string };
       return payload;
     } catch (error) {
-      throw new AppError('Invalid access token', 401, 'INVALID_ACCESS_TOKEN');
+      throw new AppError('Phiên đăng nhập không hợp lệ', 401, 'INVALID_ACCESS_TOKEN');
     }
   }
 }

@@ -69,7 +69,7 @@ export class AuthController {
       return reply.status(401).send({
         error: {
           code: 'REFRESH_TOKEN_MISSING',
-          message: 'Refresh token not found',
+          message: 'Không tìm thấy refresh token',
         },
       });
     }
@@ -102,7 +102,7 @@ export class AuthController {
 
     return reply.send({
       data: {
-        message: 'Logged out successfully',
+        message: 'Đăng xuất thành công',
       },
     });
   }
@@ -116,7 +116,7 @@ export class AuthController {
     
     return reply.send({
       data: {
-        message: 'Password changed successfully',
+        message: 'Đổi mật khẩu thành công',
       },
     });
   }
@@ -131,7 +131,7 @@ export class AuthController {
       return reply.status(404).send({
         error: {
           code: 'USER_NOT_FOUND',
-          message: 'User not found',
+          message: 'Không tìm thấy người dùng',
         },
       });
     }

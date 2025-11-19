@@ -17,7 +17,7 @@ export class AuthMiddleware {
       const authHeader = request.headers.authorization;
       
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new AppError('Access token required', 401, 'TOKEN_REQUIRED');
+        throw new AppError('Vui lòng đăng nhập', 401, 'TOKEN_REQUIRED');
       }
 
       const token = authHeader.substring(7); // Remove 'Bearer ' prefix
@@ -28,7 +28,7 @@ export class AuthMiddleware {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
+      throw new AppError('Phiên đăng nhập không hợp lệ', 401, 'INVALID_TOKEN');
     }
   }
 
@@ -50,13 +50,13 @@ export class AuthMiddleware {
   // Check if user is admin
   async requireAdmin(request: AuthenticatedRequest, _reply: FastifyReply) {
     if (!request.user) {
-      throw new AppError('Authentication required', 401, 'AUTH_REQUIRED');
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
     }
 
     const user = await this.authService.getUserById(request.user.userId);
     
     if (!user || user.role !== 'ADMIN') {
-      throw new AppError('Admin access required', 403, 'ADMIN_REQUIRED');
+      throw new AppError('Bạn không có quyền truy cập', 403, 'ADMIN_REQUIRED');
     }
   }
 }
