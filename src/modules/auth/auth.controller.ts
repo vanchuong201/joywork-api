@@ -140,4 +140,39 @@ export class AuthController {
       data: { user },
     });
   }
+
+  // Verify email
+  async verifyEmail(request: FastifyRequest, reply: FastifyReply) {
+    const { token } = request.query as { token: string };
+    
+    if (!token) {
+      return reply.status(400).send({
+        error: {
+          code: 'TOKEN_REQUIRED',
+          message: 'Mã xác thực là bắt buộc',
+        },
+      });
+    }
+
+    await this.authService.verifyEmail(token);
+
+    return reply.send({
+      data: {
+        message: 'Email đã được xác thực thành công',
+      },
+    });
+  }
+
+  // Resend verification email
+  async resendVerificationEmail(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    
+    await this.authService.resendVerificationEmail(userId);
+
+    return reply.send({
+      data: {
+        message: 'Email xác thực đã được gửi lại',
+      },
+    });
+  }
 }

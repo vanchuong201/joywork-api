@@ -3,11 +3,11 @@ import { z } from 'zod';
 // Register schema
 export const registerSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
-  password: z.string().min(8, 'Mật khẩu cần ít nhất 8 ký tự'),
+  password: z.string().min(6, 'Mật khẩu cần ít nhất 6 ký tự'),
   name: z.string().min(2, 'Tên cần ít nhất 2 ký tự').optional(),
   phone: z
     .string()
-    .regex(/^[0-9]{10,11}$/, 'Số điện thoại phải gồm 10-11 chữ số')
+    .regex(/^[0-9]*$/, 'Số điện thoại chỉ được chứa chữ số')
     .optional()
     .or(z.literal('')),
 });
@@ -26,7 +26,7 @@ export const refreshTokenSchema = z.object({
 // Change password schema
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
-  newPassword: z.string().min(8, 'Mật khẩu mới cần ít nhất 8 ký tự'),
+  newPassword: z.string().min(6, 'Mật khẩu mới cần ít nhất 6 ký tự'),
 });
 
 // Forgot password schema
@@ -37,7 +37,7 @@ export const forgotPasswordSchema = z.object({
 // Reset password schema
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, 'Mã xác thực là bắt buộc'),
-  newPassword: z.string().min(8, 'Mật khẩu mới cần ít nhất 8 ký tự'),
+  newPassword: z.string().min(6, 'Mật khẩu mới cần ít nhất 6 ký tự'),
 });
 
 // Types

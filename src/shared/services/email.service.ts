@@ -1,0 +1,198 @@
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { config } from '@/config/env';
+
+// Use SES API (same as test script which works)
+const hasValidAwsCredentials = 
+  config.AWS_ACCESS_KEY_ID && 
+  config.AWS_ACCESS_KEY_ID !== 'your_aws_access_key_id_here' &&
+  config.AWS_SECRET_ACCESS_KEY &&
+  config.AWS_SECRET_ACCESS_KEY !== 'your_aws_secret_access_key_here';
+
+const sesClient = hasValidAwsCredentials
+  ? new SESClient({
+      region: config.AWS_REGION,
+      credentials: {
+        accessKeyId: config.AWS_ACCESS_KEY_ID,
+        secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+      },
+    })
+  : null;
+
+class EmailService {
+  private getFromAddress(): string {
+    const fromEmail = config.EMAIL_SENDER || config.EMAIL_FROM || 'noreply@joywork.vn';
+    const fromName = config.FROM_NAME || 'JoyWork';
+    return `${fromName} <${fromEmail}>`;
+  }
+
+  private async sendEmail(options: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+  }): Promise<void> {
+    const fromEmail = config.EMAIL_SENDER || config.EMAIL_FROM;
+    if (!fromEmail) {
+      console.warn('Email service not configured. EMAIL_SENDER or EMAIL_FROM is missing. Skipping email send.');
+      console.log('Email would be sent:', {
+        to: options.to,
+        subject: options.subject,
+        from: this.getFromAddress(),
+      });
+      return;
+    }
+
+    if (!hasValidAwsCredentials) {
+      console.warn('AWS credentials not configured. Skipping email send.');
+      console.log('Please update AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in .env file.');
+      console.log('Email would be sent:', {
+        to: options.to,
+        subject: options.subject,
+        from: this.getFromAddress(),
+      });
+      return;
+    }
+
+    if (!sesClient) {
+      console.error('SES client not initialized. Cannot send email.');
+      return;
+    }
+
+    try {
+      const fromAddress = this.getFromAddress();
+      console.log('Sending email via AWS SES API:', {
+        from: fromAddress,
+        to: options.to,
+        subject: options.subject,
+        region: config.AWS_REGION,
+      });
+
+      const command = new SendEmailCommand({
+        Source: fromAddress,
+        Destination: {
+          ToAddresses: [options.to],
+        },
+        Message: {
+          Subject: {
+            Data: options.subject,
+            Charset: 'UTF-8',
+          },
+          Body: {
+            Html: {
+              Data: options.html,
+              Charset: 'UTF-8',
+            },
+            ...(options.text
+              ? {
+                  Text: {
+                    Data: options.text,
+                    Charset: 'UTF-8',
+                  },
+                }
+              : {}),
+          },
+        },
+      });
+
+      const result = await sesClient.send(command);
+      console.log('Email sent successfully via AWS SES API:', {
+        messageId: result.MessageId,
+        to: options.to,
+      });
+    } catch (error: any) {
+      console.error('Failed to send email via AWS SES API:', {
+        error: error.message,
+        code: error.Code,
+        statusCode: error.$metadata?.httpStatusCode,
+        requestId: error.$metadata?.requestId,
+        to: options.to,
+        from: this.getFromAddress(),
+        stack: error.stack,
+      });
+      throw new Error(`Không thể gửi email: ${error.message || 'Unknown error'}`);
+    }
+  }
+
+  async sendVerificationEmail(
+    to: string,
+    name: string | null,
+    verificationUrl: string,
+  ): Promise<void> {
+    const userName = name || 'bạn';
+    const subject = 'Chào mừng bạn đến với JOYWork! Xác nhận email của bạn ngay';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xác nhận email - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px;">
+    <h1 style="color: #ff6b00; margin-bottom: 20px;">Chào mừng đến với JOYWork!</h1>
+    
+    <p>Chào ${userName},</p>
+    
+    <p>Chúng tôi rất vui mừng chào đón bạn đến với JOYWork – nơi bạn có thể giúp Doanh nghiệp của mình xây dựng hồ sơ xuất sắc hoặc khám phá và kết nối với các nhà tuyển dụng phù hợp.</p>
+    
+    <p style="margin: 30px 0;">
+      Hãy <strong><u><a href="${verificationUrl}" style="color: #ff6b00; text-decoration: underline;">Xác nhận Email</a></u></strong> của bạn để kích hoạt tài khoản.
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${verificationUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xác nhận Email</a>
+    </div>
+    
+    <p>Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWork ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.</p>
+    
+    <p>Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một <u><a href="#" style="color: #ff6b00;">Tài liệu</a></u> <strong>Hướng dẫn sử dụng JOYWork</strong>.</p>
+    
+    <p>Chúng tôi rất mong bạn sẽ có những trải nghiệm tuyệt vời trên nền tảng!</p>
+    
+    <p style="margin-top: 30px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 12px; color: #999; text-align: center;">
+      Nếu bạn không tạo tài khoản này, vui lòng bỏ qua email này.
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Chào mừng đến với JOYWork!
+
+Chào ${userName},
+
+Chúng tôi rất vui mừng chào đón bạn đến với JOYWork – nơi bạn có thể giúp Doanh nghiệp của mình xây dựng hồ sơ xuất sắc hoặc khám phá và kết nối với các nhà tuyển dụng phù hợp.
+
+Hãy Xác nhận Email của bạn để kích hoạt tài khoản: ${verificationUrl}
+
+Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWork ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.
+
+Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một Tài liệu Hướng dẫn sử dụng JOYWork.
+
+Chúng tôi rất mong bạn sẽ có những trải nghiệm tuyệt vời trên nền tảng!
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+}
+
+export const emailService = new EmailService();
+

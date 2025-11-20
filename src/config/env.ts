@@ -29,6 +29,15 @@ const envSchema = z.object({
   AWS_REGION: z.string().default('ap-southeast-1'),
   AWS_S3_BUCKET: z.string().min(1, 'AWS_S3_BUCKET is required'),
   
+  // Email (AWS SES via SMTP)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(), // SMTP username (can be IAM access key or SMTP username)
+  SMTP_PASS: z.string().optional(), // SMTP password (can be IAM secret key or SMTP password)
+  EMAIL_SENDER: z.string().email().optional(),
+  EMAIL_FROM: z.string().email().optional(), // Fallback to EMAIL_SENDER
+  FROM_NAME: z.string().optional(),
+  
   // Logging
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });

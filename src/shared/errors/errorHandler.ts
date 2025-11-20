@@ -84,11 +84,39 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
 
   // Handle Fastify validation errors
   if (error.validation) {
+    // Translate common validation errors to Vietnamese
+    const translatedDetails = error.validation.map((err: any) => {
+      let message = err.message || 'Validation failed';
+      
+      // Translate common messages
+      if (message.includes('must NOT have fewer than')) {
+        const match = message.match(/fewer than (\d+) characters/);
+        if (match) {
+          message = `Mật khẩu cần ít nhất ${match[1]} ký tự`;
+        }
+      } else if (message.includes('must be string')) {
+        message = 'Giá trị không hợp lệ';
+      } else if (message.includes('must match format')) {
+        if (err.params?.format === 'email') {
+          message = 'Email không hợp lệ';
+        }
+      } else if (message.includes('is required')) {
+        message = 'Trường này là bắt buộc';
+      } else if (message.includes('must be equal to one of')) {
+        message = 'Giá trị không hợp lệ';
+      }
+      
+      return {
+        ...err,
+        message,
+      };
+    });
+    
     return reply.status(400).send({
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'Request validation failed',
-        details: error.validation,
+        message: 'Dữ liệu không hợp lệ',
+        details: translatedDetails,
       },
     });
   }

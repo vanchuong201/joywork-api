@@ -63,7 +63,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         required: ['email', 'password'],
         properties: {
           email: { type: 'string', format: 'email' },
-          password: { type: 'string', minLength: 8 },
+          password: { type: 'string', minLength: 6 },
           name: { type: 'string', minLength: 2 },
         },
       },
@@ -180,7 +180,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         required: ['currentPassword', 'newPassword'],
         properties: {
           currentPassword: { type: 'string' },
-          newPassword: { type: 'string', minLength: 8 },
+          newPassword: { type: 'string', minLength: 6 },
         },
       },
       response: {
@@ -219,6 +219,7 @@ export async function authRoutes(fastify: FastifyInstance) {
                     email: { type: 'string' },
                     name: { type: 'string', nullable: true },
                     role: { type: 'string' },
+                    emailVerified: { type: 'boolean' },
                   },
                 },
               },
@@ -228,4 +229,53 @@ export async function authRoutes(fastify: FastifyInstance) {
       },
     },
   }, authController.getMe.bind(authController));
+
+  fastify.get('/verify-email', {
+    schema: {
+      description: 'Verify email với token',
+      tags: ['Auth'],
+      querystring: {
+        type: 'object',
+        required: ['token'],
+        properties: {
+          token: { type: 'string', description: 'Verification token' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, authController.verifyEmail.bind(authController));
+
+  fastify.post('/resend-verification-email', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Gửi lại email xác thực',
+      tags: ['Auth'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, authController.resendVerificationEmail.bind(authController));
 }

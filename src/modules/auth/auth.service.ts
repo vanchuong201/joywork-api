@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/shared/database/prisma';
 import { config } from '@/config/env';
 import { AppError } from '@/shared/errors/errorHandler';
+import { emailService } from '@/shared/services/email.service';
 import {
   RegisterInput,
   LoginInput,
@@ -20,6 +22,7 @@ export interface AuthUser {
   email: string;
   name: string | null;
   role: string;
+  emailVerified?: boolean;
 }
 
 export class AuthService {
@@ -46,8 +49,31 @@ export class AuthService {
         password: hashedPassword,
         name: name || null,
         phone: phone || null,
+        emailVerified: false,
       },
     });
+
+    // Generate verification token
+    const verificationToken = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // Token expires in 7 days
+
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token: verificationToken,
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    const verificationUrl = `${config.FRONTEND_ORIGIN}/verify-email?token=${verificationToken}`;
+    try {
+      await emailService.sendVerificationEmail(email, name || null, verificationUrl);
+    } catch (error) {
+      // Log error but don't fail registration
+      console.error('Failed to send verification email:', error);
+    }
 
     // Generate tokens
     const tokens = this.generateTokens(user.id);
@@ -160,6 +186,7 @@ export class AuthService {
         email: true,
         name: true,
         role: true,
+        emailVerified: true,
       },
     });
 
@@ -190,6 +217,79 @@ export class AuthService {
       return payload;
     } catch (error) {
       throw new AppError('Phiên đăng nhập không hợp lệ', 401, 'INVALID_ACCESS_TOKEN');
+    }
+  }
+
+  // Verify email
+  async verifyEmail(token: string): Promise<void> {
+    const verificationToken = await prisma.emailVerificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!verificationToken) {
+      throw new AppError('Mã xác thực không hợp lệ', 400, 'INVALID_TOKEN');
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      // Delete expired token
+      await prisma.emailVerificationToken.delete({
+        where: { id: verificationToken.id },
+      });
+      throw new AppError('Mã xác thực đã hết hạn', 400, 'TOKEN_EXPIRED');
+    }
+
+    // Update user emailVerified status
+    await prisma.user.update({
+      where: { id: verificationToken.userId },
+      data: { emailVerified: true },
+    });
+
+    // Delete used token
+    await prisma.emailVerificationToken.delete({
+      where: { id: verificationToken.id },
+    });
+  }
+
+  // Resend verification email
+  async resendVerificationEmail(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
+    }
+
+    if (user.emailVerified) {
+      throw new AppError('Email đã được xác thực', 400, 'ALREADY_VERIFIED');
+    }
+
+    // Delete old tokens for this user
+    await prisma.emailVerificationToken.deleteMany({
+      where: { userId },
+    });
+
+    // Generate new verification token
+    const verificationToken = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token: verificationToken,
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    const verificationUrl = `${config.FRONTEND_ORIGIN}/verify-email?token=${verificationToken}`;
+    try {
+      await emailService.sendVerificationEmail(user.email, user.name, verificationUrl);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      throw new AppError('Không thể gửi email xác thực', 500, 'EMAIL_SEND_FAILED');
     }
   }
 }
