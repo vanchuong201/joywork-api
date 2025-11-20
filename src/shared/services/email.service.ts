@@ -192,6 +192,83 @@ Trân trọng,
       text,
     });
   }
+
+  async sendPasswordResetEmail(
+    to: string,
+    name: string | null,
+    resetUrl: string,
+  ): Promise<void> {
+    const userName = name || 'bạn';
+    const subject = 'Đặt lại mật khẩu JOYWork';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đặt lại mật khẩu - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px;">
+    <h1 style="color: #ff6b00; margin-bottom: 20px;">Đặt lại mật khẩu</h1>
+    
+    <p>Chào ${userName},</p>
+    
+    <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản JOYWork của bạn.</p>
+    
+    <p style="margin: 30px 0;">
+      Nhấn vào nút bên dưới để đặt lại mật khẩu của bạn:
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${resetUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Đặt lại mật khẩu</a>
+    </div>
+    
+    <p>Hoặc sao chép và dán link sau vào trình duyệt:</p>
+    <p style="word-break: break-all; color: #666; font-size: 12px;">${resetUrl}</p>
+    
+    <p style="margin-top: 30px; color: #999; font-size: 14px;">
+      <strong>Lưu ý:</strong> Link này sẽ hết hạn sau 1 giờ. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
+    </p>
+    
+    <p style="margin-top: 30px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 12px; color: #999; text-align: center;">
+      Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này. Mật khẩu của bạn sẽ không thay đổi.
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Đặt lại mật khẩu JOYWork
+
+Chào ${userName},
+
+Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản JOYWork của bạn.
+
+Nhấn vào link sau để đặt lại mật khẩu: ${resetUrl}
+
+Lưu ý: Link này sẽ hết hạn sau 1 giờ. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export const emailService = new EmailService();

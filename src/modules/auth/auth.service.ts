@@ -10,6 +10,8 @@ import {
   LoginInput,
   RefreshTokenInput,
   ChangePasswordInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
 } from './auth.schema';
 
 export interface AuthTokens {
@@ -291,5 +293,98 @@ export class AuthService {
       console.error('Failed to send verification email:', error);
       throw new AppError('Không thể gửi email xác thực', 500, 'EMAIL_SEND_FAILED');
     }
+  }
+
+  // Forgot password - send reset email
+  async forgotPassword(data: ForgotPasswordInput): Promise<void> {
+    const { email } = data;
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    // Don't reveal if email exists or not (security best practice)
+    if (!user) {
+      // Still return success to prevent email enumeration
+      return;
+    }
+
+    // Delete old reset tokens for this user
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id },
+    });
+
+    // Generate reset token
+    const resetToken = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1); // Token expires in 1 hour
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        token: resetToken,
+        expiresAt,
+      },
+    });
+
+    // Send reset email
+    const resetUrl = `${config.FRONTEND_ORIGIN}/reset-password?token=${resetToken}`;
+    try {
+      await emailService.sendPasswordResetEmail(user.email, user.name, resetUrl);
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      // Don't throw error to prevent email enumeration
+    }
+  }
+
+  // Reset password with token
+  async resetPassword(data: ResetPasswordInput): Promise<{ user: AuthUser; tokens: AuthTokens }> {
+    const { token, newPassword } = data;
+
+    // Find reset token
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!resetToken) {
+      throw new AppError('Mã đặt lại mật khẩu không hợp lệ', 400, 'INVALID_TOKEN');
+    }
+
+    if (resetToken.expiresAt < new Date()) {
+      // Delete expired token
+      await prisma.passwordResetToken.delete({
+        where: { id: resetToken.id },
+      });
+      throw new AppError('Mã đặt lại mật khẩu đã hết hạn', 400, 'TOKEN_EXPIRED');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update user password
+    await prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { password: hashedPassword },
+    });
+
+    // Delete used token
+    await prisma.passwordResetToken.delete({
+      where: { id: resetToken.id },
+    });
+
+    // Generate tokens for auto login
+    const tokens = this.generateTokens(resetToken.userId);
+
+    return {
+      user: {
+        id: resetToken.user.id,
+        email: resetToken.user.email,
+        name: resetToken.user.name,
+        role: resetToken.user.role,
+      },
+      tokens,
+    };
   }
 }

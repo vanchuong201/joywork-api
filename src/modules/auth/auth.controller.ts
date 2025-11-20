@@ -5,6 +5,8 @@ import {
   loginSchema,
   refreshTokenSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from './auth.schema';
 
 export class AuthController {
@@ -172,6 +174,44 @@ export class AuthController {
     return reply.send({
       data: {
         message: 'Email xác thực đã được gửi lại',
+      },
+    });
+  }
+
+  // Forgot password
+  async forgotPassword(request: FastifyRequest, reply: FastifyReply) {
+    const data = forgotPasswordSchema.parse(request.body);
+    
+    await this.authService.forgotPassword(data);
+
+    // Always return success to prevent email enumeration
+    return reply.send({
+      data: {
+        message: 'Nếu email tồn tại, chúng tôi đã gửi link đặt lại mật khẩu đến email của bạn.',
+      },
+    });
+  }
+
+  // Reset password
+  async resetPassword(request: FastifyRequest, reply: FastifyReply) {
+    const data = resetPasswordSchema.parse(request.body);
+    
+    const result = await this.authService.resetPassword(data);
+    
+    // Set refresh token as HTTP-only cookie
+    reply.setCookie('refreshToken', result.tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    return reply.send({
+      data: {
+        message: 'Mật khẩu đã được đặt lại thành công',
+        user: result.user,
+        accessToken: result.tokens.accessToken,
       },
     });
   }

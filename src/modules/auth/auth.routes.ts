@@ -278,4 +278,69 @@ export async function authRoutes(fastify: FastifyInstance) {
       },
     },
   }, authController.resendVerificationEmail.bind(authController));
+
+  fastify.post('/forgot-password', {
+    schema: {
+      description: 'Gửi email đặt lại mật khẩu',
+      tags: ['Auth'],
+      body: {
+        type: 'object',
+        required: ['email'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, authController.forgotPassword.bind(authController));
+
+  fastify.post('/reset-password', {
+    schema: {
+      description: 'Đặt lại mật khẩu với token',
+      tags: ['Auth'],
+      body: {
+        type: 'object',
+        required: ['token', 'newPassword'],
+        properties: {
+          token: { type: 'string' },
+          newPassword: { type: 'string', minLength: 6 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    name: { type: 'string', nullable: true },
+                    role: { type: 'string' },
+                  },
+                },
+                accessToken: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, authController.resetPassword.bind(authController));
 }
