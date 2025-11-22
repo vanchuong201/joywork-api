@@ -16,6 +16,7 @@ import { jobsRoutes } from '@/modules/jobs/jobs.routes';
 import { inboxRoutes } from '@/modules/inbox/inbox.routes';
 import { systemRoutes } from '@/modules/system/system.routes';
 import { uploadsRoutes } from '@/modules/uploads/uploads.routes';
+import { ticketsRoutes } from '@/modules/tickets/tickets.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -119,6 +120,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(inboxRoutes, { prefix: '/api/inbox' });
   await app.register(systemRoutes, { prefix: '/api/system' });
   await app.register(uploadsRoutes, { prefix: '/api/uploads' });
+  await app.register(ticketsRoutes, { prefix: '/api/tickets' });
 
   return app;
 }

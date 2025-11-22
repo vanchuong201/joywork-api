@@ -146,6 +146,30 @@ export class PostsController {
     });
   }
 
+  // Save post
+  async savePost(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { postId } = getPostSchema.parse(request.params);
+    await this.postsService.addFavorite(postId, userId);
+    return reply.status(201).send({ data: { success: true } });
+  }
+
+  // Remove favorite
+  async removeFavorite(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { postId } = getPostSchema.parse(request.params);
+    await this.postsService.removeFavorite(postId, userId);
+    return reply.send({ data: { success: true } });
+  }
+
+  // Get my saved posts
+  async getMyFavorites(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { page = 1, limit = 20 } = (request.query as any) ?? {};
+    const result = await this.postsService.getMyFavorites(userId, { page: Number(page), limit: Number(limit) });
+    return reply.send({ data: result });
+  }
+
   // Delete post
   async deletePost(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;

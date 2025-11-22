@@ -122,6 +122,18 @@ export interface CompanyFollowSummary {
   company: Company;
 }
 
+export interface CompanySummary {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  tagline?: string;
+  location?: string;
+  followersCount: number;
+  jobsActive: number;
+  postsCount: number;
+}
+
 export class CompaniesService {
   // Create company
   async createCompany(userId: string, data: CreateCompanyInput): Promise<Company> {
@@ -606,5 +618,60 @@ export class CompaniesService {
     await prisma.follow.delete({
       where: { id: follow.id },
     });
+  }
+
+  async getCompanySummary(companyIdOrSlug: string): Promise<CompanySummary | null> {
+    let company = await prisma.company.findUnique({
+      where: { id: companyIdOrSlug },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        tagline: true,
+        location: true,
+      },
+    });
+
+    if (!company) {
+      company = await prisma.company.findUnique({
+        where: { slug: companyIdOrSlug },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          tagline: true,
+          location: true,
+        },
+      });
+    }
+
+    if (!company) {
+      return null;
+    }
+
+    const [followersCount, postsCount, jobsActive] = await Promise.all([
+      prisma.follow.count({ where: { companyId: company.id } }),
+      prisma.post.count({ where: { companyId: company.id, visibility: 'PUBLIC' } }),
+      prisma.job.count({
+        where: {
+          companyId: company.id,
+          isActive: true,
+        },
+      }),
+    ]);
+
+    return {
+      id: company.id,
+      name: company.name,
+      slug: company.slug,
+      ...(company.logoUrl ? { logoUrl: company.logoUrl } : {}),
+      ...(company.tagline ? { tagline: company.tagline } : {}),
+      ...(company.location ? { location: company.location } : {}),
+      followersCount,
+      postsCount,
+      jobsActive,
+    };
   }
 }

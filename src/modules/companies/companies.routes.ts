@@ -251,6 +251,47 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     },
   }, companiesController.createCompany.bind(companiesController));
 
+  // Company summary for hover card
+  fastify.get('/:companyId/summary', {
+    schema: {
+      description: 'Get lightweight company summary by ID',
+      tags: ['Companies'],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                summary: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    slug: { type: 'string' },
+                    logoUrl: { type: 'string', nullable: true },
+                    tagline: { type: 'string', nullable: true },
+                    location: { type: 'string', nullable: true },
+                    followersCount: { type: 'number' },
+                    jobsActive: { type: 'number' },
+                    postsCount: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getCompanySummary.bind(companiesController));
+
   // Get company by slug
   fastify.get('/:slug', {
     schema: {

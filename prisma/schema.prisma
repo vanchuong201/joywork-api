@@ -34,6 +34,9 @@ model User {
   postAuditLogs PostAuditLog[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
+  postFavorites PostFavorite[]
+  tickets      CompanyTicket[] @relation("TicketApplicant")
+  ticketMessages CompanyTicketMessage[]
 
   @@map("users")
 }
@@ -125,6 +128,7 @@ model Company {
   posts   Post[]
   jobs    Job[]
   follows Follow[]
+  tickets CompanyTicket[]
 
   @@map("companies")
 }
@@ -180,6 +184,7 @@ model Post {
   likes   Like[]
   images  PostImage[]
   auditLogs PostAuditLog[]
+  favorites PostFavorite[]
 
   @@map("posts")
 }
@@ -380,4 +385,61 @@ model Like {
 
   @@unique([userId, postId])
   @@map("likes")
+}
+
+// Post favorites - Saved posts
+model PostFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("post_favorites")
+}
+
+enum TicketStatus {
+  OPEN
+  RESPONDED
+  CLOSED
+}
+
+model CompanyTicket {
+  id                   String       @id @default(cuid())
+  companyId            String
+  applicantId          String
+  title                String
+  status               TicketStatus @default(OPEN)
+  applicantLastViewedAt DateTime?
+  companyLastViewedAt  DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  applicant User    @relation("TicketApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  messages  CompanyTicketMessage[]
+
+  @@index([companyId])
+  @@index([applicantId])
+  @@index([status])
+  @@map("company_tickets")
+}
+
+model CompanyTicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticket CompanyTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([senderId])
+  @@map("company_ticket_messages")
 }
