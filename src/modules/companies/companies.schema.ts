@@ -82,6 +82,10 @@ export const getCompanySchema = z.object({
   slug: z.string().min(1, 'Company slug is required'),
 });
 
+export const getCompanySummarySchema = z.object({
+  companyId: z.string().min(1, 'Company ID is required'),
+});
+
 // Search companies schema
 export const searchCompaniesSchema = z.object({
   q: z.preprocess((val) => {
@@ -113,6 +117,7 @@ export const updateCompanyMemberSchema = z.object({
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export type GetCompanyInput = z.infer<typeof getCompanySchema>;
+export type GetCompanySummaryInput = z.infer<typeof getCompanySummarySchema>;
 export type SearchCompaniesInput = z.infer<typeof searchCompaniesSchema>;
 export type AddCompanyMemberInput = z.infer<typeof addCompanyMemberSchema>;
 export type UpdateCompanyMemberInput = z.infer<typeof updateCompanyMemberSchema>;

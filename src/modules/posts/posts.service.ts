@@ -48,6 +48,7 @@ export interface Post {
 
 export interface PostWithLikes extends Post {
   isLiked: boolean;
+  isSaved?: boolean;
 }
 
 function mapPostEntity(post: any): Post {
@@ -345,6 +346,7 @@ export class PostsService {
 
     // Check if user liked this post
     let isLiked = false;
+    let isSaved = false;
     if (userId) {
       const like = await prisma.like.findUnique({
         where: {
@@ -355,12 +357,19 @@ export class PostsService {
         },
       });
       isLiked = !!like;
+      const favorite = await prisma.postFavorite.findUnique({
+        where: {
+          userId_postId: { userId, postId },
+        },
+      });
+      isSaved = !!favorite;
     }
 
     const base = mapPostEntity(post);
     return {
       ...base,
       isLiked,
+      isSaved,
     };
   }
 
@@ -441,6 +450,7 @@ export class PostsService {
     const postsWithLikes: PostWithLikes[] = [];
     for (const post of posts) {
       let isLiked = false;
+      let isSaved = false;
       if (userId) {
         const like = await prisma.like.findUnique({
           where: {
@@ -451,11 +461,18 @@ export class PostsService {
           },
         });
         isLiked = !!like;
+        const favorite = await prisma.postFavorite.findUnique({
+          where: {
+            userId_postId: { userId, postId: post.id },
+          },
+        });
+        isSaved = !!favorite;
       }
 
       postsWithLikes.push({
         ...mapPostEntity(post),
         isLiked,
+        isSaved,
       });
     }
 
@@ -550,6 +567,7 @@ export class PostsService {
     const postsWithLikes: PostWithLikes[] = [];
     for (const post of posts) {
       let isLiked = false;
+      let isSaved = false;
       if (userId) {
         const like = await prisma.like.findUnique({
           where: {
@@ -560,11 +578,18 @@ export class PostsService {
           },
         });
         isLiked = !!like;
+        const favorite = await prisma.postFavorite.findUnique({
+          where: {
+            userId_postId: { userId, postId: post.id },
+          },
+        });
+        isSaved = !!favorite;
       }
 
       postsWithLikes.push({
         ...mapPostEntity(post),
         isLiked,
+        isSaved,
       });
     }
 
@@ -575,6 +600,94 @@ export class PostsService {
         limit,
         total,
         totalPages,
+      },
+    };
+  }
+
+  // Save post to favorites
+  async addFavorite(postId: string, userId: string): Promise<void> {
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+      throw new AppError('Post not found', 404, 'POST_NOT_FOUND');
+    }
+    const existing = await prisma.postFavorite.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    if (existing) return;
+    await prisma.postFavorite.create({
+      data: { userId, postId },
+    });
+  }
+
+  // Remove from favorites
+  async removeFavorite(postId: string, userId: string): Promise<void> {
+    const existing = await prisma.postFavorite.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    if (!existing) {
+      throw new AppError('Post not saved', 404, 'POST_NOT_SAVED');
+    }
+    await prisma.postFavorite.delete({
+      where: { userId_postId: { userId, postId } },
+    });
+  }
+
+  // Get my saved posts
+  async getMyFavorites(userId: string, data: { page: number; limit: number }): Promise<{
+    favorites: Array<{
+      id: string;
+      createdAt: Date;
+      post: PostWithLikes;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const { page, limit } = data;
+    const skip = (page - 1) * limit;
+
+    const [favorites, total] = await Promise.all([
+      prisma.postFavorite.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          post: {
+            include: {
+              company: { select: { id: true, name: true, slug: true, logoUrl: true } },
+              images: { select: { id: true, url: true, width: true, height: true, order: true }, orderBy: { order: 'asc' } },
+              createdBy: { select: { id: true, email: true, name: true } },
+              likes: {
+                include: {
+                  user: { select: { id: true, name: true } },
+                },
+              },
+              _count: { select: { likes: true } },
+            },
+          },
+        },
+      }),
+      prisma.postFavorite.count({ where: { userId } }),
+    ]);
+
+    return {
+      favorites: favorites.map((fav) => {
+        const mapped = mapPostEntity(fav.post as any);
+        const liked = (fav.post.likes ?? []).some((like: any) => like.userId === userId);
+        return {
+          id: fav.id,
+          createdAt: fav.createdAt,
+          post: {
+            ...mapped,
+            isLiked: liked,
+            isSaved: true,
+          },
+        };
+      }),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     };
   }

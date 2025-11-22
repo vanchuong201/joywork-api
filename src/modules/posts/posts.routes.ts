@@ -669,6 +669,136 @@ export async function postsRoutes(fastify: FastifyInstance) {
     },
   }, postsController.unlikePost.bind(postsController));
 
+  // Save post to favorites
+  fastify.post('/:postId/favorite', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Save a post to favorites',
+      tags: ['Posts'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['postId'],
+        properties: {
+          postId: { type: 'string', description: 'Post ID' },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, postsController.savePost.bind(postsController));
+
+  // Remove post from favorites
+  fastify.delete('/:postId/favorite', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Remove a post from favorites',
+      tags: ['Posts'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['postId'],
+        properties: {
+          postId: { type: 'string', description: 'Post ID' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, postsController.removeFavorite.bind(postsController));
+
+  // Get my saved posts
+  fastify.get('/me/favorites', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Get my saved posts',
+      tags: ['Posts'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'number', minimum: 1, default: 1 },
+          limit: { type: 'number', minimum: 1, maximum: 50, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                favorites: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      post: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          title: { type: 'string' },
+                          content: { type: 'string' },
+                          excerpt: { type: 'string', nullable: true },
+                          coverUrl: { type: 'string', nullable: true },
+                          company: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string' },
+                              name: { type: 'string' },
+                              slug: { type: 'string' },
+                              logoUrl: { type: 'string', nullable: true },
+                            },
+                          },
+                          _count: {
+                            type: 'object',
+                            properties: { likes: { type: 'number' } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, postsController.getMyFavorites.bind(postsController));
   // Publish post
   fastify.post('/:postId/publish', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],

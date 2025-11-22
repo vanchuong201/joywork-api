@@ -7,6 +7,7 @@ import {
   searchCompaniesSchema,
   addCompanyMemberSchema,
   updateCompanyMemberSchema,
+  getCompanySummarySchema,
 } from './companies.schema';
 
 export class CompaniesController {
@@ -54,6 +55,25 @@ export class CompaniesController {
 
     return reply.send({
       data: { company },
+    });
+  }
+
+  async getCompanySummary(request: FastifyRequest, reply: FastifyReply) {
+    const { companyId } = getCompanySummarySchema.parse(request.params);
+
+    const summary = await this.companiesService.getCompanySummary(companyId);
+
+    if (!summary) {
+      return reply.status(404).send({
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: 'Company not found',
+        },
+      });
+    }
+
+    return reply.send({
+      data: { summary },
     });
   }
 

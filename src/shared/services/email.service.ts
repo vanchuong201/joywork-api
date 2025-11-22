@@ -147,7 +147,7 @@ class EmailService {
     
     <p>Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWork ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.</p>
     
-    <p>Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một <u><a href="#" style="color: #ff6b00;">Tài liệu</a></u> <strong>Hướng dẫn sử dụng JOYWork</strong>.</p>
+    <p>Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một <u><a href="https://momtech-docs.gitbook.io/joywork/" style="color: #ff6b00;">Tài liệu</a></u> <strong>Hướng dẫn sử dụng JOYWork</strong>.</p>
     
     <p>Chúng tôi rất mong bạn sẽ có những trải nghiệm tuyệt vời trên nền tảng!</p>
     
@@ -261,6 +261,107 @@ Lưu ý: Link này sẽ hết hạn sau 1 giờ. Nếu bạn không yêu cầu �
 Trân trọng,
 Đội ngũ JOYWork
     `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendCompanyTicketOwnerEmail(
+    to: string,
+    payload: {
+      ownerName?: string | null;
+      applicantName?: string | null;
+      applicantEmail: string;
+      title: string;
+      content: string;
+      ticketUrl: string;
+    },
+  ): Promise<void> {
+    const subject = `[JOYWork] Ticket mới từ ứng viên: ${payload.title}`;
+    const ownerLabel = payload.ownerName ?? 'bạn';
+    const applicantLabel = payload.applicantName ?? payload.applicantEmail;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8" /></head>
+<body style="font-family: Arial, sans-serif; color: #1f2933;">
+  <p>Chào ${ownerLabel},</p>
+  <p>Bạn vừa nhận được một ticket mới từ <strong>${applicantLabel}</strong>.</p>
+  <p><strong>Tiêu đề:</strong> ${payload.title}</p>
+  <p><strong>Nội dung:</strong></p>
+  <blockquote style="border-left: 4px solid #ff6b00; margin: 16px 0; padding-left: 12px;">
+    ${payload.content.replace(/\n/g, '<br />')}
+  </blockquote>
+  <p>Bấm vào đường dẫn sau để trả lời ticket:</p>
+  <p><a href="${payload.ticketUrl}" style="color: #ff6b00;">${payload.ticketUrl}</a></p>
+  <p>Trân trọng,<br/>Đội ngũ JOYWork</p>
+</body>
+</html>
+`;
+
+    const text = `
+Chào ${ownerLabel},
+
+Bạn vừa nhận được một ticket mới từ ${applicantLabel}.
+
+Tiêu đề: ${payload.title}
+Nội dung:
+${payload.content}
+
+Trả lời ticket tại: ${payload.ticketUrl}
+`;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendCompanyTicketApplicantEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      title: string;
+      content: string;
+      ticketUrl: string;
+    },
+  ): Promise<void> {
+    const subject = `[JOYWork] ${payload.companyName} đã phản hồi ticket của bạn`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8" /></head>
+<body style="font-family: Arial, sans-serif; color: #1f2933;">
+  <p>Chào bạn,</p>
+  <p>Doanh nghiệp <strong>${payload.companyName}</strong> vừa phản hồi ticket <em>${payload.title}</em>.</p>
+  <p><strong>Nội dung:</strong></p>
+  <blockquote style="border-left: 4px solid #ff6b00; margin: 16px 0; padding-left: 12px;">
+    ${payload.content.replace(/\n/g, '<br />')}
+  </blockquote>
+  <p>Bạn có thể xem và trả lời tại: <a href="${payload.ticketUrl}" style="color: #ff6b00;">${payload.ticketUrl}</a></p>
+  <p>Trân trọng,<br/>Đội ngũ JOYWork</p>
+</body>
+</html>
+`;
+
+    const text = `
+Chào bạn,
+
+${payload.companyName} vừa phản hồi ticket "${payload.title}" của bạn.
+
+Nội dung:
+${payload.content}
+
+Xem chi tiết tại: ${payload.ticketUrl}
+`;
 
     await this.sendEmail({
       to,

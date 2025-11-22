@@ -62,6 +62,21 @@ export const unlikePostSchema = z.object({
   postId: z.string().cuid('Invalid post ID'),
 });
 
+// Save/Unsave favorite post schema
+export const savePostSchema = z.object({
+  postId: z.string().cuid('Invalid post ID'),
+});
+
+export const removeFavoritePostSchema = z.object({
+  postId: z.string().cuid('Invalid post ID'),
+});
+
+// Get my saved posts schema
+export const getMySavedPostsSchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(50).default(20),
+});
+
 // Publish post schema
 export const publishPostSchema = z.object({
   postId: z.string().cuid('Invalid post ID'),
@@ -80,6 +95,9 @@ export type GetCompanyPostsInput = z.infer<typeof getCompanyPostsSchema>;
 export type GetFeedPostsInput = z.infer<typeof getFeedPostsSchema>;
 export type LikePostInput = z.infer<typeof likePostSchema>;
 export type UnlikePostInput = z.infer<typeof unlikePostSchema>;
+export type SavePostInput = z.infer<typeof savePostSchema>;
+export type RemoveFavoritePostInput = z.infer<typeof removeFavoritePostSchema>;
+export type GetMySavedPostsInput = z.infer<typeof getMySavedPostsSchema>;
 export type PublishPostInput = z.infer<typeof publishPostSchema>;
 export type UnpublishPostInput = z.infer<typeof unpublishPostSchema>;
 export type PostImageInput = z.infer<typeof postImageInputSchema>;
