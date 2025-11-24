@@ -104,6 +104,7 @@ model UserProfile {
 model Company {
   id          String   @id @default(cuid())
   name        String
+  legalName   String?
   slug        String   @unique
   tagline     String?
   description String?
