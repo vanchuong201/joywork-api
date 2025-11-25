@@ -106,7 +106,17 @@ export async function createApp(): Promise<FastifyInstance> {
   // Error handler
   app.setErrorHandler(errorHandler);
 
-  // Health check
+  // Basic routes
+  app.get('/', async () => {
+    return {
+      name: 'JoyWork API',
+      status: 'running',
+      docs: '/docs',
+      health: '/health',
+      timestamp: new Date().toISOString(),
+    };
+  });
+
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
