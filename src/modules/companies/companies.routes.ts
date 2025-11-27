@@ -10,6 +10,72 @@ export async function companiesRoutes(fastify: FastifyInstance) {
   const companiesController = new CompaniesController(companiesService);
   const authMiddleware = new AuthMiddleware(authService);
 
+  // Invitation related routes
+  fastify.get('/invitations', {
+    schema: {
+      description: 'Get invitation details',
+      tags: ['Companies'],
+      querystring: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Invitation token' }
+        },
+        required: ['token']
+      },
+      response: {
+        200: {
+            type: 'object',
+            properties: {
+                data: {
+                    type: 'object',
+                    properties: {
+                        invitation: {
+                            type: 'object',
+                            properties: {
+                                email: { type: 'string' },
+                                companyName: { type: 'string' },
+                                inviterName: { type: 'string' },
+                                role: { type: 'string' }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+      }
+    }
+  }, companiesController.getInvitation.bind(companiesController));
+
+  fastify.post('/invitations/accept', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Accept company invitation',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Invitation token' }
+        },
+        required: ['token']
+      },
+      response: {
+        200: {
+            type: 'object',
+            properties: {
+                data: {
+                    type: 'object',
+                    properties: {
+                        companySlug: { type: 'string' }
+                    }
+                }
+            }
+        }
+      }
+    }
+  }, companiesController.acceptInvitation.bind(companiesController));
+
+
   // Create company
   fastify.post('/', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
@@ -775,11 +841,11 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     },
   }, companiesController.updateCompany.bind(companiesController));
 
-  // Add company member
+  // Invite company member (Renamed from addCompanyMember)
   fastify.post('/:companyId/members', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
     schema: {
-      description: 'Add company member',
+      description: 'Invite company member',
       tags: ['Companies'],
       security: [{ bearerAuth: [] }],
       params: {
@@ -791,9 +857,9 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['userId'],
+        required: ['email'],
         properties: {
-          userId: { type: 'string', description: 'User ID to add as member' },
+          email: { type: 'string', format: 'email', description: 'Email to invite' },
           role: { 
             type: 'string', 
             enum: ['OWNER', 'ADMIN', 'MEMBER'],
@@ -816,7 +882,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
         },
       },
     },
-  }, companiesController.addCompanyMember.bind(companiesController));
+  }, companiesController.inviteMember.bind(companiesController));
 
   // Update company member role
   fastify.patch('/:companyId/members/:memberId', {

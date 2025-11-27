@@ -370,6 +370,87 @@ Xem chi tiết tại: ${payload.ticketUrl}
       text,
     });
   }
+
+  async sendCompanyInvitationEmail(
+    to: string,
+    companyName: string,
+    inviterName: string,
+    role: string,
+    acceptUrl: string
+  ): Promise<void> {
+    const subject = `Lời mời tham gia ${companyName} trên JOYWork`;
+    
+    const roleText = role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lời mời tham gia Doanh nghiệp - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #ff6b00; margin-bottom: 20px;">Lời mời tham gia ${companyName}</h2>
+    
+    <p>Chào bạn,</p>
+    
+    <p><strong>${inviterName}</strong> đã mời bạn tham gia vào đội ngũ của <strong>${companyName}</strong> trên JOYWork với vai trò <strong>${roleText}</strong>.</p>
+    
+    <p>Nếu bạn chấp nhận lời mời này, hãy nhấn vào nút bên dưới để tham gia ngay:</p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${acceptUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Chấp nhận lời mời</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+        Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+        <a href="${acceptUrl}" style="color: #ff6b00;">${acceptUrl}</a>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 13px; color: #999;">
+      <strong>Lưu ý:</strong><br/>
+      - Nếu bạn chưa có tài khoản JOYWork với email <strong>${to}</strong>, bạn sẽ được yêu cầu đăng ký tài khoản mới.<br/>
+      - Nếu bạn không muốn tham gia hoặc cho rằng đây là nhầm lẫn, vui lòng bỏ qua email này.
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Lời mời tham gia ${companyName} trên JOYWork
+
+Chào bạn,
+
+${inviterName} đã mời bạn tham gia vào đội ngũ của ${companyName} trên JOYWork với vai trò ${roleText}.
+
+Để chấp nhận lời mời, vui lòng truy cập đường dẫn sau:
+${acceptUrl}
+
+Lưu ý:
+- Nếu bạn chưa có tài khoản JOYWork với email ${to}, bạn sẽ được yêu cầu đăng ký tài khoản mới.
+- Nếu bạn không muốn tham gia, vui lòng bỏ qua email này.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export const emailService = new EmailService();

@@ -37,6 +37,7 @@ model User {
   postFavorites PostFavorite[]
   tickets      CompanyTicket[] @relation("TicketApplicant")
   ticketMessages CompanyTicketMessage[]
+  sentInvitations CompanyInvitation[] @relation("SentInvitations")
 
   @@map("users")
 }
@@ -130,6 +131,7 @@ model Company {
   jobs    Job[]
   follows Follow[]
   tickets CompanyTicket[]
+  invitations CompanyInvitation[]
 
   @@map("companies")
 }
@@ -443,4 +445,22 @@ model CompanyTicketMessage {
   @@index([ticketId])
   @@index([senderId])
   @@map("company_ticket_messages")
+}
+
+model CompanyInvitation {
+  id        String             @id @default(cuid())
+  email     String
+  role      CompanyMemberRole
+  token     String             @unique
+  companyId String
+  inviterId String
+  expiresAt DateTime
+  createdAt DateTime           @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inviter   User    @relation("SentInvitations", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
+  @@index([token])
+  @@map("company_invitations")
 }

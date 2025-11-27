@@ -9,6 +9,7 @@ import {
   updateCompanyMemberSchema,
   getCompanySummarySchema,
 } from './companies.schema';
+import { z } from 'zod';
 
 export class CompaniesController {
   constructor(private companiesService: CompaniesService) {}
@@ -110,19 +111,42 @@ export class CompaniesController {
     });
   }
 
-  // Add company member
-  async addCompanyMember(request: FastifyRequest, reply: FastifyReply) {
+  // Invite company member (Renamed from addCompanyMember)
+  async inviteMember(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { companyId } = request.params as { companyId: string };
     const data = addCompanyMemberSchema.parse(request.body);
     
-    await this.companiesService.addCompanyMember(companyId, userId, data);
+    await this.companiesService.inviteMember(companyId, userId, data);
     
     return reply.status(201).send({
       data: {
-        message: 'Member added successfully',
+        message: 'Invitation sent successfully',
       },
     });
+  }
+
+  // Accept invitation
+  async acceptInvitation(request: FastifyRequest, reply: FastifyReply) {
+      const userId = (request as any).user?.userId;
+      const { token } = z.object({ token: z.string() }).parse(request.body);
+
+      const result = await this.companiesService.acceptInvitation(token, userId);
+
+      return reply.send({
+          data: result
+      });
+  }
+  
+  // Get invitation info
+  async getInvitation(request: FastifyRequest, reply: FastifyReply) {
+      const { token } = z.object({ token: z.string() }).parse(request.query);
+      
+      const invitation = await this.companiesService.getInvitation(token);
+      
+      return reply.send({
+          data: { invitation }
+      });
   }
 
   // Update company member role

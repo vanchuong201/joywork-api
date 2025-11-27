@@ -104,7 +104,7 @@ export const searchCompaniesSchema = z.object({
 
 // Add company member schema
 export const addCompanyMemberSchema = z.object({
-  userId: z.string().cuid('Invalid user ID'),
+  email: z.string().email('Invalid email address'),
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER']).default('MEMBER'),
 });
 

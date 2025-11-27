@@ -8,6 +8,9 @@ import {
   AddCompanyMemberInput,
   UpdateCompanyMemberInput,
 } from './companies.schema';
+import crypto from 'crypto';
+import { emailService } from '@/shared/services/email.service';
+import { config } from '@/config/env';
 
 export interface Company {
   id: string;
@@ -412,6 +415,7 @@ export class CompaniesService {
         limit,
         total,
         totalPages,
+        totalPages,
       },
     };
   }
@@ -492,8 +496,8 @@ export class CompaniesService {
     }));
   }
 
-  // Add company member
-  async addCompanyMember(companyId: string, ownerId: string, data: AddCompanyMemberInput): Promise<void> {
+  // Invite company member
+  async inviteMember(companyId: string, ownerId: string, data: AddCompanyMemberInput): Promise<void> {
     // Check if user is owner/admin of company
     const membership = await prisma.companyMember.findFirst({
       where: {
@@ -501,34 +505,168 @@ export class CompaniesService {
         companyId,
         role: { in: ['OWNER', 'ADMIN'] },
       },
+      include: {
+        user: true,
+      },
     });
 
     if (!membership) {
-      throw new AppError('You do not have permission to add members', 403, 'FORBIDDEN');
+      throw new AppError('You do not have permission to invite members', 403, 'FORBIDDEN');
+    }
+
+    // Role constraints: Admin cannot invite Owner or another Admin (depending on rules)
+    // Here we allow Admin to invite Member, Owner to invite Admin/Member
+    if (membership.role === 'ADMIN' && data.role !== 'MEMBER') {
+       throw new AppError('Admins can only invite Members', 403, 'FORBIDDEN');
     }
 
     // Check if user is already a member
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      const existingMembership = await prisma.companyMember.findUnique({
+        where: {
+          userId_companyId: {
+            userId: existingUser.id,
+            companyId,
+          },
+        },
+      });
+
+      if (existingMembership) {
+        throw new AppError('User is already a member of this company', 409, 'MEMBER_EXISTS');
+      }
+    }
+
+    // Create invitation
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+
+    // Check existing invitation and delete if exists
+    await prisma.companyInvitation.deleteMany({
+        where: {
+            companyId,
+            email: data.email
+        }
+    });
+
+    await prisma.companyInvitation.create({
+      data: {
+        email: data.email,
+        companyId,
+        role: data.role,
+        token,
+        inviterId: ownerId,
+        expiresAt,
+      },
+    });
+
+    const company = await prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+
+    const acceptUrl = `${config.FRONTEND_ORIGIN}/invitations/accept?token=${token}`;
+
+    await emailService.sendCompanyInvitationEmail(
+      data.email,
+      company.name,
+      membership.user.name || membership.user.email,
+      data.role,
+      acceptUrl
+    );
+  }
+
+  // Accept invitation
+  async acceptInvitation(token: string, userId: string): Promise<{ companySlug: string }> {
+    const invitation = await prisma.companyInvitation.findUnique({
+      where: { token },
+      include: { company: true },
+    });
+
+    if (!invitation) {
+      throw new AppError('Invalid or expired invitation', 404, 'INVITATION_INVALID');
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      throw new AppError('Invitation expired', 400, 'INVITATION_EXPIRED');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    if (user.email !== invitation.email) {
+      throw new AppError('Email mismatch. Please login with the invited email.', 403, 'EMAIL_MISMATCH');
+    }
+
+    // Check if already member
     const existingMembership = await prisma.companyMember.findUnique({
       where: {
         userId_companyId: {
-          userId: data.userId,
-          companyId,
+          userId,
+          companyId: invitation.companyId,
         },
       },
     });
 
     if (existingMembership) {
-      throw new AppError('User is already a member of this company', 409, 'MEMBER_EXISTS');
+        // Already member, just clean up invite
+        await prisma.companyInvitation.delete({ where: { id: invitation.id } });
+        return { companySlug: invitation.company.slug };
     }
 
     // Add member
     await prisma.companyMember.create({
       data: {
-        userId: data.userId,
-        companyId,
-        role: data.role,
+        userId,
+        companyId: invitation.companyId,
+        role: invitation.role,
       },
     });
+
+    // Delete invitation
+    await prisma.companyInvitation.delete({
+      where: { id: invitation.id },
+    });
+
+    return { companySlug: invitation.company.slug };
+  }
+
+  // Get invitation details (for frontend preview)
+  async getInvitation(token: string): Promise<{
+    email: string;
+    companyName: string;
+    inviterName: string;
+    role: string;
+  }> {
+     const invitation = await prisma.companyInvitation.findUnique({
+      where: { token },
+      include: { 
+          company: true,
+          inviter: true
+      },
+    });
+
+    if (!invitation) {
+      throw new AppError('Invalid or expired invitation', 404, 'INVITATION_INVALID');
+    }
+    
+    if (invitation.expiresAt < new Date()) {
+        throw new AppError('Invitation expired', 400, 'INVITATION_EXPIRED');
+    }
+
+    return {
+        email: invitation.email,
+        companyName: invitation.company.name,
+        inviterName: invitation.inviter.name || invitation.inviter.email,
+        role: invitation.role
+    };
   }
 
   // Update company member role
@@ -544,6 +682,34 @@ export class CompaniesService {
 
     if (!membership) {
       throw new AppError('You do not have permission to update members', 403, 'FORBIDDEN');
+    }
+    
+    const targetMember = await prisma.companyMember.findUnique({
+        where: { id: memberId }
+    });
+
+    if (!targetMember) {
+        throw new AppError('Member not found', 404, 'MEMBER_NOT_FOUND');
+    }
+
+    // OWNER can update anyone except themselves (logic handled in frontend mostly, but good to check)
+    // ADMIN can update MEMBER only
+    
+    if (membership.role === 'ADMIN') {
+        if (targetMember.role !== 'MEMBER') {
+            throw new AppError('Admins can only update Members', 403, 'FORBIDDEN');
+        }
+        if (data.role !== 'MEMBER') { // Admin cannot promote to Admin/Owner
+             // Actually, the requirement says "Admin được invite người khác làm admin hoặc member".
+             // But for update role: "Owner có quyền cao nhất nên được phép xóa hoặc thay đổi quyền của Admin" implies Admin might be restricted.
+             // Let's stick to standard: Admin manages Member.
+             throw new AppError('Admins cannot change roles to Admin/Owner', 403, 'FORBIDDEN');
+        }
+    }
+
+    // Owner cannot change someone else to Owner (ownership transfer is different process usually)
+    if (data.role === 'OWNER') {
+         throw new AppError('Ownership transfer is not supported via this endpoint', 400, 'INVALID_OPERATION');
     }
 
     // Update member role
@@ -566,6 +732,25 @@ export class CompaniesService {
 
     if (!membership) {
       throw new AppError('You do not have permission to remove members', 403, 'FORBIDDEN');
+    }
+
+    const targetMember = await prisma.companyMember.findUnique({
+        where: { id: memberId }
+    });
+
+    if (!targetMember) {
+        throw new AppError('Member not found', 404, 'MEMBER_NOT_FOUND');
+    }
+    
+    // Logic permissions
+    if (membership.role === 'ADMIN') {
+        if (targetMember.role !== 'MEMBER') {
+             throw new AppError('Admins can only remove Members', 403, 'FORBIDDEN');
+        }
+    }
+    
+    if (targetMember.userId === ownerId) {
+         throw new AppError('Cannot remove yourself', 400, 'INVALID_OPERATION');
     }
 
     // Remove member
