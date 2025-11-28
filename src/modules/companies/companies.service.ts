@@ -415,7 +415,6 @@ export class CompaniesService {
         limit,
         total,
         totalPages,
-        totalPages,
       },
     };
   }
