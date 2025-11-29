@@ -379,11 +379,20 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { q, location, remote, employmentType, experienceLevel, salaryMin, salaryMax, skills, companyId, page, limit } = data;
+    const { q, location, remote, employmentType, experienceLevel, salaryMin, salaryMax, skills, companyId, isActive, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: any = { isActive: true };
+    const where: any = {};
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    } else {
+      // Default: only active jobs for public search.
+      // For company-specific management (companyId provided), show all unless explicitly filtered.
+      if (!companyId) {
+        where.isActive = true;
+      }
+    }
 
     if (q) {
       where.OR = [

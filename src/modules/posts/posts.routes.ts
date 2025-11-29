@@ -236,6 +236,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       },
                     },
                     isLiked: { type: 'boolean' },
+                    isSaved: { type: 'boolean' },
                   },
                 },
               },
@@ -354,6 +355,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         },
                       },
                       isLiked: { type: 'boolean' },
+                      isSaved: { type: 'boolean' },
                     },
                   },
                 },
@@ -471,6 +473,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         },
                       },
                       isLiked: { type: 'boolean' },
+                      isSaved: { type: 'boolean' },
                     },
                   },
                 },
@@ -522,6 +525,23 @@ export async function postsRoutes(fastify: FastifyInstance) {
             description: 'Post visibility'
           },
           publishedAt: { type: 'string', format: 'date-time', description: 'Publish date' },
+          images: {
+            type: 'array',
+            maxItems: 8,
+            items: {
+              type: 'object',
+              required: ['url'],
+              properties: {
+                id: { type: 'string' },
+                key: { type: 'string' },
+                url: { type: 'string' },
+                width: { type: 'number' },
+                height: { type: 'number' },
+                order: { type: 'number' },
+              },
+            },
+            description: 'Replace images set for the post (up to 8)',
+          },
         },
       },
       response: {

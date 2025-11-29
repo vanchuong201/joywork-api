@@ -28,6 +28,16 @@ export const updatePostSchema = z.object({
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).optional(),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   publishedAt: z.string().datetime().optional(),
+  images: z.array(
+    z.object({
+      id: z.string().optional(),           // existing image id (if updating/reordering)
+      key: z.string().optional(),          // storage key for new uploads
+      url: z.string().url('Image URL must be valid'),
+      width: z.number().int().min(1).max(10000).optional(),
+      height: z.number().int().min(1).max(10000).optional(),
+      order: z.number().int().min(0).max(99).optional(),
+    })
+  ).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
 });
 
 // Get post schema

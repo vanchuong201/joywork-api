@@ -224,9 +224,16 @@ export class PostsService {
       throw new AppError('Post not found', 404, 'POST_NOT_FOUND');
     }
 
-    // Check if user is member of company
+    // Check permissions:
+    // - OWNER/ADMIN: có thể sửa mọi bài trong công ty mình quản lý
+    // - MEMBER: chỉ được sửa bài do chính mình tạo
     const membership = post.company.members[0];
-    if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
+    if (!membership) {
+      throw new AppError('You do not have permission to update this post', 403, 'FORBIDDEN');
+    }
+    const isOwnerOrAdmin = ['OWNER', 'ADMIN'].includes(membership.role);
+    const isMemberEditingOwnPost = membership.role === 'MEMBER' && post.createdById === userId;
+    if (!(isOwnerOrAdmin || isMemberEditingOwnPost)) {
       throw new AppError('You do not have permission to update this post', 403, 'FORBIDDEN');
     }
 
@@ -242,6 +249,66 @@ export class PostsService {
     if (data.visibility !== undefined) updateData.visibility = data.visibility;
     if (data.publishedAt !== undefined) updateData.publishedAt = data.publishedAt ? new Date(data.publishedAt) : null;
     
+    // Handle images replacement if provided
+    if (data['images'] !== undefined) {
+      const currentImages = await prisma.postImage.findMany({
+        where: { postId },
+        select: { id: true, url: true, storageKey: true },
+      });
+      const desired = (data['images'] as any[]).map(img => ({
+        id: img.id as string | undefined,
+        key: img.key as string | undefined,
+        url: img.url as string,
+        width: img.width as number | undefined,
+        height: img.height as number | undefined,
+        order: img.order as number | undefined,
+      }));
+      const currentById = new Map(currentImages.map(ci => [ci.id, ci]));
+      const currentByUrl = new Map(currentImages.map(ci => [ci.url, ci]));
+      const desiredIds = new Set(desired.filter(d => d.id).map(d => d.id as string));
+      const toDelete = currentImages.filter(ci => !desiredIds.has(ci.id));
+      // Delete removed images in DB and S3
+      if (toDelete.length) {
+        const keysToDelete = toDelete.map(d => d.storageKey).filter(Boolean) as string[];
+        if (keysToDelete.length) {
+          await deleteS3Objects(keysToDelete);
+        }
+        await prisma.postImage.deleteMany({
+          where: { id: { in: toDelete.map(d => d.id) } },
+        });
+      }
+      // Upsert/update desired images
+      for (const d of desired) {
+        const ord = d.order ?? 0;
+        const width = d.width ?? null;
+        const height = d.height ?? null;
+        if (d.id && currentById.has(d.id)) {
+          await prisma.postImage.update({
+            where: { id: d.id },
+            data: {
+              url: d.url,
+              width,
+              height,
+              order: ord,
+            },
+          });
+        } else {
+          // find storageKey: prefer provided key; else try match by url from current
+          const storageKey = d.key ?? currentByUrl.get(d.url)?.storageKey ?? null;
+          await prisma.postImage.create({
+            data: {
+              postId,
+              url: d.url,
+              storageKey,
+              width,
+              height,
+              order: ord,
+            },
+          });
+        }
+      }
+    }
+
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: updateData,
@@ -858,6 +925,11 @@ export class PostsService {
             },
           },
         },
+        images: {
+          select: {
+            storageKey: true,
+          },
+        },
       },
     });
 
@@ -865,9 +937,14 @@ export class PostsService {
       throw new AppError('Post not found', 404, 'POST_NOT_FOUND');
     }
 
-    // Check if user is member of company
+    // Check permissions
     const membership = post.company.members[0];
-    if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
+    if (!membership) {
+      throw new AppError('You do not have permission to delete this post', 403, 'FORBIDDEN');
+    }
+    const isOwnerOrAdmin = ['OWNER', 'ADMIN'].includes(membership.role);
+    const isMemberDeletingOwnPost = membership.role === 'MEMBER' && post.createdById === userId;
+    if (!(isOwnerOrAdmin || isMemberDeletingOwnPost)) {
       throw new AppError('You do not have permission to delete this post', 403, 'FORBIDDEN');
     }
 

@@ -88,6 +88,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
         required: ['name', 'slug'],
         properties: {
           name: { type: 'string', minLength: 2, description: 'Company name' },
+          legalName: { type: 'string', maxLength: 200, description: 'Registered business name' },
           slug: { type: 'string', minLength: 2, pattern: '^[a-z0-9-]+$', description: 'URL-friendly slug' },
           tagline: { type: 'string', maxLength: 150, description: 'Company tagline' },
           description: { type: 'string', maxLength: 10000, description: 'Company description (HTML allowed, sanitized server-side)' },
@@ -213,6 +214,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                   properties: {
                     id: { type: 'string' },
                     name: { type: 'string' },
+                    legalName: { type: 'string', nullable: true },
                     slug: { type: 'string' },
                     tagline: { type: 'string', nullable: true },
                     description: { type: 'string', nullable: true },
@@ -382,6 +384,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                   properties: {
                     id: { type: 'string' },
                     name: { type: 'string' },
+                    legalName: { type: 'string', nullable: true },
                     slug: { type: 'string' },
                     tagline: { type: 'string', nullable: true },
                     description: { type: 'string', nullable: true },
@@ -549,6 +552,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                     properties: {
                       id: { type: 'string' },
                       name: { type: 'string' },
+                      legalName: { type: 'string', nullable: true },
                       slug: { type: 'string' },
                       tagline: { type: 'string', nullable: true },
                       description: { type: 'string', nullable: true },
@@ -608,6 +612,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                         properties: {
                           id: { type: 'string' },
                           name: { type: 'string' },
+                          legalName: { type: 'string', nullable: true },
                           slug: { type: 'string' },
                           tagline: { type: 'string', nullable: true },
                           description: { type: 'string', nullable: true },
@@ -660,6 +665,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                         properties: {
                           id: { type: 'string' },
                           name: { type: 'string' },
+                          legalName: { type: 'string', nullable: true },
                           slug: { type: 'string' },
                           tagline: { type: 'string', nullable: true },
                           description: { type: 'string', nullable: true },
@@ -704,6 +710,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
         type: 'object',
         properties: {
           name: { type: 'string', minLength: 2, description: 'Company name' },
+          legalName: { type: 'string', maxLength: 200, description: 'Registered business name' },
           slug: { type: 'string', minLength: 2, pattern: '^[a-z0-9-]+$', description: 'URL-friendly slug' },
           tagline: { type: 'string', maxLength: 150, description: 'Company tagline' },
           description: { type: 'string', maxLength: 10000, description: 'Company description (HTML allowed, sanitized server-side)' },
@@ -737,6 +744,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                   properties: {
                     id: { type: 'string' },
                     name: { type: 'string' },
+                    legalName: { type: 'string', nullable: true },
                     slug: { type: 'string' },
                     tagline: { type: 'string', nullable: true },
                     description: { type: 'string', nullable: true },
@@ -1016,4 +1024,67 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
     },
   }, companiesController.unfollowCompany.bind(companiesController));
+
+  // List company followers (members only)
+  fastify.get('/:companyId/followers', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'List followers of a company (members only)',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'number', minimum: 1, default: 1 },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                followers: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      followedAt: { type: 'string', format: 'date-time' },
+                      user: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          email: { type: 'string' },
+                          name: { type: 'string', nullable: true },
+                          avatar: { type: 'string', nullable: true },
+                        },
+                      },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    hasMore: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.listCompanyFollowers.bind(companiesController));
 }

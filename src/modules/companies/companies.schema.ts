@@ -49,6 +49,7 @@ const highlightsSchema = z.array(
 
 const baseCompanySchema = {
   name: z.string().min(2, 'Company name must be at least 2 characters'),
+  legalName: z.string().max(200, 'Legal name must be less than 200 characters').optional(),
   slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
   tagline: z.string().max(150, 'Tagline must be less than 150 characters').optional(),
   description: z.string().max(10000, 'Description must be less than 10000 characters').optional(),
@@ -121,3 +122,11 @@ export type GetCompanySummaryInput = z.infer<typeof getCompanySummarySchema>;
 export type SearchCompaniesInput = z.infer<typeof searchCompaniesSchema>;
 export type AddCompanyMemberInput = z.infer<typeof addCompanyMemberSchema>;
 export type UpdateCompanyMemberInput = z.infer<typeof updateCompanyMemberSchema>;
+
+// List followers of a company
+export const listCompanyFollowersSchema = z.object({
+  companyId: z.string().min(1, 'Company ID is required'),
+  page: z.coerce.number().min(1).default(1).optional(),
+  limit: z.coerce.number().min(1).max(100).default(20).optional(),
+});
+export type ListCompanyFollowersInput = z.infer<typeof listCompanyFollowersSchema>;

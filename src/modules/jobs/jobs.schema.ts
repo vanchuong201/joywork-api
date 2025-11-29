@@ -56,6 +56,7 @@ export const searchJobsSchema = z.object({
   salaryMax: z.coerce.number().int().min(0).optional(),
   skills: z.string().optional(), // Comma-separated skills
   companyId: z.string().cuid('Invalid company ID').optional(),
+  isActive: z.coerce.boolean().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });

@@ -276,6 +276,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           salaryMax: { type: 'number', minimum: 0, description: 'Maximum salary filter' },
           skills: { type: 'string', description: 'Comma-separated skills' },
           companyId: { type: 'string', description: 'Filter by company ID' },
+          isActive: { type: 'boolean', description: 'Filter by job active status' },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
         },

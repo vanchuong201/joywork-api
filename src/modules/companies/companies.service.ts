@@ -15,6 +15,7 @@ import { config } from '@/config/env';
 export interface Company {
   id: string;
   name: string;
+  legalName?: string | null;
   slug: string;
   tagline?: string;
   description?: string;
@@ -77,6 +78,7 @@ export interface CompanyHighlight {
 export interface CompanyWithMembers {
   id: string;
   name: string;
+  legalName?: string | null;
   slug: string;
   tagline?: string;
   description?: string;
@@ -178,6 +180,7 @@ export class CompaniesService {
     return {
       id: company.id,
       name: company.name,
+      legalName: company.legalName,
       slug: company.slug,
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
@@ -199,6 +202,57 @@ export class CompaniesService {
     };
   }
 
+  // List followers of a company (members only)
+  async listCompanyFollowers(requesterId: string, companyId: string, page = 1, limit = 20) {
+    // Ensure requester is a member (any role)
+    const membership = await prisma.companyMember.findFirst({
+      where: { userId: requesterId, companyId },
+      select: { id: true },
+    });
+    if (!membership) {
+      throw new AppError('You do not have permission to view followers', 403, 'FORBIDDEN');
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.follow.count({ where: { companyId } }),
+      prisma.follow.findMany({
+        where: { companyId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              profile: { select: { avatar: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const followers = items.map((f) => ({
+      followedAt: f.createdAt,
+      user: {
+        id: f.user.id,
+        email: f.user.email,
+        name: f.user.name ?? null,
+        avatar: f.user.profile?.avatar ?? null,
+      },
+    }));
+
+    return {
+      followers,
+      pagination: {
+        page,
+        limit,
+        total,
+        hasMore: page * limit < total,
+      },
+    };
+  }
   // Update company
   async updateCompany(companyId: string, userId: string, data: UpdateCompanyInput): Promise<Company> {
     // Check if user is owner/admin of company
@@ -250,6 +304,7 @@ export class CompaniesService {
     return {
       id: company.id,
       name: company.name,
+      legalName: company.legalName,
       slug: company.slug,
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
@@ -304,6 +359,7 @@ export class CompaniesService {
     return {
       id: company.id,
       name: company.name,
+      legalName: company.legalName,
       slug: company.slug,
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
@@ -396,6 +452,7 @@ export class CompaniesService {
       companies: companies.map(company => ({
         id: company.id,
         name: company.name,
+        legalName: company.legalName,
         slug: company.slug,
         ...(company.tagline != null ? { tagline: company.tagline } : {}),
         ...(company.description != null ? { description: company.description } : {}),
@@ -435,6 +492,7 @@ export class CompaniesService {
       company: {
         id: membership.company.id,
         name: membership.company.name,
+        legalName: membership.company.legalName,
         slug: membership.company.slug,
         ...(membership.company.tagline != null ? { tagline: membership.company.tagline } : {}),
         ...(membership.company.description != null ? { description: membership.company.description } : {}),
@@ -473,6 +531,7 @@ export class CompaniesService {
       company: {
         id: follow.company.id,
         name: follow.company.name,
+        legalName: follow.company.legalName,
         slug: follow.company.slug,
         ...(follow.company.tagline != null ? { tagline: follow.company.tagline } : {}),
         ...(follow.company.description != null ? { description: follow.company.description } : {}),

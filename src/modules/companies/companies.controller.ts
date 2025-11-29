@@ -126,6 +126,24 @@ export class CompaniesController {
     });
   }
 
+  // List company followers (members only)
+  async listCompanyFollowers(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const companyId = (request.params as any)?.companyId as string;
+    const { page = 1, limit = 20 } = (request.query as any) ?? {};
+
+    const data = await this.companiesService.listCompanyFollowers(
+      userId,
+      companyId,
+      Number(page) || 1,
+      Number(limit) || 20,
+    );
+
+    return reply.send({
+      data,
+    });
+  }
+
   // Accept invitation
   async acceptInvitation(request: FastifyRequest, reply: FastifyReply) {
       const userId = (request as any).user?.userId;
@@ -146,7 +164,7 @@ export class CompaniesController {
       
       return reply.send({
           data: { invitation }
-      });
+    });
   }
 
   // Update company member role
