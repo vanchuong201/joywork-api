@@ -44,6 +44,13 @@ export interface Post {
   _count: {
     likes: number;
   };
+  jobs?: Array<{
+    id: string;
+    title: string;
+    location?: string | null;
+    employmentType: string;
+    isActive: boolean;
+  }>;
 }
 
 export interface PostWithLikes extends Post {
@@ -90,13 +97,22 @@ function mapPostEntity(post: any): Post {
       },
     })),
     _count: post._count,
+    jobs: Array.isArray(post.postJobs)
+      ? post.postJobs.map((pj: any) => ({
+          id: pj.job.id,
+          title: pj.job.title,
+          location: pj.job.location,
+          employmentType: pj.job.employmentType,
+          isActive: pj.job.isActive,
+        }))
+      : [],
   };
 }
 
 export class PostsService {
   // Create post
   async createPost(companyId: string, userId: string, data: CreatePostInput): Promise<Post> {
-    const { images, publishNow, publishedAt, ...postData } = data;
+    const { images, publishNow, publishedAt, jobIds, ...postData } = data;
 
     const membership = await prisma.companyMember.findFirst({
       where: {
@@ -143,7 +159,16 @@ export class PostsService {
             }
     
     const post = await prisma.post.create({
-      data: postDataToCreate,
+      data: {
+        ...postDataToCreate,
+        ...(Array.isArray(jobIds) && jobIds.length > 0
+          ? {
+              postJobs: {
+                create: jobIds.slice(0, 10).map((jid) => ({ jobId: jid })),
+              },
+            }
+          : {}),
+      },
       include: {
         company: {
           select: {
@@ -163,6 +188,11 @@ export class PostsService {
         images: {
           select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
           orderBy: { order: 'asc' },
+        },
+        postJobs: {
+          include: {
+            job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } },
+          },
         },
         likes: {
           include: {
@@ -491,6 +521,9 @@ export class PostsService {
             select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
             orderBy: { order: 'asc' },
           },
+          postJobs: {
+            include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
+          },
           likes: {
             include: {
               user: {
@@ -607,6 +640,9 @@ export class PostsService {
           images: {
             select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
             orderBy: { order: 'asc' },
+          },
+          postJobs: {
+            include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
           },
           likes: {
             include: {

@@ -60,6 +60,11 @@ export async function postsRoutes(fastify: FastifyInstance) {
               },
             },
           },
+          jobIds: {
+            type: 'array',
+            description: 'Optional attached job IDs (max 10)',
+            items: { type: 'string' },
+          },
         },
       },
       response: {
@@ -135,6 +140,19 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       type: 'object',
                       properties: {
                         likes: { type: 'number' },
+                      },
+                    },
+                    jobs: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          title: { type: 'string' },
+                          location: { type: 'string', nullable: true },
+                          employmentType: { type: 'string' },
+                          isActive: { type: 'boolean' },
+                        },
                       },
                     },
                   },
@@ -352,6 +370,19 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         type: 'object',
                         properties: {
                           likes: { type: 'number' },
+                        },
+                      },
+                      jobs: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            title: { type: 'string' },
+                            location: { type: 'string', nullable: true },
+                            employmentType: { type: 'string' },
+                            isActive: { type: 'boolean' },
+                          },
                         },
                       },
                       isLiked: { type: 'boolean' },

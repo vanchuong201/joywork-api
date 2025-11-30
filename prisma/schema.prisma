@@ -12,32 +12,32 @@ datasource db {
 
 // User model - Core user entity
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  password     String
-  name         String?
-  phone        String?
-  emailVerified Boolean @default(false)
-  role         UserRole @default(USER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  name          String?
+  phone         String?
+  emailVerified Boolean  @default(false)
+  role          UserRole @default(USER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  profile     UserProfile?
-  companies   CompanyMember[]
-  applications Application[]
-  messages    Message[]
-  follows     Follow[]
-  likes       Like[]
-  jobFavorites JobFavorite[]
-  posts       Post[]
-  postAuditLogs PostAuditLog[]
+  profile                 UserProfile?
+  companies               CompanyMember[]
+  applications            Application[]
+  messages                Message[]
+  follows                 Follow[]
+  likes                   Like[]
+  jobFavorites            JobFavorite[]
+  posts                   Post[]
+  postAuditLogs           PostAuditLog[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
-  postFavorites PostFavorite[]
-  tickets      CompanyTicket[] @relation("TicketApplicant")
-  ticketMessages CompanyTicketMessage[]
-  sentInvitations CompanyInvitation[] @relation("SentInvitations")
+  postFavorites           PostFavorite[]
+  tickets                 CompanyTicket[]          @relation("TicketApplicant")
+  ticketMessages          CompanyTicketMessage[]
+  sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
 
   @@map("users")
 }
@@ -81,19 +81,19 @@ enum UserRole {
 
 // UserProfile - Extended user information
 model UserProfile {
-  id          String  @id @default(cuid())
-  userId      String  @unique
-  avatar      String?
-  headline    String?
-  bio         String?
-  skills      String[]
-  cvUrl       String?
-  location    String?
-  website     String?
-  linkedin    String?
-  github      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  avatar    String?
+  headline  String?
+  bio       String?
+  skills    String[]
+  cvUrl     String?
+  location  String?
+  website   String?
+  linkedin  String?
+  github    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -103,34 +103,34 @@ model UserProfile {
 
 // Company model
 model Company {
-  id          String   @id @default(cuid())
-  name        String
-  legalName   String?
-  slug        String   @unique
-  tagline     String?
-  description String?
-  logoUrl     String?
-  coverUrl    String?
-  website     String?
-  location    String?
-  industry    String?
-  size        CompanySize?
-  foundedYear Int?
-  headcount   Int?
+  id            String       @id @default(cuid())
+  name          String
+  legalName     String?
+  slug          String       @unique
+  tagline       String?
+  description   String?
+  logoUrl       String?
+  coverUrl      String?
+  website       String?
+  location      String?
+  industry      String?
+  size          CompanySize?
+  foundedYear   Int?
+  headcount     Int?
   headcountNote String?
-  metrics     Json?
-  profileStory Json?
-  highlights  Json?
-  isVerified  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  metrics       Json?
+  profileStory  Json?
+  highlights    Json?
+  isVerified    Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   // Relations
-  members CompanyMember[]
-  posts   Post[]
-  jobs    Job[]
-  follows Follow[]
-  tickets CompanyTicket[]
+  members     CompanyMember[]
+  posts       Post[]
+  jobs        Job[]
+  follows     Follow[]
+  tickets     CompanyTicket[]
   invitations CompanyInvitation[]
 
   @@map("companies")
@@ -146,11 +146,11 @@ enum CompanySize {
 
 // CompanyMember - Many-to-many relationship between User and Company
 model CompanyMember {
-  id        String           @id @default(cuid())
+  id        String            @id @default(cuid())
   userId    String
   companyId String
   role      CompanyMemberRole @default(MEMBER)
-  joinedAt  DateTime         @default(now())
+  joinedAt  DateTime          @default(now())
 
   // Relations
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -168,39 +168,40 @@ enum CompanyMemberRole {
 
 // Post model - Company posts (Story posts)
 model Post {
-  id          String      @id @default(cuid())
+  id          String         @id @default(cuid())
   companyId   String
   createdById String?
   title       String
   content     String
   excerpt     String?
   coverUrl    String?
-  type        PostType    @default(STORY)
+  type        PostType       @default(STORY)
   visibility  PostVisibility @default(PUBLIC)
   publishedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   // Relations
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  likes   Like[]
-  images  PostImage[]
+  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  likes     Like[]
+  images    PostImage[]
   auditLogs PostAuditLog[]
   favorites PostFavorite[]
+  postJobs  PostJob[]
 
   @@map("posts")
 }
 
 // Post images (gallery)
 model PostImage {
-  id      String  @id @default(cuid())
-  postId  String
-  url     String
+  id         String  @id @default(cuid())
+  postId     String
+  url        String
   storageKey String?
-  width   Int?
-  height  Int?
-  order   Int     @default(0)
+  width      Int?
+  height     Int?
+  order      Int     @default(0)
 
   // Relations
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -221,6 +222,22 @@ model PostAuditLog {
   actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@map("post_audit_logs")
+}
+
+// Link jobs to posts
+model PostJob {
+  id        String   @id @default(cuid())
+  postId    String
+  jobId     String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, jobId])
+  @@index([jobId])
+  @@index([postId])
+  @@map("post_jobs")
 }
 
 enum PostAuditAction {
@@ -245,40 +262,41 @@ enum PostVisibility {
 
 // Job model - Job postings
 model Job {
-  id                  String           @id @default(cuid())
+  id                  String          @id @default(cuid())
   companyId           String
   title               String
   description         String
   requirements        String?
   responsibilities    String?
-  benefits           String?
-  location           String?
-  remote             Boolean          @default(false)
-  salaryMin          Int?
-  salaryMax          Int?
-  currency           String           @default("VND")
-  employmentType     EmploymentType   @default(FULL_TIME)
-  experienceLevel    ExperienceLevel @default(MID)
-  skills             String[]
-  tags               String[]
+  benefits            String?
+  location            String?
+  remote              Boolean         @default(false)
+  salaryMin           Int?
+  salaryMax           Int?
+  currency            String          @default("VND")
+  employmentType      EmploymentType  @default(FULL_TIME)
+  experienceLevel     ExperienceLevel @default(MID)
+  skills              String[]
+  tags                String[]
   applicationDeadline DateTime?
-  isActive           Boolean          @default(true)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   // Relations
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   applications Application[]
   favorites    JobFavorite[]
+  PostJob      PostJob[]
 
   @@map("jobs")
 }
 
 // Job favorites - Saved jobs
 model JobFavorite {
-  id     String @id @default(cuid())
-  userId String
-  jobId  String
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -343,15 +361,15 @@ enum MessageType {
 
 // Message model - Inbox messages
 model Message {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   applicationId String
   senderId      String
   content       String
   messageType   MessageType @default(TEXT)
   fileUrl       String?
-  isRead        Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isRead        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   // Relations
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -411,18 +429,18 @@ enum TicketStatus {
 }
 
 model CompanyTicket {
-  id                   String       @id @default(cuid())
-  companyId            String
-  applicantId          String
-  title                String
-  status               TicketStatus @default(OPEN)
+  id                    String       @id @default(cuid())
+  companyId             String
+  applicantId           String
+  title                 String
+  status                TicketStatus @default(OPEN)
   applicantLastViewedAt DateTime?
-  companyLastViewedAt  DateTime?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  companyLastViewedAt   DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  applicant User    @relation("TicketApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  company   Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  applicant User                   @relation("TicketApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
   messages  CompanyTicketMessage[]
 
   @@index([companyId])
@@ -448,17 +466,17 @@ model CompanyTicketMessage {
 }
 
 model CompanyInvitation {
-  id        String             @id @default(cuid())
+  id        String            @id @default(cuid())
   email     String
   role      CompanyMemberRole
-  token     String             @unique
+  token     String            @unique
   companyId String
   inviterId String
   expiresAt DateTime
-  createdAt DateTime           @default(now())
+  createdAt DateTime          @default(now())
 
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  inviter   User    @relation("SentInvitations", fields: [inviterId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inviter User    @relation("SentInvitations", fields: [inviterId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, email])
   @@index([token])

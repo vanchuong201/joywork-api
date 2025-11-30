@@ -18,6 +18,7 @@ export const createPostSchema = z.object({
   publishedAt: z.string().datetime().optional(),
   publishNow: z.boolean().default(true),
   images: z.array(postImageInputSchema).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
+  jobIds: z.array(z.string()).max(10).optional(),
 });
 
 // Update post schema
