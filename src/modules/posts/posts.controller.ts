@@ -118,6 +118,27 @@ export class PostsController {
     });
   }
 
+  // React to post
+  async reactPost(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { postId } = getPostSchema.parse(request.params);
+    const body = request.body as any;
+    const type = body?.type as 'JOY' | 'TRUST' | 'SKEPTIC';
+    if (!['JOY', 'TRUST', 'SKEPTIC'].includes(type as any)) {
+      return reply.status(400).send({ error: { code: 'INVALID_REACTION', message: 'Invalid reaction type' } });
+    }
+    await this.postsService.reactPost(postId, userId, type);
+    return reply.status(201).send({ data: { reacted: true } });
+  }
+
+  // Remove reaction
+  async removeReaction(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { postId } = getPostSchema.parse(request.params);
+    await this.postsService.removeReaction(postId, userId);
+    return reply.send({ data: { reacted: false } });
+  }
+
   // Publish post
   async publishPost(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;

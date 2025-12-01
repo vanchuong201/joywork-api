@@ -59,6 +59,7 @@ export const getCompanyPostsSchema = z.object({
 export const getFeedPostsSchema = z.object({
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).optional(),
   companyId: z.string().cuid('Invalid company ID').optional(),
+  following: z.coerce.boolean().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });

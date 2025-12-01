@@ -56,6 +56,12 @@ export interface Post {
 export interface PostWithLikes extends Post {
   isLiked: boolean;
   isSaved?: boolean;
+  reactions?: {
+    JOY: number;
+    TRUST: number;
+    SKEPTIC: number;
+  };
+  userReaction?: 'JOY' | 'TRUST' | 'SKEPTIC' | null;
 }
 
 function mapPostEntity(post: any): Post {
@@ -441,9 +447,14 @@ export class PostsService {
       return null;
     }
 
-    // Check if user liked this post
+    // Check reactions/likes/saved for this post
     let isLiked = false;
     let isSaved = false;
+    let userReaction: 'JOY' | 'TRUST' | 'SKEPTIC' | null = null;
+    const reactions = { JOY: 0, TRUST: 0, SKEPTIC: 0 };
+    reactions.JOY = await prisma.postReaction.count({ where: { postId, type: 'JOY' as any } });
+    reactions.TRUST = await prisma.postReaction.count({ where: { postId, type: 'TRUST' as any } });
+    reactions.SKEPTIC = await prisma.postReaction.count({ where: { postId, type: 'SKEPTIC' as any } });
     if (userId) {
       const like = await prisma.like.findUnique({
         where: {
@@ -454,6 +465,10 @@ export class PostsService {
         },
       });
       isLiked = !!like;
+      const myReaction = await prisma.postReaction.findUnique({
+        where: { userId_postId: { userId, postId } },
+      });
+      userReaction = (myReaction?.type as any) ?? null;
       const favorite = await prisma.postFavorite.findUnique({
         where: {
           userId_postId: { userId, postId },
@@ -467,6 +482,8 @@ export class PostsService {
       ...base,
       isLiked,
       isSaved,
+      reactions,
+      userReaction,
     };
   }
 
@@ -546,11 +563,16 @@ export class PostsService {
 
     const totalPages = Math.ceil(total / limit);
 
-    // Check if user liked each post
+    // Check reactions and favorites for each post
     const postsWithLikes: PostWithLikes[] = [];
     for (const post of posts) {
       let isLiked = false;
       let isSaved = false;
+      let userReaction: 'JOY' | 'TRUST' | 'SKEPTIC' | null = null;
+      const reactions = { JOY: 0, TRUST: 0, SKEPTIC: 0 };
+      reactions.JOY = await prisma.postReaction.count({ where: { postId: post.id, type: 'JOY' as any } });
+      reactions.TRUST = await prisma.postReaction.count({ where: { postId: post.id, type: 'TRUST' as any } });
+      reactions.SKEPTIC = await prisma.postReaction.count({ where: { postId: post.id, type: 'SKEPTIC' as any } });
       if (userId) {
         const like = await prisma.like.findUnique({
           where: {
@@ -561,6 +583,10 @@ export class PostsService {
           },
         });
         isLiked = !!like;
+        const myReaction = await prisma.postReaction.findUnique({
+          where: { userId_postId: { userId, postId: post.id } },
+        });
+        userReaction = (myReaction?.type as any) ?? null;
         const favorite = await prisma.postFavorite.findUnique({
           where: {
             userId_postId: { userId, postId: post.id },
@@ -573,6 +599,8 @@ export class PostsService {
         ...mapPostEntity(post),
         isLiked,
         isSaved,
+        reactions,
+        userReaction,
       });
     }
 
@@ -597,7 +625,7 @@ export class PostsService {
       totalPages: number;
     };
   }> {
-    const { type, companyId, page, limit } = data;
+    const { type, companyId, following, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause - only public posts
@@ -610,7 +638,39 @@ export class PostsService {
       where.type = type;
     }
 
-    if (companyId) {
+    // Following filter: restrict to companies current user follows
+    if (following) {
+      if (!userId) {
+        return {
+          posts: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        };
+      }
+      const follows = await prisma.follow.findMany({
+        where: { userId },
+        select: { companyId: true },
+      });
+      const followedCompanyIds = follows.map((f) => f.companyId);
+      if (followedCompanyIds.length === 0) {
+        return {
+          posts: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        };
+      }
+      if (companyId) {
+        // Intersect with selected companyId to ensure only followed companies
+        const intersection = followedCompanyIds.filter((id) => id === companyId);
+        if (intersection.length === 0) {
+          return {
+            posts: [],
+            pagination: { page, limit, total: 0, totalPages: 0 },
+          };
+        }
+        where.companyId = { in: intersection };
+      } else {
+        where.companyId = { in: followedCompanyIds };
+      }
+    } else if (companyId) {
       where.companyId = companyId;
     }
 
@@ -666,11 +726,16 @@ export class PostsService {
 
     const totalPages = Math.ceil(total / limit);
 
-    // Check if user liked each post
+    // Check reactions and favorites for each post
     const postsWithLikes: PostWithLikes[] = [];
     for (const post of posts) {
       let isLiked = false;
       let isSaved = false;
+      let userReaction: 'JOY' | 'TRUST' | 'SKEPTIC' | null = null;
+      const reactions = { JOY: 0, TRUST: 0, SKEPTIC: 0 };
+      reactions.JOY = await prisma.postReaction.count({ where: { postId: post.id, type: 'JOY' as any } });
+      reactions.TRUST = await prisma.postReaction.count({ where: { postId: post.id, type: 'TRUST' as any } });
+      reactions.SKEPTIC = await prisma.postReaction.count({ where: { postId: post.id, type: 'SKEPTIC' as any } });
       if (userId) {
         const like = await prisma.like.findUnique({
           where: {
@@ -681,6 +746,10 @@ export class PostsService {
           },
         });
         isLiked = !!like;
+        const myReaction = await prisma.postReaction.findUnique({
+          where: { userId_postId: { userId, postId: post.id } },
+        });
+        userReaction = (myReaction?.type as any) ?? null;
         const favorite = await prisma.postFavorite.findUnique({
           where: {
             userId_postId: { userId, postId: post.id },
@@ -693,6 +762,8 @@ export class PostsService {
         ...mapPostEntity(post),
         isLiked,
         isSaved,
+        reactions,
+        userReaction,
       });
     }
 
@@ -1009,5 +1080,30 @@ export class PostsService {
     await prisma.post.delete({
       where: { id: postId },
     });
+  }
+
+  // React to post (create or change)
+  async reactPost(postId: string, userId: string, type: 'JOY' | 'TRUST' | 'SKEPTIC'): Promise<void> {
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new AppError('Post not found', 404, 'POST_NOT_FOUND');
+    const existing = await prisma.postReaction.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    if (!existing) {
+      await prisma.postReaction.create({ data: { userId, postId, type: type as any } });
+      return;
+    }
+    if (existing.type !== (type as any)) {
+      await prisma.postReaction.update({ where: { id: existing.id }, data: { type: type as any } });
+    }
+  }
+
+  // Remove reaction
+  async removeReaction(postId: string, userId: string): Promise<void> {
+    const existing = await prisma.postReaction.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    if (!existing) throw new AppError('Reaction not found', 404, 'REACTION_NOT_FOUND');
+    await prisma.postReaction.delete({ where: { id: existing.id } });
   }
 }

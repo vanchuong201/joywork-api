@@ -255,6 +255,16 @@ export async function postsRoutes(fastify: FastifyInstance) {
                     },
                     isLiked: { type: 'boolean' },
                     isSaved: { type: 'boolean' },
+                    reactions: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        JOY: { type: 'number' },
+                        TRUST: { type: 'number' },
+                        SKEPTIC: { type: 'number' },
+                      },
+                    },
+                    userReaction: { type: 'string', nullable: true, enum: ['JOY', 'TRUST', 'SKEPTIC', null] },
                   },
                 },
               },
@@ -387,6 +397,16 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       },
                       isLiked: { type: 'boolean' },
                       isSaved: { type: 'boolean' },
+                      reactions: {
+                        type: 'object',
+                        nullable: true,
+                        properties: {
+                          JOY: { type: 'number' },
+                          TRUST: { type: 'number' },
+                          SKEPTIC: { type: 'number' },
+                        },
+                      },
+                      userReaction: { type: 'string', nullable: true, enum: ['JOY', 'TRUST', 'SKEPTIC', null] },
                     },
                   },
                 },
@@ -422,6 +442,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
             description: 'Filter by post type'
           },
           companyId: { type: 'string', description: 'Filter by company ID' },
+          following: { type: 'boolean', description: 'Only posts from companies the current user follows' },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
         },
@@ -505,6 +526,16 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       },
                       isLiked: { type: 'boolean' },
                       isSaved: { type: 'boolean' },
+                      reactions: {
+                        type: 'object',
+                        nullable: true,
+                        properties: {
+                          JOY: { type: 'number' },
+                          TRUST: { type: 'number' },
+                          SKEPTIC: { type: 'number' },
+                        },
+                      },
+                      userReaction: { type: 'string', nullable: true, enum: ['JOY', 'TRUST', 'SKEPTIC', null] },
                     },
                   },
                 },
@@ -719,6 +750,69 @@ export async function postsRoutes(fastify: FastifyInstance) {
       },
     },
   }, postsController.unlikePost.bind(postsController));
+
+  // React to a post
+  fastify.post('/:postId/react', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'React to a post',
+      tags: ['Posts'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          postId: { type: 'string', description: 'Post ID' },
+        },
+        required: ['postId'],
+      },
+      body: {
+        type: 'object',
+        required: ['type'],
+        properties: {
+          type: { type: 'string', enum: ['JOY', 'TRUST', 'SKEPTIC'] },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: { reacted: { type: 'boolean' } },
+            },
+          },
+        },
+      },
+    },
+  }, postsController.reactPost.bind(postsController));
+
+  // Remove reaction
+  fastify.delete('/:postId/react', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Remove my reaction from a post',
+      tags: ['Posts'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          postId: { type: 'string', description: 'Post ID' },
+        },
+        required: ['postId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: { reacted: { type: 'boolean' } },
+            },
+          },
+        },
+      },
+    },
+  }, postsController.removeReaction.bind(postsController));
 
   // Save post to favorites
   fastify.post('/:postId/favorite', {

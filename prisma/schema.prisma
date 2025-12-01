@@ -32,6 +32,7 @@ model User {
   jobFavorites            JobFavorite[]
   posts                   Post[]
   postAuditLogs           PostAuditLog[]
+  postReactions           PostReaction[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   postFavorites           PostFavorite[]
@@ -185,6 +186,7 @@ model Post {
   company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
   likes     Like[]
+  postReactions PostReaction[]
   images    PostImage[]
   auditLogs PostAuditLog[]
   favorites PostFavorite[]
@@ -408,6 +410,27 @@ model Like {
   @@map("likes")
 }
 
+enum ReactionType {
+  JOY
+  TRUST
+  SKEPTIC
+}
+
+// Post reactions - Multi-reaction support
+model PostReaction {
+  id        String       @id @default(cuid())
+  userId    String
+  postId    String
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId], name: "userId_postId")
+  @@index([postId])
+  @@map("post_reactions")
+}
 // Post favorites - Saved posts
 model PostFavorite {
   id        String   @id @default(cuid())
