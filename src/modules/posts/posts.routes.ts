@@ -253,6 +253,19 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         likes: { type: 'number' },
                       },
                     },
+                    jobs: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          title: { type: 'string' },
+                          location: { type: 'string', nullable: true },
+                          employmentType: { type: 'string' },
+                          isActive: { type: 'boolean' },
+                        },
+                      },
+                    },
                     isLiked: { type: 'boolean' },
                     isSaved: { type: 'boolean' },
                     reactions: {
@@ -524,6 +537,19 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           likes: { type: 'number' },
                         },
                       },
+                      jobs: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            title: { type: 'string' },
+                            location: { type: 'string', nullable: true },
+                            employmentType: { type: 'string' },
+                            isActive: { type: 'boolean' },
+                          },
+                        },
+                      },
                       isLiked: { type: 'boolean' },
                       isSaved: { type: 'boolean' },
                       reactions: {
@@ -604,6 +630,12 @@ export async function postsRoutes(fastify: FastifyInstance) {
             },
             description: 'Replace images set for the post (up to 8)',
           },
+          jobIds: {
+            type: 'array',
+            items: { type: 'string' },
+            maxItems: 10,
+            description: 'Replace attached jobs (IDs) for this post (max 10)',
+          },
         },
       },
       response: {
@@ -679,6 +711,19 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       type: 'object',
                       properties: {
                         likes: { type: 'number' },
+                      },
+                    },
+                    jobs: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          title: { type: 'string' },
+                          location: { type: 'string', nullable: true },
+                          employmentType: { type: 'string' },
+                          isActive: { type: 'boolean' },
+                        },
                       },
                     },
                   },

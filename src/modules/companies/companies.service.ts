@@ -338,6 +338,7 @@ export class CompaniesService {
                 id: true,
                 email: true,
                 name: true,
+                profile: { select: { avatar: true } },
               },
             },
           },
@@ -387,6 +388,7 @@ export class CompaniesService {
           id: member.user.id,
           email: member.user.email,
           ...(member.user.name != null ? { name: member.user.name } : {}),
+          avatar: member.user.profile?.avatar ?? null,
         },
       })),
       ...(company._count ? {
@@ -814,6 +816,28 @@ export class CompaniesService {
     // Remove member
     await prisma.companyMember.delete({
       where: { id: memberId },
+    });
+  }
+
+  // Leave company
+  async leaveCompany(companyId: string, userId: string): Promise<void> {
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('You are not a member of this company', 404, 'MEMBER_NOT_FOUND');
+    }
+
+    if (membership.role === 'OWNER') {
+      throw new AppError('Owners cannot leave the company. Please transfer ownership or delete the company.', 400, 'OWNER_CANNOT_LEAVE');
+    }
+
+    await prisma.companyMember.delete({
+      where: { id: membership.id },
     });
   }
 

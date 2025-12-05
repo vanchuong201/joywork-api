@@ -39,6 +39,7 @@ export const updatePostSchema = z.object({
       order: z.number().int().min(0).max(99).optional(),
     })
   ).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
+  jobIds: z.array(z.string()).max(10).optional(),
 });
 
 // Get post schema

@@ -299,6 +299,10 @@ export class PostsService {
         height: img.height as number | undefined,
         order: img.order as number | undefined,
       }));
+      // Cập nhật coverUrl theo bộ ảnh mới:
+      // - Nếu còn ảnh: lấy ảnh đầu tiên làm cover
+      // - Nếu không còn ảnh: xoá coverUrl (null)
+      const newCoverUrl: string | null = desired.length > 0 ? desired[0]!.url : null;
       const currentById = new Map(currentImages.map(ci => [ci.id, ci]));
       const currentByUrl = new Map(currentImages.map(ci => [ci.url, ci]));
       const desiredIds = new Set(desired.filter(d => d.id).map(d => d.id as string));
@@ -343,6 +347,52 @@ export class PostsService {
           });
         }
       }
+      // Ghi nhận coverUrl mới vào updateData để đảm bảo client không còn hiển thị cover cũ
+      updateData.coverUrl = newCoverUrl;
+    }
+    
+    // Handle attached jobs replacement if provided
+    if (data['jobIds'] !== undefined) {
+      const desiredJobIds = Array.from(
+        new Set(((data['jobIds'] as unknown as string[]) || []).filter(Boolean))
+      ).slice(0, 10);
+      
+      // Validate all desired jobs belong to the same company as the post
+      if (desiredJobIds.length > 0) {
+        const jobs = await prisma.job.findMany({
+          where: { id: { in: desiredJobIds } },
+          select: { id: true, companyId: true },
+        });
+        const invalid = jobs.some((j) => j.companyId !== post.companyId);
+        if (invalid || jobs.length !== desiredJobIds.length) {
+          throw new AppError('Some jobs are invalid or do not belong to this company', 400, 'INVALID_JOB_IDS');
+        }
+      }
+      
+      const currentPostJobs = await prisma.postJob.findMany({
+        where: { postId },
+        select: { id: true, jobId: true },
+      });
+      const currentJobIds = new Set(currentPostJobs.map((pj) => pj.jobId));
+      const desiredSet = new Set(desiredJobIds);
+      
+      const toDeleteJobIds = currentPostJobs.filter((pj) => !desiredSet.has(pj.jobId)).map((pj) => pj.jobId);
+      const toAddJobIds = desiredJobIds.filter((jid) => !currentJobIds.has(jid));
+      
+      if (toDeleteJobIds.length > 0) {
+        await prisma.postJob.deleteMany({
+          where: {
+            postId,
+            jobId: { in: toDeleteJobIds },
+          },
+        });
+      }
+      if (toAddJobIds.length > 0) {
+        await prisma.postJob.createMany({
+          data: toAddJobIds.map((jid) => ({ postId, jobId: jid })),
+          skipDuplicates: true,
+        });
+      }
     }
 
     const updatedPost = await prisma.post.update({
@@ -367,6 +417,11 @@ export class PostsService {
         images: {
           select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
           orderBy: { order: 'asc' },
+        },
+        postJobs: {
+          include: {
+            job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } },
+          },
         },
         likes: {
           include: {

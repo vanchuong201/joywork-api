@@ -494,6 +494,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                               id: { type: 'string' },
                               email: { type: 'string' },
                               name: { type: 'string', nullable: true },
+                              avatar: { type: 'string', nullable: true },
                             },
                           },
                         },
@@ -964,6 +965,36 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
     },
   }, companiesController.removeCompanyMember.bind(companiesController));
+
+  // Leave company
+  fastify.delete('/:companyId/leave', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Leave company',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.leaveCompany.bind(companiesController));
 
   // Follow company
   fastify.post('/:companyId/follow', {

@@ -196,6 +196,20 @@ export class CompaniesController {
     });
   }
 
+  // Leave company
+  async leaveCompany(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+
+    await this.companiesService.leaveCompany(companyId, userId);
+
+    return reply.send({
+      data: {
+        message: 'Left company successfully',
+      },
+    });
+  }
+
   async followCompany(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { companyId } = request.params as { companyId: string };
