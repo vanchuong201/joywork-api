@@ -955,6 +955,20 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           content: { type: 'string' },
                           excerpt: { type: 'string', nullable: true },
                           coverUrl: { type: 'string', nullable: true },
+                          type: { type: 'string' },
+                          visibility: { type: 'string' },
+                          publishedAt: { type: 'string', format: 'date-time', nullable: true },
+                          createdAt: { type: 'string', format: 'date-time' },
+                          updatedAt: { type: 'string', format: 'date-time' },
+                          createdBy: {
+                            type: 'object',
+                            nullable: true,
+                            properties: {
+                              id: { type: 'string' },
+                              email: { type: 'string' },
+                              name: { type: 'string', nullable: true },
+                            },
+                          },
                           company: {
                             type: 'object',
                             properties: {
@@ -964,10 +978,65 @@ export async function postsRoutes(fastify: FastifyInstance) {
                               logoUrl: { type: 'string', nullable: true },
                             },
                           },
+                          images: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string' },
+                                url: { type: 'string' },
+                                width: { type: 'number', nullable: true },
+                                height: { type: 'number', nullable: true },
+                                order: { type: 'number' },
+                              },
+                            },
+                          },
+                          likes: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string' },
+                                userId: { type: 'string' },
+                                user: {
+                                  type: 'object',
+                                  properties: {
+                                    id: { type: 'string' },
+                                    name: { type: 'string', nullable: true },
+                                  },
+                                },
+                              },
+                            },
+                          },
                           _count: {
                             type: 'object',
                             properties: { likes: { type: 'number' } },
                           },
+                          jobs: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string' },
+                                title: { type: 'string' },
+                                location: { type: 'string', nullable: true },
+                                employmentType: { type: 'string' },
+                                isActive: { type: 'boolean' },
+                              },
+                            },
+                          },
+                          isLiked: { type: 'boolean' },
+                          isSaved: { type: 'boolean' },
+                          reactions: {
+                            type: 'object',
+                            nullable: true,
+                            properties: {
+                              JOY: { type: 'number' },
+                              TRUST: { type: 'number' },
+                              SKEPTIC: { type: 'number' },
+                            },
+                          },
+                          userReaction: { type: 'string', nullable: true, enum: ['JOY', 'TRUST', 'SKEPTIC', null] },
                         },
                       },
                     },
