@@ -191,6 +191,7 @@ model Post {
   auditLogs PostAuditLog[]
   favorites PostFavorite[]
   postJobs  PostJob[]
+  hashtags  PostHashtag[]
 
   @@map("posts")
 }
@@ -240,6 +241,36 @@ model PostJob {
   @@index([jobId])
   @@index([postId])
   @@map("post_jobs")
+}
+
+// Global hashtags for posts
+model Hashtag {
+  id        String        @id @default(cuid())
+  slug      String        @unique
+  label     String
+  createdAt DateTime      @default(now())
+
+  // Relations
+  posts PostHashtag[]
+
+  @@map("hashtags")
+}
+
+// Link hashtags to posts (explicit many-to-many with timestamps)
+model PostHashtag {
+  id        String   @id @default(cuid())
+  postId    String
+  hashtagId String
+  createdAt DateTime @default(now())
+
+  // Relations
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, hashtagId])
+  @@index([hashtagId])
+  @@index([postId])
+  @@map("post_hashtags")
 }
 
 enum PostAuditAction {

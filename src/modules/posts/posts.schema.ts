@@ -19,6 +19,17 @@ export const createPostSchema = z.object({
   publishNow: z.boolean().default(true),
   images: z.array(postImageInputSchema).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
   jobIds: z.array(z.string()).max(10).optional(),
+  // Hashtags: tối đa 5 hashtag, user có thể gõ tự do, backend sẽ normalize
+  hashtags: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, 'Hashtag không được để trống')
+        .max(50, 'Hashtag tối đa 50 ký tự')
+    )
+    .max(5, 'Tối đa 5 hashtag cho mỗi bài viết')
+    .optional(),
 });
 
 // Update post schema
@@ -40,6 +51,16 @@ export const updatePostSchema = z.object({
     })
   ).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
   jobIds: z.array(z.string()).max(10).optional(),
+  hashtags: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, 'Hashtag không được để trống')
+        .max(50, 'Hashtag tối đa 50 ký tự')
+    )
+    .max(5, 'Tối đa 5 hashtag cho mỗi bài viết')
+    .optional(),
 });
 
 // Get post schema
@@ -60,6 +81,7 @@ export const getCompanyPostsSchema = z.object({
 export const getFeedPostsSchema = z.object({
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).optional(),
   companyId: z.string().cuid('Invalid company ID').optional(),
+  hashtag: z.string().optional(), // Filter by hashtag slug
   following: z.coerce.boolean().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),

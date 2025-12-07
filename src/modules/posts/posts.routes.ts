@@ -65,6 +65,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
             description: 'Optional attached job IDs (max 10)',
             items: { type: 'string' },
           },
+          hashtags: {
+            type: 'array',
+            description: 'Optional hashtags (max 5)',
+            maxItems: 5,
+            items: {
+              type: 'string',
+              description: 'Hashtag text, có thể có hoặc không có ký tự # ở đầu',
+              minLength: 1,
+              maxLength: 50,
+            },
+          },
         },
       },
       response: {
@@ -152,6 +163,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           location: { type: 'string', nullable: true },
                           employmentType: { type: 'string' },
                           isActive: { type: 'boolean' },
+                        },
+                      },
+                    },
+                    hashtags: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          slug: { type: 'string' },
+                          label: { type: 'string' },
                         },
                       },
                     },
@@ -263,6 +285,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           location: { type: 'string', nullable: true },
                           employmentType: { type: 'string' },
                           isActive: { type: 'boolean' },
+                        },
+                      },
+                    },
+                    hashtags: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          slug: { type: 'string' },
+                          label: { type: 'string' },
                         },
                       },
                     },
@@ -408,6 +441,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           },
                         },
                       },
+                        hashtags: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string' },
+                              slug: { type: 'string' },
+                              label: { type: 'string' },
+                          },
+                        },
+                      },
                       isLiked: { type: 'boolean' },
                       isSaved: { type: 'boolean' },
                       reactions: {
@@ -455,6 +499,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
             description: 'Filter by post type'
           },
           companyId: { type: 'string', description: 'Filter by company ID' },
+          hashtag: { type: 'string', description: 'Filter by hashtag slug' },
           following: { type: 'boolean', description: 'Only posts from companies the current user follows' },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
@@ -636,6 +681,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
             maxItems: 10,
             description: 'Replace attached jobs (IDs) for this post (max 10)',
           },
+          hashtags: {
+            type: 'array',
+            description: 'Replace hashtags for this post (max 5)',
+            maxItems: 5,
+            items: {
+              type: 'string',
+              description: 'Hashtag text, có thể có hoặc không có ký tự # ở đầu',
+              minLength: 1,
+              maxLength: 50,
+            },
+          },
         },
       },
       response: {
@@ -723,6 +779,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           location: { type: 'string', nullable: true },
                           employmentType: { type: 'string' },
                           isActive: { type: 'boolean' },
+                        },
+                      },
+                    },
+                    hashtags: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          slug: { type: 'string' },
+                          label: { type: 'string' },
                         },
                       },
                     },

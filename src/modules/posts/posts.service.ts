@@ -9,6 +9,31 @@ import {
   GetFeedPostsInput,
 } from './posts.schema';
 
+// Chuẩn hoá hashtag: tạo slug từ text user nhập
+function normalizeHashtag(input: string): { slug: string; label: string } {
+  const raw = input.trim();
+  const label = raw.startsWith('#') ? raw.slice(1).trim() : raw;
+
+  // remove accents
+  const withoutAccents = label
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // to slug: lowercase, keep a-z0-9-_, spaces to dash
+  const slug = withoutAccents
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-_]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-_]+|[-_]+$/g, '')
+    .slice(0, 50);
+
+  return {
+    slug,
+    label: label || slug,
+  };
+}
+
 export interface Post {
   id: string;
   companyId: string;
@@ -50,6 +75,11 @@ export interface Post {
     location?: string | null;
     employmentType: string;
     isActive: boolean;
+  }>;
+  hashtags?: Array<{
+    id: string;
+    slug: string;
+    label: string;
   }>;
 }
 
@@ -112,13 +142,20 @@ function mapPostEntity(post: any): Post {
           isActive: pj.job.isActive,
         }))
       : [],
+    hashtags: Array.isArray(post.hashtags)
+      ? post.hashtags.map((ph: any) => ({
+          id: ph.hashtag.id,
+          slug: ph.hashtag.slug,
+          label: ph.hashtag.label,
+        }))
+      : [],
   };
 }
 
 export class PostsService {
   // Create post
   async createPost(companyId: string, userId: string, data: CreatePostInput): Promise<Post> {
-    const { images, publishNow, publishedAt, jobIds, ...postData } = data;
+    const { images, publishNow, publishedAt, jobIds, hashtags, ...postData } = data;
 
     const membership = await prisma.companyMember.findFirst({
       where: {
@@ -174,6 +211,34 @@ export class PostsService {
               },
             }
           : {}),
+        ...(Array.isArray(hashtags) && hashtags.length > 0
+          ? {
+              hashtags: {
+                create: await Promise.all(
+                  Array.from(
+                    new Map(
+                      hashtags
+                        .map((h) => normalizeHashtag(h))
+                        .filter((h) => h.slug)
+                        .map((h) => [h.slug, h])
+                    ).values()
+                  )
+                    .slice(0, 5)
+                    .map(async (h) => ({
+                      hashtag: {
+                        connectOrCreate: {
+                          where: { slug: h.slug },
+                          create: {
+                            slug: h.slug,
+                            label: h.label,
+                          },
+                        },
+                      },
+                    }))
+                ),
+              },
+            }
+          : {}),
       },
       include: {
         company: {
@@ -198,6 +263,13 @@ export class PostsService {
         postJobs: {
           include: {
             job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } },
+          },
+        },
+        hashtags: {
+          include: {
+            hashtag: {
+              select: { id: true, slug: true, label: true },
+            },
           },
         },
         likes: {
@@ -395,6 +467,45 @@ export class PostsService {
       }
     }
 
+    // Handle hashtags replacement if provided
+    if (data['hashtags'] !== undefined) {
+      const raw = (data['hashtags'] as unknown as string[]) || [];
+      const normalizedUnique = Array.from(
+        new Map(
+          raw
+            .map((h) => normalizeHashtag(h))
+            .filter((h) => h.slug)
+            .map((h) => [h.slug, h])
+        ).values()
+      ).slice(0, 5);
+
+      // Xoá toàn bộ liên kết cũ
+      await prisma.postHashtag.deleteMany({
+        where: { postId },
+      });
+
+      if (normalizedUnique.length > 0) {
+        // Tạo lại các liên kết mới
+        for (const h of normalizedUnique) {
+          const hashtag = await prisma.hashtag.upsert({
+            where: { slug: h.slug },
+            update: {},
+            create: {
+              slug: h.slug,
+              label: h.label,
+            },
+          });
+
+          await prisma.postHashtag.create({
+            data: {
+              postId,
+              hashtagId: hashtag.id,
+            },
+          });
+        }
+      }
+    }
+
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: updateData,
@@ -421,6 +532,13 @@ export class PostsService {
         postJobs: {
           include: {
             job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } },
+          },
+        },
+        hashtags: {
+          include: {
+            hashtag: {
+              select: { id: true, slug: true, label: true },
+            },
           },
         },
         likes: {
@@ -479,6 +597,13 @@ export class PostsService {
         images: {
           select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
           orderBy: { order: 'asc' },
+        },
+        hashtags: {
+          include: {
+            hashtag: {
+              select: { id: true, slug: true, label: true },
+            },
+          },
         },
         likes: {
           include: {
@@ -596,6 +721,13 @@ export class PostsService {
           postJobs: {
             include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
           },
+          hashtags: {
+            include: {
+              hashtag: {
+                select: { id: true, slug: true, label: true },
+              },
+            },
+          },
           likes: {
             include: {
               user: {
@@ -680,7 +812,7 @@ export class PostsService {
       totalPages: number;
     };
   }> {
-    const { type, companyId, following, page, limit } = data;
+    const { type, companyId, hashtag, following, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause - only public posts
@@ -691,6 +823,22 @@ export class PostsService {
 
     if (type) {
       where.type = type;
+    }
+
+    if (hashtag) {
+      const tag = await prisma.hashtag.findUnique({ where: { slug: hashtag } });
+      if (tag) {
+        where.hashtags = {
+          some: {
+            hashtagId: tag.id,
+          },
+        };
+      } else {
+        return {
+          posts: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        };
+      }
     }
 
     // Following filter: restrict to companies current user follows
@@ -758,6 +906,13 @@ export class PostsService {
           },
           postJobs: {
             include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
+          },
+          hashtags: {
+            include: {
+              hashtag: {
+                select: { id: true, slug: true, label: true },
+              },
+            },
           },
           likes: {
             include: {
@@ -891,6 +1046,13 @@ export class PostsService {
                 },
               },
               _count: { select: { likes: true } },
+              hashtags: {
+                include: {
+                  hashtag: {
+                    select: { id: true, slug: true, label: true },
+                  },
+                },
+              },
             },
           },
         },
