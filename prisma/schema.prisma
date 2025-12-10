@@ -36,6 +36,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   postFavorites           PostFavorite[]
+  socialAccounts          UserSocialAccount[]
   tickets                 CompanyTicket[]          @relation("TicketApplicant")
   ticketMessages          CompanyTicketMessage[]
   sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
@@ -535,4 +536,20 @@ model CompanyInvitation {
   @@unique([companyId, email])
   @@index([token])
   @@map("company_invitations")
+}
+
+// Social login accounts (Google, Facebook, ...)
+model UserSocialAccount {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String   // e.g. "google", "facebook"
+  providerId String   // sub/id from provider
+  email      String?  // email from provider (if available)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("user_social_accounts")
 }

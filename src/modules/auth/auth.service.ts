@@ -388,4 +388,175 @@ export class AuthService {
     };
   }
 
+  /**
+   * Login or register a user via social provider (Google, Facebook, ...)
+   *
+   * - Nếu đã có UserSocialAccount (provider + providerId) -> đăng nhập user đó
+   * - Nếu chưa có:
+   *   - Nếu emailFromProvider = true:
+   *       * Nếu đã có user với email đó => tự động link social account vào user này
+   *       * Nếu chưa có => tạo user mới với email đó
+   *   - Nếu emailFromProvider = false (email do user tự nhập, ví dụ từ Facebook không trả email):
+   *       * YÊU CẦU email chưa tồn tại trong hệ thống, nếu đã tồn tại -> báo lỗi
+   */
+  async loginOrRegisterSocialUser(params: {
+    provider: 'google' | 'facebook';
+    providerId: string;
+    email: string;
+    emailVerified: boolean;
+    name?: string | null;
+    emailFromProvider: boolean;
+  }): Promise<{ user: AuthUser; tokens: AuthTokens }> {
+    const { provider, providerId, email, emailVerified, name, emailFromProvider } = params;
+
+    // 1. Tìm link social account nếu đã tồn tại
+    const existingLink = await prisma.userSocialAccount.findUnique({
+      where: {
+        provider_providerId: {
+          provider,
+          providerId,
+        },
+      },
+      include: { user: true },
+    });
+
+    let user = existingLink?.user ?? null;
+
+    // 2. Nếu chưa có link, xử lý theo email
+    if (!user) {
+      const existingUserByEmail = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUserByEmail) {
+        if (!emailFromProvider) {
+          // Email do user tự nhập (không phải từ provider) thì KHÔNG được phép gộp
+          // để tránh chiếm quyền tài khoản đã tồn tại.
+          throw new AppError(
+            'Email này đã tồn tại trong hệ thống. Vui lòng dùng phương thức đăng nhập khác.',
+            400,
+            'SOCIAL_EMAIL_ALREADY_EXISTS',
+          );
+    }
+
+        // Email được provider cung cấp -> cho phép tự động link
+        user = existingUserByEmail;
+      } else {
+        // Tạo user mới
+        const randomPassword = randomUUID();
+        const hashedPassword = await bcrypt.hash(randomPassword, 12);
+
+        user = await prisma.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name: name || null,
+            emailVerified: emailVerified,
+          },
+        });
+      }
+
+      // Tạo social account link
+      try {
+        await prisma.userSocialAccount.create({
+          data: {
+            userId: user.id,
+            provider,
+            providerId,
+            email,
+          },
+        });
+      } catch {
+        // Fallback nếu migration chưa được áp dụng (cột email chưa tồn tại)
+        await prisma.userSocialAccount.create({
+          data: {
+            userId: user.id,
+            provider,
+            providerId,
+          },
+        });
+      }
+
+      // Nếu provider xác nhận email đã verify, cập nhật cờ trong DB (nếu cần)
+      if (emailVerified && !user.emailVerified) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+        });
+      }
+    }
+
+    const tokens = this.generateTokens(user.id);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        emailVerified: user.emailVerified,
+      },
+      tokens,
+    };
+  }
+
+  // Link social account
+  async linkSocialAccount(userId: string, params: { provider: string; providerId: string; email?: string | null }) {
+    const { provider, providerId, email } = params;
+
+    // Check if already linked
+    const existingLink = await prisma.userSocialAccount.findUnique({
+      where: {
+        provider_providerId: { provider, providerId },
+      },
+    });
+
+    if (existingLink) {
+      if (existingLink.userId === userId) {
+        // Cập nhật email nếu chưa có hoặc khác (khi re-link để bổ sung email)
+        if (email && existingLink.email !== email) {
+          try {
+            await prisma.userSocialAccount.update({
+              where: { id: existingLink.id },
+              data: { email },
+            });
+          } catch {
+            // bỏ qua nếu cột email chưa tồn tại
+          }
+        }
+        return;
+      }
+      throw new AppError('Tài khoản này đã được liên kết với người dùng khác', 400, 'SOCIAL_ALREADY_LINKED');
+    }
+
+    try {
+      await prisma.userSocialAccount.create({
+        data: { userId, provider, providerId, email: email ?? null },
+      });
+    } catch {
+      // Fallback nếu migration chưa được áp dụng
+      await prisma.userSocialAccount.create({
+        data: { userId, provider, providerId },
+      });
+    }
+  }
+
+  // Get linked accounts
+  async getLinkedSocialAccounts(userId: string) {
+    try {
+      const accounts = await prisma.userSocialAccount.findMany({
+        where: { userId },
+        select: { provider: true, createdAt: true, email: true },
+      });
+      return accounts;
+    } catch {
+      // Fallback nếu migration chưa được áp dụng
+      const accounts = await prisma.userSocialAccount.findMany({
+        where: { userId },
+        select: { provider: true, createdAt: true },
+    });
+      // Map để thêm email = null cho đồng nhất API
+      return accounts.map((a: any) => ({ ...a, email: null }));
+    }
+  }
 }

@@ -169,6 +169,149 @@ export async function authRoutes(fastify: FastifyInstance) {
     },
   }, authController.logout.bind(authController));
 
+  // Social login - Google
+  fastify.get('/google/start', {
+    schema: {
+      description: 'Bắt đầu đăng nhập với Google (OAuth2)',
+      tags: ['Auth'],
+      querystring: {
+        type: 'object',
+        properties: {
+          mode: { type: 'string', description: 'popup | redirect', default: 'popup' },
+          action: { type: 'string', description: 'login | link', nullable: true },
+          auth_token: { type: 'string', description: 'Bearer access token khi action=link', nullable: true },
+        },
+      },
+    },
+  }, authController.googleStart.bind(authController));
+
+  fastify.get('/google/callback', {
+    schema: {
+      description: 'Callback từ Google OAuth2',
+      tags: ['Auth'],
+      querystring: {
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          state: { type: 'string' },
+        },
+      },
+    },
+  }, authController.googleCallback.bind(authController));
+
+  // Google One Tap
+  fastify.post('/google/one-tap', {
+    schema: {
+      description: 'Đăng nhập bằng Google One Tap (nhận ID Token)',
+      tags: ['Auth'],
+      body: {
+        type: 'object',
+        required: ['credential'],
+        properties: {
+          credential: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    name: { type: 'string', nullable: true },
+                    role: { type: 'string' },
+                    emailVerified: { type: 'boolean' },
+                  },
+                },
+                accessToken: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, authController.googleOneTap.bind(authController));
+
+  // Social login - Facebook
+  fastify.get('/facebook/start', {
+    schema: {
+      description: 'Bắt đầu đăng nhập với Facebook (OAuth2)',
+      tags: ['Auth'],
+      querystring: {
+        type: 'object',
+        properties: {
+          mode: { type: 'string', description: 'popup | redirect', default: 'popup' },
+        },
+      },
+    },
+  }, authController.facebookStart.bind(authController));
+
+  fastify.get('/facebook/callback', {
+    schema: {
+      description: 'Callback từ Facebook OAuth2',
+      tags: ['Auth'],
+      querystring: {
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          state: { type: 'string' },
+        },
+      },
+    },
+  }, authController.facebookCallback.bind(authController));
+
+  fastify.post('/facebook/complete', {
+    schema: {
+      description: 'Hoàn tất đăng nhập Facebook khi provider không trả email (user nhập email tay)',
+      tags: ['Auth'],
+      body: {
+        type: 'object',
+        required: ['token', 'email'],
+        properties: {
+          token: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+        },
+      },
+    },
+  }, authController.facebookComplete.bind(authController));
+
+  fastify.get('/me/social-accounts', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Get linked social accounts',
+      tags: ['Auth'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                accounts: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      provider: { type: 'string' },
+                      email: { type: 'string', nullable: true },
+                      createdAt: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, authController.getLinkedSocialAccounts.bind(authController));
+
   fastify.post('/change-password', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
     schema: {

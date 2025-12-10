@@ -595,6 +595,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           },
                         },
                       },
+                      hashtags: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            slug: { type: 'string' },
+                            label: { type: 'string' },
+                          },
+                        },
+                      },
                       isLiked: { type: 'boolean' },
                       isSaved: { type: 'boolean' },
                       reactions: {
@@ -1089,6 +1100,17 @@ export async function postsRoutes(fastify: FastifyInstance) {
                                 location: { type: 'string', nullable: true },
                                 employmentType: { type: 'string' },
                                 isActive: { type: 'boolean' },
+                              },
+                            },
+                          },
+                          hashtags: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string' },
+                                slug: { type: 'string' },
+                                label: { type: 'string' },
                               },
                             },
                           },

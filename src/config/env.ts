@@ -40,6 +40,14 @@ const envSchema = z.object({
   
   // Logging
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+
+  // OAuth - Google
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // OAuth - Facebook
+  FACEBOOK_CLIENT_ID: z.string().optional(),
+  FACEBOOK_CLIENT_SECRET: z.string().optional(),
 });
 
 export const config = envSchema.parse(process.env);
