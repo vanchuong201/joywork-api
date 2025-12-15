@@ -8,6 +8,7 @@ import {
   addCompanyMemberSchema,
   updateCompanyMemberSchema,
   getCompanySummarySchema,
+  updateCompanyProfileSchema,
 } from './companies.schema';
 import { z } from 'zod';
 
@@ -75,6 +76,18 @@ export class CompaniesController {
 
     return reply.send({
       data: { summary },
+    });
+  }
+
+  async updateCompanyProfile(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+    const data = updateCompanyProfileSchema.parse(request.body);
+
+    const profile = await this.companiesService.updateCompanyProfile(companyId, userId, data);
+
+    return reply.send({
+      data: { profile },
     });
   }
 

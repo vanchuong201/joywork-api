@@ -128,6 +128,7 @@ model Company {
   updatedAt     DateTime     @updatedAt
 
   // Relations
+  profile     CompanyProfile?
   members     CompanyMember[]
   posts       Post[]
   jobs        Job[]
@@ -136,6 +137,58 @@ model Company {
   invitations CompanyInvitation[]
 
   @@map("companies")
+}
+
+// New model for detailed Company Profile (Showcase)
+model CompanyProfile {
+  companyId  String   @id
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Section: NHỮNG CON SỐ BIẾT NÓI
+  stats      Json?    // [{ value, label, trend?, icon? }]
+
+  // Section: TẦM NHÌN – SỨ MỆNH – GIÁ TRỊ CỐT LÕI
+  vision     String?  // Text
+  mission    String?  // Text
+  coreValues String?  // Text (semicolon separated or simple text)
+
+  // Section: HỆ SINH THÁI SẢN PHẨM
+  products   Json?    // { items: string[] } or [{ name, icon }]
+
+  // Section: NGUYÊN TẮC TUYỂN DỤNG
+  recruitmentPrinciples Json? // [{ title, desc, icon? }]
+
+  // Section: PHÚC LỢI TOÀN DIỆN
+  benefits   Json?    // { financial: [], nonFinancial: [] }
+
+  // Section: HÀNH TRÌNH NHÂN SỰ
+  hrJourney  Json?    // [{ step, title, desc }]
+
+  // Section: LỘ TRÌNH THĂNG TIẾN
+  careerPath Json?    // { levels: string[] }
+
+  // Section: CƠ CHẾ LƯƠNG & THƯỞNG
+  salaryAndBonus Json? // { salary: [], bonus: [] }
+
+  // Section: ĐÀO TẠO & PHÁT TRIỂN
+  training   Json?    // { philosophy, programs: [], budget? }
+
+  // Section: BAN LÃNH ĐẠO
+  leaders    Json?    // [{ name, role, image, message, ... }]
+
+  // Section: CÂU CHUYỆN & CỘT MỐC
+  story      Json?    // { founderStory: { title, content, image? }, milestones: [] }
+
+  // Section: VĂN HÓA (Testimonials, Typical Day)
+  culture    Json?    // { testimonials: [], typicalDay: [] }
+
+  // Section: GIẢI THƯỞNG
+  awards     Json?    // [{ year, name, org }]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("company_profiles")
 }
 
 enum CompanySize {

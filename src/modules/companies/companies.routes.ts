@@ -509,6 +509,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                         followers: { type: 'number' },
                       },
                     },
+                    profile: { type: 'object', nullable: true, additionalProperties: true }
                   },
                 },
               },
@@ -849,6 +850,40 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
     },
   }, companiesController.updateCompany.bind(companiesController));
+
+  // Update company profile
+  fastify.patch('/:companyId/profile', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Update company profile (Showcase sections)',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      body: {
+        type: 'object',
+        additionalProperties: true
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                profile: { type: 'object', additionalProperties: true }
+              }
+            }
+          }
+        }
+      }
+    }
+  }, companiesController.updateCompanyProfile.bind(companiesController));
 
   // Invite company member (Renamed from addCompanyMember)
   fastify.post('/:companyId/members', {

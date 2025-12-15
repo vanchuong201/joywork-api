@@ -114,6 +114,25 @@ export const updateCompanyMemberSchema = z.object({
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
 });
 
+// Update Company Profile Schema (JSON fields are loose for flexibility, but could be tighter)
+export const updateCompanyProfileSchema = z.object({
+  stats: z.array(z.any()).optional(),
+  vision: z.string().optional(),
+  mission: z.string().optional(),
+  coreValues: z.string().optional(),
+  products: z.any().optional(),
+  recruitmentPrinciples: z.any().optional(),
+  benefits: z.any().optional(),
+  hrJourney: z.any().optional(),
+  careerPath: z.any().optional(),
+  salaryAndBonus: z.any().optional(),
+  training: z.any().optional(),
+  leaders: z.any().optional(),
+  story: z.any().optional(),
+  culture: z.any().optional(),
+  awards: z.any().optional(),
+});
+
 // Types
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
@@ -122,6 +141,7 @@ export type GetCompanySummaryInput = z.infer<typeof getCompanySummarySchema>;
 export type SearchCompaniesInput = z.infer<typeof searchCompaniesSchema>;
 export type AddCompanyMemberInput = z.infer<typeof addCompanyMemberSchema>;
 export type UpdateCompanyMemberInput = z.infer<typeof updateCompanyMemberSchema>;
+export type UpdateCompanyProfileInput = z.infer<typeof updateCompanyProfileSchema>;
 
 // List followers of a company
 export const listCompanyFollowersSchema = z.object({
