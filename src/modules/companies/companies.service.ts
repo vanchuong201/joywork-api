@@ -81,6 +81,7 @@ export interface CompanyProfile {
   vision?: string;
   mission?: string;
   coreValues?: string;
+  leadershipPhilosophy?: any;
   products?: any;
   recruitmentPrinciples?: any;
   benefits?: any;
@@ -385,27 +386,35 @@ export class CompaniesService {
       return null;
     }
 
-    // Ensure profile exists if not (lazy create) or just return null
-    // Better to just return what we have
-    const profile = company.profile ? {
-        stats: company.profile.stats as any,
-        vision: company.profile.vision ?? undefined,
-        mission: company.profile.mission ?? undefined,
-        coreValues: company.profile.coreValues ?? undefined,
-        products: company.profile.products as any,
-        recruitmentPrinciples: company.profile.recruitmentPrinciples as any,
-        benefits: company.profile.benefits as any,
-        hrJourney: company.profile.hrJourney as any,
-        careerPath: company.profile.careerPath as any,
-        salaryAndBonus: company.profile.salaryAndBonus as any,
-        training: company.profile.training as any,
-        leaders: company.profile.leaders as any,
-        story: company.profile.story as any,
-        culture: company.profile.culture as any,
-        awards: company.profile.awards as any,
-        createdAt: company.profile.createdAt,
-        updatedAt: company.profile.updatedAt
-    } : null;
+    // Map profile with optional fields respecting exactOptionalPropertyTypes
+    const profile: CompanyProfile | null = company.profile
+      ? {
+          ...(company.profile.stats != null ? { stats: company.profile.stats as any } : {}),
+          ...(company.profile.vision != null ? { vision: company.profile.vision } : {}),
+          ...(company.profile.mission != null ? { mission: company.profile.mission } : {}),
+          ...(company.profile.coreValues != null ? { coreValues: company.profile.coreValues } : {}),
+          ...(company.profile.leadershipPhilosophy != null
+            ? { leadershipPhilosophy: company.profile.leadershipPhilosophy as any }
+            : {}),
+          ...(company.profile.products != null ? { products: company.profile.products as any } : {}),
+          ...(company.profile.recruitmentPrinciples != null
+            ? { recruitmentPrinciples: company.profile.recruitmentPrinciples as any }
+            : {}),
+          ...(company.profile.benefits != null ? { benefits: company.profile.benefits as any } : {}),
+          ...(company.profile.hrJourney != null ? { hrJourney: company.profile.hrJourney as any } : {}),
+          ...(company.profile.careerPath != null ? { careerPath: company.profile.careerPath as any } : {}),
+          ...(company.profile.salaryAndBonus != null
+            ? { salaryAndBonus: company.profile.salaryAndBonus as any }
+            : {}),
+          ...(company.profile.training != null ? { training: company.profile.training as any } : {}),
+          ...(company.profile.leaders != null ? { leaders: company.profile.leaders as any } : {}),
+          ...(company.profile.story != null ? { story: company.profile.story as any } : {}),
+          ...(company.profile.culture != null ? { culture: company.profile.culture as any } : {}),
+          ...(company.profile.awards != null ? { awards: company.profile.awards as any } : {}),
+          createdAt: company.profile.createdAt,
+          updatedAt: company.profile.updatedAt,
+        }
+      : null;
 
     return {
       id: company.id,

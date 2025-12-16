@@ -152,6 +152,9 @@ model CompanyProfile {
   mission    String?  // Text
   coreValues String?  // Text (semicolon separated or simple text)
 
+  // Section: TRIẾT LÝ LÃNH ĐẠO (Leadership Philosophy)
+  leadershipPhilosophy Json? // { media, mediaType, quote, author? }
+
   // Section: HỆ SINH THÁI SẢN PHẨM
   products   Json?    // { items: string[] } or [{ name, icon }]
 

@@ -120,6 +120,7 @@ export const updateCompanyProfileSchema = z.object({
   vision: z.string().optional(),
   mission: z.string().optional(),
   coreValues: z.string().optional(),
+  leadershipPhilosophy: z.any().optional(),
   products: z.any().optional(),
   recruitmentPrinciples: z.any().optional(),
   benefits: z.any().optional(),

@@ -5,6 +5,7 @@ CREATE TABLE "company_profiles" (
     "vision" TEXT,
     "mission" TEXT,
     "coreValues" TEXT,
+    "leadershipPhilosophy" JSONB,
     "products" JSONB,
     "recruitmentPrinciples" JSONB,
     "benefits" JSONB,
