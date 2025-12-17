@@ -1031,6 +1031,411 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     },
   }, companiesController.leaveCompany.bind(companiesController));
 
+  // Upload verification contacts CSV for statements
+  fastify.post('/:companyId/verification-contacts/upload-csv', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Upload CSV file containing employee emails for statement verification',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          fileName: { type: 'string', description: 'Original file name' },
+          fileType: { type: 'string', description: 'MIME type, e.g. text/csv' },
+          fileData: { type: 'string', description: 'Base64 encoded CSV content' },
+          listName: { type: 'string', description: 'Optional display name for this list' },
+        },
+        required: ['fileName', 'fileType', 'fileData'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                list: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    fileKey: { type: 'string' },
+                    fileUrl: { type: 'string' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+                contactsCount: { type: 'number' },
+                uploadedAt: { type: 'string', format: 'date-time' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.uploadVerificationContactsCsv.bind(companiesController));
+
+  // List uploaded verification contact lists
+  fastify.get('/:companyId/verification-contacts/lists', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'List uploaded CSV lists of employee emails for verification',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                lists: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      name: { type: 'string' },
+                      fileKey: { type: 'string' },
+                      fileUrl: { type: 'string' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      contactsCount: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getVerificationContactLists.bind(companiesController));
+
+  // Send company statements for verification
+  fastify.post('/:companyId/statements/send', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Send company statements to employees for verification',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      body: {
+        type: 'object',
+        required: ['listId', 'statements'],
+        properties: {
+          listId: { type: 'string', description: 'Verification list ID' },
+          statements: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['title'],
+              properties: {
+                title: { type: 'string' },
+                description: { type: 'string' },
+                isPublic: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                statements: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      title: { type: 'string' },
+                      description: { type: 'string', nullable: true },
+                      isPublic: { type: 'boolean' },
+                      sentAt: { type: 'string', format: 'date-time', nullable: true },
+                      expiresAt: { type: 'string', format: 'date-time', nullable: true },
+                    },
+                  },
+                },
+                recipientsCount: { type: 'number' },
+                listId: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.sendCompanyStatements.bind(companiesController));
+
+  // Get company statements (manage)
+  fastify.get('/:companyId/statements', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Get company statements with aggregated verification stats (manage view)',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                statements: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      title: { type: 'string' },
+                      description: { type: 'string', nullable: true },
+                      isPublic: { type: 'boolean' },
+                      status: { type: 'string' },
+                      sentAt: { type: 'string', format: 'date-time', nullable: true },
+                      expiresAt: { type: 'string', format: 'date-time', nullable: true },
+                      totalRecipients: { type: 'number' },
+                      yesCount: { type: 'number' },
+                      respondedCount: { type: 'number' },
+                      percentYes: { type: 'number' },
+                      isExpired: { type: 'boolean' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getCompanyStatements.bind(companiesController));
+
+  // Update statement (e.g. toggle isPublic)
+  fastify.patch('/:companyId/statements/:statementId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Update a company statement (only non-content fields like isPublic)',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+          statementId: { type: 'string', description: 'Statement ID' },
+        },
+        required: ['companyId', 'statementId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          isPublic: { type: 'boolean' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                isPublic: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.updateCompanyStatement.bind(companiesController));
+
+  // Reorder statements
+  fastify.put('/:companyId/statements/reorder', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Reorder company statements',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+        },
+        required: ['companyId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          orders: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                order: { type: 'number' },
+              },
+              required: ['id', 'order'],
+            },
+          },
+        },
+        required: ['orders'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.reorderCompanyStatements.bind(companiesController));
+
+  // Public endpoints for statements verification (no auth)
+  fastify.get('/public/:slug/statements/verify', {
+    schema: {
+      description: 'Get statements to verify for a given contact token (public, no auth)',
+      tags: ['Companies'],
+      querystring: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Verification token from email link' },
+        },
+        required: ['token'],
+      },
+      params: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'Company slug' },
+        },
+        required: ['slug'],
+      },
+    },
+  }, companiesController.getStatementsForVerificationView.bind(companiesController));
+
+  fastify.post('/public/:slug/statements/verify', {
+    schema: {
+      description: 'Submit Yes/No verification for company statements (public, no auth)',
+      tags: ['Companies'],
+      body: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Verification token from email link' },
+          answers: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['statementId', 'answer'],
+              properties: {
+                statementId: { type: 'string' },
+                answer: { type: 'string', enum: ['YES', 'NO'] },
+              },
+            },
+          },
+        },
+        required: ['token', 'answers'],
+      },
+      params: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'Company slug' },
+        },
+        required: ['slug'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                updated: { type: 'number' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.submitStatementsVerification.bind(companiesController));
+
+  fastify.get('/public/:slug/statements', {
+    schema: {
+      description: 'Get public statements with aggregated stats for company profile',
+      tags: ['Companies'],
+      params: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'Company slug' },
+        },
+        required: ['slug'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                statements: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      title: { type: 'string' },
+                      description: { type: 'string', nullable: true },
+                      isPublic: { type: 'boolean' },
+                      status: { type: 'string' },
+                      sentAt: { type: 'string', format: 'date-time', nullable: true },
+                      expiresAt: { type: 'string', format: 'date-time', nullable: true },
+                      totalRecipients: { type: 'number' },
+                      yesCount: { type: 'number' },
+                      respondedCount: { type: 'number' },
+                      percentYes: { type: 'number' },
+                      isExpired: { type: 'boolean' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getPublicCompanyStatements.bind(companiesController));
+
   // Follow company
   fastify.post('/:companyId/follow', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],

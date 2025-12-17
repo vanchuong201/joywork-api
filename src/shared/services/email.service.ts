@@ -451,6 +451,108 @@ Trân trọng,
       text,
     });
   }
+
+  async sendCompanyStatementsVerificationEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      contactName?: string | null;
+      verifyUrl: string;
+      statements: { title: string; description?: string; expiresAt?: Date | string | null }[];
+    },
+  ): Promise<void> {
+    const displayName = payload.contactName || 'bạn';
+    const subject = `[JOYWork] Xác thực các cam kết từ ${payload.companyName}`;
+
+    const statementsHtml = payload.statements
+      .map((s) => {
+        const expires =
+          s.expiresAt instanceof Date
+            ? s.expiresAt.toLocaleString('vi-VN')
+            : s.expiresAt || '';
+        return `
+          <li style="margin-bottom: 12px;">
+            <div style="font-weight: 600; color: #111827;">${s.title}</div>
+            ${
+              s.description
+                ? `<div style="color:#4b5563; font-size: 14px; margin-top: 4px;">${s.description}</div>`
+                : ''
+            }
+            ${
+              expires
+                ? `<div style="color:#9ca3af; font-size: 12px; margin-top: 4px;">Thời hạn xác thực đến: ${expires}</div>`
+                : ''
+            }
+          </li>
+        `;
+      })
+      .join('');
+
+    const html = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xác thực cam kết doanh nghiệp - JOYWork</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px; background-color:#f9fafb;">
+    <div style="background-color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb;">
+      <h2 style="color:#111827; margin-bottom: 16px;">Xác thực cam kết từ ${payload.companyName}</h2>
+      <p>Chào ${displayName},</p>
+      <p>
+        Doanh nghiệp <strong>${payload.companyName}</strong> vừa cập nhật một số cam kết liên quan đến
+        chính sách và môi trường làm việc. Chúng tôi mong muốn anh/chị xác thực tính chính xác của
+        các thông tin sau:
+      </p>
+      <ul style="padding-left: 20px; margin: 16px 0;">
+        ${statementsHtml}
+      </ul>
+      <p>Để xác thực, vui lòng bấm vào nút bên dưới và lựa chọn <strong>Đúng / Không đúng</strong> cho từng cam kết.</p>
+      <div style="text-align:center; margin: 24px 0;">
+        <a href="${payload.verifyUrl}" style="display:inline-block; padding: 10px 24px; background-color:#ff6b00; color:#ffffff; border-radius:999px; text-decoration:none; font-weight:600;">
+          Xác thực các cam kết
+        </a>
+      </div>
+      <p style="font-size:13px; color:#6b7280;">
+        Nếu nút trên không hoạt động, hãy sao chép đường dẫn sau và dán vào trình duyệt của bạn:<br/>
+        <a href="${payload.verifyUrl}" style="color:#ff6b00;">${payload.verifyUrl}</a>
+      </p>
+      <p style="font-size:12px; color:#9ca3af; margin-top:24px;">
+        Lưu ý: Thời gian xác thực tối đa là 3 ngày kể từ khi nhận được email này. Sau thời gian trên, liên kết có thể hết hiệu lực.
+      </p>
+      <p style="margin-top:24px;">
+        Trân trọng,<br/>
+        <strong>Đội ngũ JOYWork</strong>
+      </p>
+    </div>
+  </body>
+</html>
+    `;
+
+    const text = `
+Xác thực cam kết từ ${payload.companyName}
+
+Chào ${displayName},
+
+Doanh nghiệp ${payload.companyName} vừa cập nhật một số cam kết liên quan đến chính sách và môi trường làm việc.
+Vui lòng truy cập liên kết sau để xác thực các cam kết (Đúng / Không đúng):
+
+${payload.verifyUrl}
+
+Lưu ý: Thời gian xác thực tối đa là 3 ngày kể từ khi nhận được email này.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export const emailService = new EmailService();

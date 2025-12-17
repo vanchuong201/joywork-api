@@ -134,6 +134,38 @@ export const updateCompanyProfileSchema = z.object({
   awards: z.any().optional(),
 });
 
+// Upload verification contacts CSV
+export const uploadVerificationContactsCsvSchema = z.object({
+  fileName: z.string().min(1, 'File name is required'),
+  fileType: z.string().min(1, 'File type is required'),
+  fileData: z.string().min(1, 'File data (base64) is required'),
+  listName: z.string().max(200).optional(),
+});
+
+// Send company statements for verification
+export const sendCompanyStatementsSchema = z.object({
+  listId: z.string().min(1, 'Verification list ID is required'),
+  statements: z
+    .array(
+      z.object({
+        title: z.string().min(3, 'Tiêu đề tuyên bố phải có ít nhất 3 ký tự'),
+        description: z.string().max(2000).optional(),
+        isPublic: z.boolean().optional().default(true),
+      }),
+    )
+    .min(1, 'Cần ít nhất 1 tuyên bố để gửi xác thực'),
+});
+
+// Reorder company statements
+export const reorderCompanyStatementsSchema = z.object({
+  orders: z.array(
+    z.object({
+      id: z.string().min(1, 'Statement ID is required'),
+      order: z.number().int().min(0, 'Order must be non-negative'),
+    }),
+  ),
+});
+
 // Types
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
@@ -143,6 +175,9 @@ export type SearchCompaniesInput = z.infer<typeof searchCompaniesSchema>;
 export type AddCompanyMemberInput = z.infer<typeof addCompanyMemberSchema>;
 export type UpdateCompanyMemberInput = z.infer<typeof updateCompanyMemberSchema>;
 export type UpdateCompanyProfileInput = z.infer<typeof updateCompanyProfileSchema>;
+export type UploadVerificationContactsCsvInput = z.infer<typeof uploadVerificationContactsCsvSchema>;
+export type SendCompanyStatementsInput = z.infer<typeof sendCompanyStatementsSchema>;
+export type ReorderCompanyStatementsInput = z.infer<typeof reorderCompanyStatementsSchema>;
 
 // List followers of a company
 export const listCompanyFollowersSchema = z.object({

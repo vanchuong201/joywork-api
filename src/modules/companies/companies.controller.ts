@@ -9,6 +9,8 @@ import {
   updateCompanyMemberSchema,
   getCompanySummarySchema,
   updateCompanyProfileSchema,
+  sendCompanyStatementsSchema,
+  ReorderCompanyStatementsInput,
 } from './companies.schema';
 import { z } from 'zod';
 
@@ -220,6 +222,152 @@ export class CompaniesController {
       data: {
         message: 'Left company successfully',
       },
+    });
+  }
+
+  // Upload verification contacts CSV
+  async uploadVerificationContactsCsv(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+
+    // Body is validated in service via Zod; keep route schema generic
+    const data = (request.body ?? {}) as any;
+
+    const result = await this.companiesService.uploadVerificationContactsCsv(
+      userId,
+      companyId,
+      data,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  async getVerificationContactLists(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+
+    const result = await this.companiesService.getVerificationContactLists(
+      companyId,
+      userId,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  // Send company statements for verification
+  async sendCompanyStatements(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+    const data = sendCompanyStatementsSchema.parse(request.body);
+
+    const result = await this.companiesService.sendCompanyStatements(
+      companyId,
+      userId,
+      data,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  async getCompanyStatements(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+
+    const result = await this.companiesService.getCompanyStatementsForManage(
+      companyId,
+      userId,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  async updateCompanyStatement(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId, statementId } = request.params as {
+      companyId: string;
+      statementId: string;
+    };
+    const body = (request.body ?? {}) as any;
+
+    const updateData: { isPublic?: boolean } = {};
+    if (typeof body.isPublic === 'boolean') {
+      updateData.isPublic = body.isPublic as boolean;
+    }
+
+    const result = await this.companiesService.updateCompanyStatement(
+      companyId,
+      userId,
+      statementId,
+      updateData,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  // Public verification flows
+  async getStatementsForVerificationView(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) {
+    const { slug } = request.params as { slug: string };
+    const { token } = (request.query as any) ?? {};
+
+    const data = await this.companiesService.getStatementsForVerificationView(
+      slug,
+      token,
+    );
+
+    return reply.send({
+      data,
+    });
+  }
+
+  async submitStatementsVerification(request: FastifyRequest, reply: FastifyReply) {
+    const { slug } = request.params as { slug: string };
+
+    const result = await this.companiesService.submitStatementsVerification(
+      slug,
+      request.body,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  async reorderCompanyStatements(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.params as { companyId: string };
+    const body = request.body as ReorderCompanyStatementsInput;
+
+    const result = await this.companiesService.reorderCompanyStatements(
+      companyId,
+      userId,
+      body.orders,
+    );
+
+    return reply.send({
+      data: result,
+    });
+  }
+
+  async getPublicCompanyStatements(request: FastifyRequest, reply: FastifyReply) {
+    const { slug } = request.params as { slug: string };
+
+    const result = await this.companiesService.getPublicCompanyStatements(slug);
+
+    return reply.send({
+      data: result,
     });
   }
 

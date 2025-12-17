@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import {
@@ -8,10 +8,14 @@ import {
   AddCompanyMemberInput,
   UpdateCompanyMemberInput,
   UpdateCompanyProfileInput,
+  UploadVerificationContactsCsvInput,
+  SendCompanyStatementsInput,
 } from './companies.schema';
 import crypto from 'crypto';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { buildS3ObjectUrl, getS3BucketName, s3Client } from '@/shared/storage/s3';
 
 export interface Company {
   id: string;
@@ -163,6 +167,24 @@ export interface CompanySummary {
 }
 
 export class CompaniesService {
+  private async ensureAdminOrOwner(userId: string, companyId: string) {
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('You do not have permission to manage this company', 403, 'FORBIDDEN');
+    }
+  }
+
+  private sanitizeFileName(name: string): string {
+    return name.trim().replace(/[^a-zA-Z0-9.\-_]+/g, '-');
+  }
+
   // Create company
   async createCompany(userId: string, data: CreateCompanyInput): Promise<Company> {
     // Check if slug already exists
@@ -1033,6 +1055,631 @@ export class CompaniesService {
       followersCount,
       postsCount,
       jobsActive,
+    };
+  }
+
+  // =========================
+  // Verification contacts CSV
+  // =========================
+
+  async uploadVerificationContactsCsv(
+    userId: string,
+    companyId: string,
+    input: UploadVerificationContactsCsvInput,
+  ) {
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const { fileName, fileType, fileData, listName } = input;
+
+    const ALLOWED_CSV_MIME_TYPES = new Set([
+      'text/csv',
+      'application/vnd.ms-excel',
+      'text/plain',
+    ]);
+    const MAX_CSV_SIZE = 2 * 1024 * 1024; // 2MB
+
+    if (!ALLOWED_CSV_MIME_TYPES.has(fileType)) {
+      throw new AppError(
+        'Chỉ chấp nhận tệp CSV (text/csv)',
+        400,
+        'INVALID_CSV_TYPE',
+      );
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+    if (!buffer.length) {
+      throw new AppError('Tệp CSV không được rỗng', 400, 'EMPTY_FILE');
+    }
+    if (buffer.length > MAX_CSV_SIZE) {
+      throw new AppError(
+        'Kích thước tệp CSV vượt quá giới hạn 2MB',
+        400,
+        'FILE_TOO_LARGE',
+      );
+    }
+
+    const now = new Date();
+    const safeBaseName =
+      listName?.trim() ||
+      this.sanitizeFileName(fileName.replace(/\.csv$/i, '') || 'ds-nhan-vien');
+
+    const key = `companies/${companyId}/verification-lists/${crypto.randomUUID()}.csv`;
+
+    // Upload raw CSV to S3
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: getS3BucketName(),
+          Key: key,
+          Body: buffer,
+          ContentType: fileType,
+          ContentLength: buffer.length,
+        }),
+      );
+    } catch (error) {
+      console.error('Failed to upload verification CSV to S3', error);
+      throw new AppError(
+        'Không thể tải tệp CSV lên, vui lòng thử lại.',
+        500,
+        'UPLOAD_FAILED',
+      );
+    }
+
+    // Parse CSV (simple parser: email,name)
+    const text = buffer.toString('utf8');
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    if (!lines.length) {
+      throw new AppError('Tệp CSV không chứa dữ liệu', 400, 'CSV_NO_ROWS');
+    }
+
+    const headerLine = lines[0]!;
+    const header = headerLine
+      .split(',')
+      .map((h) => h.trim().toLowerCase());
+
+    const emailIndex = header.indexOf('email');
+    const nameIndex = header.indexOf('name');
+
+    if (emailIndex === -1) {
+      throw new AppError(
+        'Dòng đầu tiên của CSV phải chứa cột "email" (và tùy chọn "name")',
+        400,
+        'CSV_INVALID_HEADER',
+      );
+    }
+
+    const contacts: { email: string; name?: string }[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const rawLine = lines[i] ?? '';
+      const row = rawLine.split(',');
+      const rawEmail = (row[emailIndex] ?? '').trim();
+      if (!rawEmail) continue;
+      const email = rawEmail.toLowerCase();
+      const nameValue =
+        nameIndex !== -1 ? (row[nameIndex] ?? '').trim() || undefined : undefined;
+
+      const contactObj: { email: string; name?: string } = { email };
+      if (nameValue !== undefined) {
+        contactObj.name = nameValue;
+      }
+
+      contacts.push(contactObj);
+    }
+
+    if (!contacts.length) {
+      throw new AppError(
+        'Không tìm thấy email hợp lệ trong tệp CSV',
+        400,
+        'CSV_NO_VALID_EMAILS',
+      );
+    }
+
+    const fileUrl = buildS3ObjectUrl(key);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const list = await tx.companyVerificationList.create({
+        data: {
+          companyId,
+          name: safeBaseName,
+          fileKey: key,
+        },
+      });
+
+      let createdContacts = 0;
+
+      for (const contact of contacts) {
+        const contactRecord = await tx.companyVerificationContact.upsert({
+          where: {
+            companyId_email: {
+              companyId,
+              email: contact.email,
+            },
+          },
+          create: {
+            companyId,
+            email: contact.email,
+            name: contact.name ?? null,
+            token: crypto.randomBytes(32).toString('hex'),
+          },
+          update: {
+            ...(contact.name ? { name: contact.name } : {}),
+          },
+        });
+
+        await tx.companyVerificationListItem.upsert({
+          where: {
+            listId_contactId: {
+              listId: list.id,
+              contactId: contactRecord.id,
+            },
+          },
+          create: {
+            listId: list.id,
+            contactId: contactRecord.id,
+          },
+          update: {},
+        });
+
+        createdContacts++;
+      }
+
+      return {
+        list: {
+          id: list.id,
+          name: list.name,
+          fileKey: list.fileKey,
+          fileUrl,
+          createdAt: list.createdAt,
+        },
+        contactsCount: createdContacts,
+        uploadedAt: now,
+      };
+    });
+
+    return result;
+  }
+
+  async getVerificationContactLists(companyId: string, userId: string) {
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const lists = await prisma.companyVerificationList.findMany({
+      where: { companyId },
+      include: {
+        items: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return {
+      lists: lists.map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        fileKey: l.fileKey,
+        fileUrl: buildS3ObjectUrl(l.fileKey),
+        createdAt: l.createdAt,
+        contactsCount: l.items.length,
+      })),
+    };
+  }
+
+  // =========================
+  // Company statements - send & manage
+  // =========================
+
+  async sendCompanyStatements(
+    companyId: string,
+    userId: string,
+    input: SendCompanyStatementsInput,
+  ) {
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const { listId, statements } = input;
+
+    const [company, list] = await Promise.all([
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { id: true, name: true, slug: true },
+      }),
+      prisma.companyVerificationList.findFirst({
+        where: { id: listId, companyId },
+        include: {
+          items: {
+            include: {
+              contact: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    if (!company) {
+      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    if (!list) {
+      throw new AppError(
+        'Danh sách email xác thực không tồn tại',
+        404,
+        'VERIFICATION_LIST_NOT_FOUND',
+      );
+    }
+
+    const contacts = list.items.map((i: any) => i.contact);
+    if (!contacts.length) {
+      throw new AppError(
+        'Danh sách email không có nhân viên nào. Vui lòng kiểm tra lại tệp CSV.',
+        400,
+        'VERIFICATION_LIST_EMPTY',
+      );
+    }
+
+    const now = new Date();
+
+    const createdStatements = await prisma.$transaction(async (tx) => {
+      // 1. Tạo các statement mới
+      const stmts = await Promise.all(
+        statements.map((s) =>
+          tx.companyStatement.create({
+            data: {
+              companyId,
+              title: s.title,
+              description: s.description ?? null,
+              isPublic: s.isPublic ?? true,
+              status: 'ACTIVE',
+              sentAt: now,
+              expiresAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // +3 ngày
+            },
+          }),
+        ),
+      );
+
+      // 2. Tạo recipient cho từng statement-contact
+      for (const stmt of stmts) {
+        for (const item of list.items) {
+          await tx.companyStatementRecipient.create({
+            data: {
+              statementId: stmt.id,
+              contactId: item.contactId,
+              sentAt: now,
+            },
+          });
+        }
+      }
+
+      return stmts;
+    });
+
+    // 3. Gửi email cho từng contact (ngoài transaction)
+    const verifyBaseUrl = `${config.FRONTEND_ORIGIN}/verify/company/${company.slug}`;
+
+    for (const contact of contacts as any[]) {
+      const verifyUrl = `${verifyBaseUrl}?token=${encodeURIComponent(
+        contact.token,
+      )}`;
+
+      try {
+        await emailService.sendCompanyStatementsVerificationEmail(contact.email, {
+          companyName: company.name,
+          contactName: contact.name,
+          verifyUrl,
+          statements: createdStatements.map((s: any) => ({
+            title: s.title,
+            description: s.description ?? undefined,
+            expiresAt: s.expiresAt ?? undefined,
+          })),
+        });
+      } catch (error) {
+        console.error(
+          'Failed to send statement verification email',
+          contact.email,
+          error,
+        );
+        // Không throw để tránh fail cả batch; log là đủ
+      }
+    }
+
+    return {
+      statements: createdStatements.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        isPublic: s.isPublic,
+        sentAt: s.sentAt,
+        expiresAt: s.expiresAt,
+      })),
+      recipientsCount: contacts.length,
+      listId: list.id,
+    };
+  }
+
+  private async getStatementsWithStats(companyId: string, forPublic = false) {
+    const now = new Date();
+
+    const statements = await prisma.companyStatement.findMany({
+      where: {
+        companyId,
+        ...(forPublic ? { isPublic: true } : {}),
+      },
+      include: {
+        recipients: true,
+      },
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'desc' },
+      ],
+    });
+
+    return statements.map((s: any) => {
+      const totalRecipients = s.recipients.length;
+      const yesCount = s.recipients.filter(
+        (r: any) => r.answer === CompanyStatementAnswer.YES,
+      ).length;
+      const respondedCount = s.recipients.filter(
+        (r: any) => r.answer !== null,
+      ).length;
+      const percentYes =
+        totalRecipients > 0 ? Math.round((yesCount / totalRecipients) * 100) : 0;
+      const isExpired = !!s.expiresAt && s.expiresAt < now;
+
+      return {
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        isPublic: s.isPublic,
+        status: s.status,
+        sentAt: s.sentAt,
+        expiresAt: s.expiresAt,
+        totalRecipients,
+        yesCount,
+        respondedCount,
+        percentYes,
+        isExpired,
+      };
+    });
+  }
+
+  async getCompanyStatementsForManage(companyId: string, userId: string) {
+    await this.ensureAdminOrOwner(userId, companyId);
+    const items = await this.getStatementsWithStats(companyId, false);
+    return { statements: items };
+  }
+
+  async updateCompanyStatement(
+    companyId: string,
+    userId: string,
+    statementId: string,
+    data: { isPublic?: boolean },
+  ) {
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const stmt = await prisma.companyStatement.findUnique({
+      where: { id: statementId },
+      select: { id: true, companyId: true },
+    });
+
+    if (!stmt || stmt.companyId !== companyId) {
+      throw new AppError('Statement not found', 404, 'STATEMENT_NOT_FOUND');
+    }
+
+    const updated = await prisma.companyStatement.update({
+      where: { id: statementId },
+      data: {
+        ...(typeof data.isPublic === 'boolean' ? { isPublic: data.isPublic } : {}),
+      },
+    });
+
+    return {
+      id: updated.id,
+      isPublic: updated.isPublic,
+    };
+  }
+
+  // =========================
+  // Public verification flows
+  // =========================
+
+  async getStatementsForVerificationView(slug: string, token: string) {
+    const company = await prisma.company.findUnique({
+      where: { slug },
+      select: { id: true, name: true, slug: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    if (!token) {
+      throw new AppError('Thiếu token xác thực', 400, 'MISSING_TOKEN');
+    }
+
+    const contact = await prisma.companyVerificationContact.findFirst({
+      where: {
+        token,
+        companyId: company.id,
+      },
+    });
+
+    if (!contact) {
+      throw new AppError(
+        'Liên kết xác thực không hợp lệ hoặc đã hết hạn',
+        404,
+        'CONTACT_NOT_FOUND',
+      );
+    }
+
+    const now = new Date();
+
+    const recipients = await prisma.companyStatementRecipient.findMany({
+      where: {
+        contactId: contact.id,
+        answer: null,
+        statement: {
+          companyId: company.id,
+          expiresAt: {
+            gt: now,
+          },
+        },
+      },
+      include: {
+        statement: true,
+      },
+      orderBy: {
+        sentAt: 'asc',
+      },
+    });
+
+    const statements = recipients.map((r) => ({
+      id: r.statement.id,
+      title: r.statement.title,
+      description: r.statement.description ?? undefined,
+      expiresAt: r.statement.expiresAt ?? undefined,
+    }));
+
+    return {
+      company: {
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+      },
+      contact: {
+        email: contact.email,
+        name: contact.name ?? undefined,
+      },
+      statements,
+    };
+  }
+
+  async submitStatementsVerification(slug: string, body: any) {
+    const company = await prisma.company.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const token = typeof body?.token === 'string' ? body.token : '';
+    const answers = Array.isArray(body?.answers) ? body.answers : [];
+
+    if (!token) {
+      throw new AppError('Thiếu token xác thực', 400, 'MISSING_TOKEN');
+    }
+
+    if (!answers.length) {
+      throw new AppError(
+        'Không có dữ liệu phản hồi nào được gửi lên',
+        400,
+        'NO_ANSWERS',
+      );
+    }
+
+    const contact = await prisma.companyVerificationContact.findFirst({
+      where: {
+        token,
+        companyId: company.id,
+      },
+    });
+
+    if (!contact) {
+      throw new AppError(
+        'Liên kết xác thực không hợp lệ hoặc đã hết hạn',
+        404,
+        'CONTACT_NOT_FOUND',
+      );
+    }
+
+    const now = new Date();
+
+    let updatedCount = 0;
+
+    for (const item of answers as any[]) {
+      if (
+        !item ||
+        typeof item.statementId !== 'string' ||
+        (item.answer !== 'YES' && item.answer !== 'NO')
+      ) {
+        continue;
+      }
+
+      const recipient = await prisma.companyStatementRecipient.findUnique({
+        where: {
+          statementId_contactId: {
+            statementId: item.statementId,
+            contactId: contact.id,
+          },
+        },
+        include: {
+          statement: true,
+        },
+      });
+
+      if (!recipient) continue;
+      if (recipient.answer !== null) continue;
+      if (recipient.statement.companyId !== company.id) continue;
+      if (recipient.statement.expiresAt && recipient.statement.expiresAt < now)
+        continue;
+
+      await prisma.companyStatementRecipient.update({
+        where: {
+          statementId_contactId: {
+            statementId: item.statementId,
+            contactId: contact.id,
+          },
+        },
+        data: {
+          answer: item.answer as CompanyStatementAnswer,
+          verifiedAt: now,
+        },
+      });
+
+      updatedCount++;
+    }
+
+    return {
+      updated: updatedCount,
+    };
+  }
+
+  async reorderCompanyStatements(
+    companyId: string,
+    userId: string,
+    orders: { id: string; order: number }[],
+  ) {
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const transaction = orders.map((item) =>
+      prisma.companyStatement.update({
+        where: { id: item.id, companyId },
+        data: { order: item.order },
+      }),
+    );
+
+    await prisma.$transaction(transaction);
+
+    return { success: true };
+  }
+
+  async getPublicCompanyStatements(slug: string) {
+    const company = await prisma.company.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const statements = await this.getStatementsWithStats(company.id, true);
+
+    return {
+      statements,
     };
   }
 }

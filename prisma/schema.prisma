@@ -136,6 +136,11 @@ model Company {
   tickets     CompanyTicket[]
   invitations CompanyInvitation[]
 
+  // Verification & transparency modules
+  verificationContacts CompanyVerificationContact[]
+  verificationLists    CompanyVerificationList[]
+  statements           CompanyStatement[]
+
   @@map("companies")
 }
 
@@ -592,6 +597,97 @@ model CompanyInvitation {
   @@unique([companyId, email])
   @@index([token])
   @@map("company_invitations")
+}
+
+// =========================
+// Company Statements Verification (Transparency)
+// =========================
+
+model CompanyVerificationContact {
+  id        String   @id @default(cuid())
+  companyId String
+  email     String
+  name      String?
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company    Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lists      CompanyVerificationListItem[]
+  recipients CompanyStatementRecipient[]
+
+  @@unique([companyId, email])
+  @@map("company_verification_contacts")
+}
+
+model CompanyVerificationList {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  fileKey   String
+  createdAt DateTime @default(now())
+
+  company Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items   CompanyVerificationListItem[]
+
+  @@map("company_verification_lists")
+}
+
+model CompanyVerificationListItem {
+  id        String   @id @default(cuid())
+  listId    String
+  contactId String
+
+  list    CompanyVerificationList    @relation(fields: [listId], references: [id], onDelete: Cascade)
+  contact CompanyVerificationContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, contactId])
+  @@map("company_verification_list_items")
+}
+
+enum CompanyStatementStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+}
+
+model CompanyStatement {
+  id        String                 @id @default(cuid())
+  companyId String
+  title     String
+  description String?
+  isPublic  Boolean                @default(false)
+  status    CompanyStatementStatus @default(DRAFT)
+  sentAt    DateTime?
+  expiresAt DateTime?
+  order     Int                    @default(0)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  company    Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipients CompanyStatementRecipient[]
+
+  @@map("company_statements")
+}
+
+enum CompanyStatementAnswer {
+  YES
+  NO
+}
+
+model CompanyStatementRecipient {
+  id          String                 @id @default(cuid())
+  statementId String
+  contactId   String
+  sentAt      DateTime
+  answer      CompanyStatementAnswer?
+  verifiedAt  DateTime?
+
+  statement CompanyStatement          @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  contact   CompanyVerificationContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([statementId, contactId])
+  @@map("company_statement_recipients")
 }
 
 // Social login accounts (Google, Facebook, ...)
