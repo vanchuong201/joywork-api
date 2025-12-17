@@ -319,8 +319,15 @@ export class UploadsService {
         ContentType: fileType,
         ContentLength: buffer.length,
       }));
+
+      // Update company logoUrl in database
+      await prisma.company.update({
+        where: { id: companyId },
+        data: { logoUrl: buildS3ObjectUrl(key) },
+      });
+
     } catch (error) {
-      console.error('Failed to upload company logo to S3', error);
+      console.error('Failed to upload company logo to S3 or update DB', error);
       throw new AppError('Không thể tải logo lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
@@ -385,8 +392,15 @@ export class UploadsService {
         ContentType: fileType,
         ContentLength: buffer.length,
       }));
+
+      // Update company coverUrl in database
+      await prisma.company.update({
+        where: { id: companyId },
+        data: { coverUrl: buildS3ObjectUrl(key) },
+      });
+
     } catch (error) {
-      console.error('Failed to upload company cover to S3', error);
+      console.error('Failed to upload company cover to S3 or update DB', error);
       throw new AppError('Không thể tải ảnh cover lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
