@@ -57,6 +57,8 @@ const baseCompanySchema = {
   coverUrl: z.string().url('Invalid cover URL').optional(),
   website: z.string().url('Invalid website URL').optional(),
   location: z.string().max(120, 'Location must be less than 120 characters').optional(),
+  email: z.string().email('Invalid email address').max(200, 'Email must be less than 200 characters').optional(),
+  phone: z.string().max(50, 'Phone number must be less than 50 characters').optional(),
   industry: z.string().max(80, 'Industry must be less than 80 characters').optional(),
   size: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']).optional(),
   foundedYear: z.number().int().min(1800).max(new Date().getFullYear()).optional(),

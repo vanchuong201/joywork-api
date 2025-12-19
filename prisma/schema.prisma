@@ -115,6 +115,8 @@ model Company {
   coverUrl      String?
   website       String?
   location      String?
+  email         String?
+  phone         String?
   industry      String?
   size          CompanySize?
   foundedYear   Int?
