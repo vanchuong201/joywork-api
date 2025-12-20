@@ -139,9 +139,9 @@ model Company {
   invitations CompanyInvitation[]
 
   // Verification & transparency modules
-  verificationContacts CompanyVerificationContact[]
-  verificationLists    CompanyVerificationList[]
-  statements           CompanyStatement[]
+  verificationContacts CompanyVerificationContact[] @relation("CompanyToVerificationContacts")
+  verificationLists    CompanyVerificationList[]    @relation("CompanyToVerificationLists")
+  statements           CompanyStatement[]           @relation("CompanyToStatements")
 
   @@map("companies")
 }
@@ -614,7 +614,7 @@ model CompanyVerificationContact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company    Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company    Company                       @relation("CompanyToVerificationContacts", fields: [companyId], references: [id], onDelete: Cascade)
   lists      CompanyVerificationListItem[]
   recipients CompanyStatementRecipient[]
 
@@ -629,7 +629,7 @@ model CompanyVerificationList {
   fileKey   String
   createdAt DateTime @default(now())
 
-  company Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company                     @relation("CompanyToVerificationLists", fields: [companyId], references: [id], onDelete: Cascade)
   items   CompanyVerificationListItem[]
 
   @@map("company_verification_lists")
@@ -666,7 +666,7 @@ model CompanyStatement {
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
 
-  company    Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company    Company                   @relation("CompanyToStatements", fields: [companyId], references: [id], onDelete: Cascade)
   recipients CompanyStatementRecipient[]
 
   @@map("company_statements")
