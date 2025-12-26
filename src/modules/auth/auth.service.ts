@@ -25,6 +25,10 @@ export interface AuthUser {
   name: string | null;
   role: string;
   emailVerified?: boolean;
+  avatar?: string | null;
+  profile?: {
+    avatar?: string | null;
+  } | null;
 }
 
 export class AuthService {
@@ -189,10 +193,30 @@ export class AuthService {
         name: true,
         role: true,
         emailVerified: true,
+        avatar: true, // Account avatar
+        profile: {
+          select: {
+            avatar: true, // Profile avatar
+          },
+        },
       },
     });
 
-    return user;
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      emailVerified: user.emailVerified,
+      avatar: user.avatar,
+      profile: user.profile ? {
+        avatar: user.profile.avatar,
+      } : null,
+    };
   }
 
   // Generate JWT tokens

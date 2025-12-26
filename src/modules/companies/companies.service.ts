@@ -337,7 +337,7 @@ export class CompaniesService {
     // Update company
     const { metrics, profileStory, highlights, ...rest } = data;
 
-    // Omit undefined properties to satisfy exactOptionalPropertyTypes
+    // Schema đã xử lý empty string thành null, chỉ cần omit undefined
     const updateBase = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined)
     );

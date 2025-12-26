@@ -363,6 +363,14 @@ export async function authRoutes(fastify: FastifyInstance) {
                     name: { type: 'string', nullable: true },
                     role: { type: 'string' },
                     emailVerified: { type: 'boolean' },
+                    avatar: { type: 'string', nullable: true },
+                    profile: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        avatar: { type: 'string', nullable: true },
+                      },
+                    },
                   },
                 },
               },

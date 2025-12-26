@@ -47,18 +47,44 @@ const highlightsSchema = z.array(
   }),
 );
 
+// Helper để chấp nhận empty string hoặc null cho các trường optional
+// Nếu là empty string hoặc null thì không validate format, nếu có giá trị thì validate
+const optionalString = (maxLength?: number) => 
+  z.preprocess(
+    (val) => val === "" ? null : val,
+    z.string().max(maxLength || 10000, `Must be less than ${maxLength || 10000} characters`).nullable().optional()
+  );
+
+const optionalUrl = () => 
+  z.preprocess(
+    (val) => val === "" ? null : val,
+    z.union([
+      z.string().url('Invalid URL'),
+      z.null(),
+    ]).optional()
+  );
+
+const optionalEmail = () => 
+  z.preprocess(
+    (val) => val === "" ? null : val,
+    z.union([
+      z.string().email('Invalid email address').max(200, 'Email must be less than 200 characters'),
+      z.null(),
+    ]).optional()
+  );
+
 const baseCompanySchema = {
   name: z.string().min(2, 'Company name must be at least 2 characters'),
-  legalName: z.string().max(200, 'Legal name must be less than 200 characters').optional(),
+  legalName: optionalString(200),
   slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
-  tagline: z.string().max(150, 'Tagline must be less than 150 characters').optional(),
-  description: z.string().max(10000, 'Description must be less than 10000 characters').optional(),
-  logoUrl: z.string().url('Invalid logo URL').optional(),
-  coverUrl: z.string().url('Invalid cover URL').optional(),
-  website: z.string().url('Invalid website URL').optional(),
-  location: z.string().max(120, 'Location must be less than 120 characters').optional(),
-  email: z.string().email('Invalid email address').max(200, 'Email must be less than 200 characters').optional(),
-  phone: z.string().max(50, 'Phone number must be less than 50 characters').optional(),
+  tagline: optionalString(150),
+  description: optionalString(10000),
+  logoUrl: optionalUrl(),
+  coverUrl: optionalUrl(),
+  website: optionalUrl(),
+  location: optionalString(120),
+  email: optionalEmail(),
+  phone: optionalString(50),
   industry: z.string().max(80, 'Industry must be less than 80 characters').optional(),
   size: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']).optional(),
   foundedYear: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
