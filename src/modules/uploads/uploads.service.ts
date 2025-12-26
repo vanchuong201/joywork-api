@@ -152,7 +152,7 @@ export class UploadsService {
   }
 
   async uploadProfileAvatar(userId: string, input: UploadProfileAvatarInput) {
-    const { fileName, fileType, fileData, previousKey } = input;
+    const { fileName, fileType, fileData, previousKey, target = 'profile' } = input;
 
     if (!ALLOWED_MIME_TYPES.has(fileType)) {
       throw new AppError('Định dạng ảnh đại diện không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
@@ -176,7 +176,7 @@ export class UploadsService {
       return `.${sanitized.slice(idx + 1).toLowerCase()}`;
     })();
     const extension = extFromMime ?? fallbackExt ?? '';
-    const key = `users/${userId}/avatar/${randomUUID()}${extension}`;
+    const key = `users/${userId}/avatar/${target}/${randomUUID()}${extension}`;
 
     try {
       await s3Client.send(new PutObjectCommand({
@@ -191,6 +191,7 @@ export class UploadsService {
       throw new AppError('Không thể tải ảnh đại diện, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
+    // Delete previous avatar if exists
     if (previousKey && previousKey.startsWith(`users/${userId}/avatar/`)) {
       try {
         await deleteS3Objects([previousKey]);
@@ -200,9 +201,33 @@ export class UploadsService {
       }
     }
 
+    const assetUrl = buildS3ObjectUrl(key);
+
+    // Update database based on target
+    if (target === 'account') {
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: { avatar: assetUrl },
+        select: { id: true, avatar: true },
+      });
+      console.log(`[Upload] Updated User.avatar for userId=${userId}, avatar=${updated.avatar}`);
+    } else {
+      // Update or create profile
+      const updated = await prisma.userProfile.upsert({
+        where: { userId },
+        update: { avatar: assetUrl },
+        create: {
+          userId,
+          avatar: assetUrl,
+        },
+        select: { id: true, userId: true, avatar: true },
+      });
+      console.log(`[Upload] Updated UserProfile.avatar for userId=${userId}, avatar=${updated.avatar}`);
+    }
+
     return {
       key,
-      assetUrl: buildS3ObjectUrl(key),
+      assetUrl,
     };
   }
 

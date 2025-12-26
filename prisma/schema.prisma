@@ -16,6 +16,8 @@ model User {
   email         String   @unique
   password      String
   name          String?
+  slug          String?  @unique
+  avatar        String?  // Avatar for account (separate from profile avatar)
   phone         String?
   emailVerified Boolean  @default(false)
   role          UserRole @default(USER)
@@ -24,6 +26,8 @@ model User {
 
   // Relations
   profile                 UserProfile?
+  experiences             UserExperience[]
+  educations              UserEducation[]
   companies               CompanyMember[]
   applications            Application[]
   messages                Message[]
@@ -41,6 +45,7 @@ model User {
   ticketMessages          CompanyTicketMessage[]
   sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
 
+  @@index([slug])
   @@map("users")
 }
 
@@ -81,19 +86,45 @@ enum UserRole {
   ADMIN
 }
 
+enum UserStatus {
+  OPEN_TO_WORK
+  NOT_AVAILABLE
+  LOOKING
+}
+
 // UserProfile - Extended user information
 model UserProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  avatar    String?
-  headline  String?
-  bio       String?
-  skills    String[]
-  cvUrl     String?
-  location  String?
-  website   String?
-  linkedin  String?
-  github    String?
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  avatar   String?
+  headline String?
+  bio      String?
+  skills   String[]
+  cvUrl    String?
+  location String?
+  website  String?
+  linkedin String?
+  github   String?
+
+  // Profile-specific fields
+  fullName   String? // Full name for CV/applications (separate from User.name)
+  title      String?
+  status     UserStatus?
+  isPublic   Boolean     @default(true)
+  visibility Json? // { bio: boolean, experience: boolean, education: boolean, ksa: boolean, expectations: boolean }
+
+  // KSA (Knowledge, Skills, Attitude)
+  knowledge String[] // Array of knowledge items
+  attitude  String[] // Array of attitude items
+
+  // Expectations
+  expectedSalary  String?
+  workMode        String?
+  expectedCulture String?
+
+  // Career Goals
+  careerGoals String[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -101,6 +132,52 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
+}
+
+// UserExperience - Work experience history
+model UserExperience {
+  id           String    @id @default(cuid())
+  userId       String
+  role         String
+  company      String
+  startDate    DateTime?
+  endDate      DateTime?
+  period       String? // Display string: "2019 - Hiện tại"
+  desc         String?
+  achievements String[]
+  order        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([company])
+  @@map("user_experiences")
+}
+
+// UserEducation - Education history
+model UserEducation {
+  id        String    @id @default(cuid())
+  userId    String
+  school    String
+  degree    String
+  startDate DateTime?
+  endDate   DateTime?
+  period    String? // Display string: "2015 - 2019"
+  gpa       String?
+  honors    String?
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([school])
+  @@map("user_educations")
 }
 
 // Company model
@@ -148,56 +225,56 @@ model Company {
 
 // New model for detailed Company Profile (Showcase)
 model CompanyProfile {
-  companyId  String   @id
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String  @id
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // Section: NHỮNG CON SỐ BIẾT NÓI
-  stats      Json?    // [{ value, label, trend?, icon? }]
+  stats Json? // [{ value, label, trend?, icon? }]
 
   // Section: TẦM NHÌN – SỨ MỆNH – GIÁ TRỊ CỐT LÕI
-  vision     String?  // Text
-  mission    String?  // Text
-  coreValues String?  // Text (semicolon separated or simple text)
+  vision     String? // Text
+  mission    String? // Text
+  coreValues String? // Text (semicolon separated or simple text)
 
   // Section: TRIẾT LÝ LÃNH ĐẠO (Leadership Philosophy)
   leadershipPhilosophy Json? // { media, mediaType, quote, author? }
 
   // Section: HỆ SINH THÁI SẢN PHẨM
-  products   Json?    // { items: string[] } or [{ name, icon }]
+  products Json? // { items: string[] } or [{ name, icon }]
 
   // Section: NGUYÊN TẮC TUYỂN DỤNG
   recruitmentPrinciples Json? // [{ title, desc, icon? }]
 
   // Section: PHÚC LỢI TOÀN DIỆN
-  benefits   Json?    // { financial: [], nonFinancial: [] }
+  benefits Json? // { financial: [], nonFinancial: [] }
 
   // Section: HÀNH TRÌNH NHÂN SỰ
-  hrJourney  Json?    // [{ step, title, desc }]
+  hrJourney Json? // [{ step, title, desc }]
 
   // Section: LỘ TRÌNH THĂNG TIẾN
-  careerPath Json?    // { levels: string[] }
+  careerPath Json? // { levels: string[] }
 
   // Section: CƠ CHẾ LƯƠNG & THƯỞNG
   salaryAndBonus Json? // { salary: [], bonus: [] }
 
   // Section: ĐÀO TẠO & PHÁT TRIỂN
-  training   Json?    // { philosophy, programs: [], budget? }
+  training Json? // { philosophy, programs: [], budget? }
 
   // Section: BAN LÃNH ĐẠO
-  leaders    Json?    // [{ name, role, image, message, ... }]
+  leaders Json? // [{ name, role, image, message, ... }]
 
   // Section: CÂU CHUYỆN & CỘT MỐC
-  story      Json?    // { founderStory: { title, content, image? }, milestones: [] }
+  story Json? // { founderStory: { title, content, image? }, milestones: [] }
 
   // Section: VĂN HÓA (Testimonials, Typical Day)
-  culture    Json?    // { testimonials: [], typicalDay: [] }
+  culture Json? // { testimonials: [], typicalDay: [] }
 
   // Section: GIẢI THƯỞNG
-  awards     Json?    // [{ year, name, org }]
+  awards Json? // [{ year, name, org }]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@map("company_profiles")
 }
 
@@ -247,15 +324,15 @@ model Post {
   updatedAt   DateTime       @updatedAt
 
   // Relations
-  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  likes     Like[]
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  likes         Like[]
   postReactions PostReaction[]
-  images    PostImage[]
-  auditLogs PostAuditLog[]
-  favorites PostFavorite[]
-  postJobs  PostJob[]
-  hashtags  PostHashtag[]
+  images        PostImage[]
+  auditLogs     PostAuditLog[]
+  favorites     PostFavorite[]
+  postJobs      PostJob[]
+  hashtags      PostHashtag[]
 
   @@map("posts")
 }
@@ -309,10 +386,10 @@ model PostJob {
 
 // Global hashtags for posts
 model Hashtag {
-  id        String        @id @default(cuid())
-  slug      String        @unique
+  id        String   @id @default(cuid())
+  slug      String   @unique
   label     String
-  createdAt DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
   posts PostHashtag[]
@@ -526,6 +603,7 @@ model PostReaction {
   @@index([postId])
   @@map("post_reactions")
 }
+
 // Post favorites - Saved posts
 model PostFavorite {
   id        String   @id @default(cuid())
@@ -629,14 +707,14 @@ model CompanyVerificationList {
   fileKey   String
   createdAt DateTime @default(now())
 
-  company Company                     @relation("CompanyToVerificationLists", fields: [companyId], references: [id], onDelete: Cascade)
+  company Company                       @relation("CompanyToVerificationLists", fields: [companyId], references: [id], onDelete: Cascade)
   items   CompanyVerificationListItem[]
 
   @@map("company_verification_lists")
 }
 
 model CompanyVerificationListItem {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   listId    String
   contactId String
 
@@ -654,19 +732,19 @@ enum CompanyStatementStatus {
 }
 
 model CompanyStatement {
-  id        String                 @id @default(cuid())
-  companyId String
-  title     String
+  id          String                 @id @default(cuid())
+  companyId   String
+  title       String
   description String?
-  isPublic  Boolean                @default(false)
-  status    CompanyStatementStatus @default(DRAFT)
-  sentAt    DateTime?
-  expiresAt DateTime?
-  order     Int                    @default(0)
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
+  isPublic    Boolean                @default(false)
+  status      CompanyStatementStatus @default(DRAFT)
+  sentAt      DateTime?
+  expiresAt   DateTime?
+  order       Int                    @default(0)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
-  company    Company                   @relation("CompanyToStatements", fields: [companyId], references: [id], onDelete: Cascade)
+  company    Company                     @relation("CompanyToStatements", fields: [companyId], references: [id], onDelete: Cascade)
   recipients CompanyStatementRecipient[]
 
   @@map("company_statements")
@@ -678,14 +756,14 @@ enum CompanyStatementAnswer {
 }
 
 model CompanyStatementRecipient {
-  id          String                 @id @default(cuid())
+  id          String                  @id @default(cuid())
   statementId String
   contactId   String
   sentAt      DateTime
   answer      CompanyStatementAnswer?
   verifiedAt  DateTime?
 
-  statement CompanyStatement          @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statement CompanyStatement           @relation(fields: [statementId], references: [id], onDelete: Cascade)
   contact   CompanyVerificationContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@unique([statementId, contactId])
@@ -696,9 +774,9 @@ model CompanyStatementRecipient {
 model UserSocialAccount {
   id         String   @id @default(cuid())
   userId     String
-  provider   String   // e.g. "google", "facebook"
-  providerId String   // sub/id from provider
-  email      String?  // email from provider (if available)
+  provider   String // e.g. "google", "facebook"
+  providerId String // sub/id from provider
+  email      String? // email from provider (if available)
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

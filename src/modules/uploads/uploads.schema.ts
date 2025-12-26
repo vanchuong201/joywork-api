@@ -35,6 +35,7 @@ export const uploadProfileAvatarSchema = z.object({
       }
     }, 'Invalid base64 data'),
   previousKey: z.string().optional(),
+  target: z.enum(['account', 'profile']).default('profile'), // 'account' for User.avatar, 'profile' for UserProfile.avatar
 });
 
 export const uploadCompanyPostImageSchema = z.object({

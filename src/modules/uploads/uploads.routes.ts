@@ -113,6 +113,7 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
             fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
             fileData: { type: 'string', description: 'Dữ liệu ảnh dạng base64' },
             previousKey: { type: 'string' },
+            target: { type: 'string', enum: ['account', 'profile'], description: 'Target: account for User.avatar, profile for UserProfile.avatar', default: 'profile' },
           },
         },
         response: {
