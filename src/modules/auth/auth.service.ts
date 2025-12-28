@@ -5,6 +5,7 @@ import { prisma } from '@/shared/database/prisma';
 import { config } from '@/config/env';
 import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
+import { generateSlug, ensureUniqueSlug } from '../users/user-profile.service';
 import {
   RegisterInput,
   LoginInput,
@@ -48,6 +49,18 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Generate slug from name or email, fallback to a unique identifier
+    let slug: string;
+    if (name) {
+      const baseSlug = generateSlug(name);
+      slug = baseSlug ? await ensureUniqueSlug(baseSlug) : await ensureUniqueSlug(`user-${randomUUID().substring(0, 8)}`);
+    } else {
+      // Use email prefix or generate from email
+      const emailPrefix = email.split('@')[0] || email;
+      const baseSlug = generateSlug(emailPrefix);
+      slug = baseSlug ? await ensureUniqueSlug(baseSlug) : await ensureUniqueSlug(`user-${randomUUID().substring(0, 8)}`);
+    }
+
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -55,6 +68,7 @@ export class AuthService {
         password: hashedPassword,
         name: name || null,
         phone: phone || null,
+        slug,
         emailVerified: false,
       },
     });

@@ -445,6 +445,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                           id: { type: 'string' },
                           name: { type: 'string', nullable: true },
                           email: { type: 'string' },
+                          slug: { type: 'string', nullable: true },
                           profile: {
                             type: 'object',
                             nullable: true,

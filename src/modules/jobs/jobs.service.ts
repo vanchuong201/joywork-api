@@ -680,6 +680,7 @@ export class JobsService {
           id: app.user.id,
           name: app.user.name ?? undefined,
           email: app.user.email,
+          slug: app.user.slug ?? undefined,
           profile: app.user.profile ? {
             id: app.user.profile.id,
             headline: app.user.profile.headline ?? undefined,

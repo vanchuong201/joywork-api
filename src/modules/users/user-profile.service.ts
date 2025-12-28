@@ -37,9 +37,10 @@ export async function ensureUniqueSlug(baseSlug: string, excludeUserId?: string)
 }
 
 export class UserProfileService {
-  // Get public profile by slug
+  // Get public profile by slug (or ID as fallback)
   async getPublicProfileBySlug(slug: string): Promise<any | null> {
-    const user = await prisma.user.findUnique({
+    // Try to find by slug first
+    let user = await prisma.user.findUnique({
       where: { slug },
       include: {
         profile: true,
@@ -57,6 +58,45 @@ export class UserProfileService {
         },
       },
     });
+
+    // If not found by slug, try to find by ID (for backward compatibility)
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { id: slug },
+        include: {
+          profile: true,
+          experiences: {
+            orderBy: [
+              { order: 'asc' },
+              { startDate: 'desc' },
+            ],
+          },
+          educations: {
+            orderBy: [
+              { order: 'asc' },
+              { startDate: 'desc' },
+            ],
+          },
+        },
+      });
+
+      // If found by ID but user doesn't have slug, generate one
+      if (user && !user.slug) {
+        const baseName = user.name || user.email.split('@')[0] || 'user';
+        const baseSlug = generateSlug(baseName);
+        const newSlug = baseSlug 
+          ? await ensureUniqueSlug(baseSlug, user.id)
+          : await ensureUniqueSlug(`user-${user.id.substring(0, 8)}`, user.id);
+        
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { slug: newSlug },
+        });
+        
+        // Update the user object with new slug (need to cast to include slug)
+        user = { ...user, slug: newSlug } as typeof user & { slug: string };
+      }
+    }
 
     if (!user) {
       return null;
