@@ -224,6 +224,8 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         website: { type: 'string', nullable: true },
                         linkedin: { type: 'string', nullable: true },
                         github: { type: 'string', nullable: true },
+                        contactEmail: { type: 'string', nullable: true },
+                        contactPhone: { type: 'string', nullable: true },
                         status: { type: 'string', nullable: true },
                         isPublic: { type: 'boolean' },
                         visibility: { type: 'object', nullable: true },

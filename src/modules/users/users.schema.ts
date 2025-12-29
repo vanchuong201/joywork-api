@@ -13,6 +13,16 @@ const optionalUrl = z
   .nullable()
   .optional();
 
+// Helper for optional email field - accepts empty string and converts to null
+const optionalEmail = z
+  .string()
+  .transform((val) => (val === '' ? null : val))
+  .refine((val) => val === null || z.string().email().safeParse(val).success, {
+    message: 'Invalid email address',
+  })
+  .nullable()
+  .optional();
+
 // Update profile schema
 export const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
@@ -26,6 +36,14 @@ export const updateProfileSchema = z.object({
   website: optionalUrl,
   linkedin: optionalUrl,
   github: optionalUrl,
+  // CV contact info (independent from account email/phone)
+  contactEmail: optionalEmail,
+  contactPhone: z
+    .string()
+    .max(50, 'Phone must be less than 50 characters')
+    .optional()
+    .nullable()
+    .transform((val) => (val === '' ? null : val)),
   // New profile fields
   fullName: z.string().max(200, 'Full name must be less than 200 characters').optional().nullable().transform((val) => val === '' ? null : val),
   title: z.string().max(150, 'Title must be less than 150 characters').optional().nullable().transform((val) => val === '' ? null : val),

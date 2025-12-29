@@ -106,6 +106,10 @@ model UserProfile {
   linkedin String?
   github   String?
 
+  // Contact info specific for CV/applications (independent from User.email/phone)
+  contactEmail String?
+  contactPhone String?
+
   // Profile-specific fields
   fullName   String? // Full name for CV/applications (separate from User.name)
   title      String?
