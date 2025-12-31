@@ -504,6 +504,19 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                         },
                       },
                     },
+                    invitations: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          email: { type: 'string' },
+                          role: { type: 'string' },
+                          expiresAt: { type: 'string', format: 'date-time' },
+                          createdAt: { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
                     stats: {
                       type: 'object',
                       nullable: true,

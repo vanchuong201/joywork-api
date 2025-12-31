@@ -382,6 +382,8 @@ export class CompaniesService {
 
   // Get company by slug
   async getCompanyBySlug(slug: string): Promise<CompanyWithMembers | null> {
+    const now = new Date();
+
     const company = await prisma.company.findUnique({
       where: { slug },
       include: {
@@ -398,6 +400,12 @@ export class CompaniesService {
             },
           },
         },
+        // Active invitations (not expired)
+        invitations: {
+          where: {
+            expiresAt: { gt: now },
+          },
+        },
         _count: {
           select: {
             posts: true,
@@ -411,6 +419,14 @@ export class CompaniesService {
     if (!company) {
       return null;
     }
+
+    // Best-effort cleanup of expired invitations for this company
+    await prisma.companyInvitation.deleteMany({
+      where: {
+        companyId: company.id,
+        expiresAt: { lt: now },
+      },
+    });
 
     // Map profile with optional fields respecting exactOptionalPropertyTypes
     const profile: CompanyProfile | null = company.profile
@@ -477,6 +493,13 @@ export class CompaniesService {
           ...(member.user.name != null ? { name: member.user.name } : {}),
           avatar: member.user.profile?.avatar ?? null,
         },
+      })),
+      invitations: company.invitations.map(inv => ({
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
       })),
       ...(company._count ? {
         stats: {
@@ -728,18 +751,38 @@ export class CompaniesService {
       }
     }
 
-    // Create invitation
+    // Cleanup expired invitations for this email
+    const now = new Date();
+    await prisma.companyInvitation.deleteMany({
+      where: {
+        companyId,
+        email: data.email,
+        expiresAt: { lt: now },
+      },
+    });
+
+    // Check if there is already an active invitation for this email
+    const existingInvitation = await prisma.companyInvitation.findFirst({
+      where: {
+        companyId,
+        email: data.email,
+        expiresAt: { gt: now },
+      },
+    });
+
+    if (existingInvitation) {
+      // Already invited and not yet expired
+      throw new AppError(
+        'Email này đã được mời, vui lòng chờ ứng viên chấp nhận hoặc đợi lời mời hết hạn.',
+        409,
+        'INVITATION_EXISTS',
+      );
+    }
+
+    // Create new invitation
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
-
-    // Check existing invitation and delete if exists
-    await prisma.companyInvitation.deleteMany({
-        where: {
-            companyId,
-            email: data.email
-        }
-    });
 
     await prisma.companyInvitation.create({
       data: {
