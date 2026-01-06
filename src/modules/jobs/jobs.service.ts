@@ -231,13 +231,16 @@ export class JobsService {
     if (data.benefits !== undefined) updateData.benefits = data.benefits ?? null;
     if (data.location !== undefined) updateData.location = data.location ?? null;
     if (data.remote !== undefined) updateData.remote = data.remote;
-    if (data.salaryMin !== undefined) updateData.salaryMin = data.salaryMin ?? null;
-    if (data.salaryMax !== undefined) updateData.salaryMax = data.salaryMax ?? null;
-    if (data.currency !== undefined) updateData.currency = data.currency;
+    // Handle salaryMin/salaryMax: allow setting to null when explicitly cleared
+    if (data.salaryMin !== undefined) updateData.salaryMin = data.salaryMin;
+    if (data.salaryMax !== undefined) updateData.salaryMax = data.salaryMax;
+    // Currency: only update if a valid value is provided (not null/empty)
+    if (data.currency !== undefined && data.currency !== null) updateData.currency = data.currency;
     if (data.employmentType !== undefined) updateData.employmentType = data.employmentType;
     if (data.experienceLevel !== undefined) updateData.experienceLevel = data.experienceLevel;
     if (data.skills !== undefined) updateData.skills = data.skills;
     if (data.tags !== undefined) updateData.tags = data.tags;
+    // Handle applicationDeadline: allow setting to null when explicitly cleared
     if (data.applicationDeadline !== undefined) updateData.applicationDeadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     

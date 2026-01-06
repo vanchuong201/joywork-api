@@ -134,6 +134,13 @@ export interface CompanyWithMembers {
       name?: string;
     };
   }>;
+  invitations?: Array<{
+    id: string;
+    email: string;
+    role: string;
+    expiresAt: Date;
+    createdAt: Date;
+  }>;
   stats?: {
     posts: number;
     jobs: number;
