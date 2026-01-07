@@ -48,6 +48,9 @@ const envSchema = z.object({
   // OAuth - Facebook
   FACEBOOK_CLIENT_ID: z.string().optional(),
   FACEBOOK_CLIENT_SECRET: z.string().optional(),
+
+  // JoyWork Support Company ID (allows support tickets even if user is a member)
+  JOYWORK_COMPANY_ID: z.string().optional(),
 });
 
 export const config = envSchema.parse(process.env);

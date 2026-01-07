@@ -42,6 +42,26 @@ export class CompaniesController {
     });
   }
 
+  // Get company by ID (minimal info for support)
+  async getCompanyById(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    
+    const company = await this.companiesService.getCompanyById(id);
+    
+    if (!company) {
+      return reply.status(404).send({
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: 'Company not found',
+        },
+      });
+    }
+
+    return reply.send({
+      data: { company },
+    });
+  }
+
   // Get company by slug
   async getCompany(request: FastifyRequest, reply: FastifyReply) {
     const { slug } = getCompanySchema.parse(request.params);

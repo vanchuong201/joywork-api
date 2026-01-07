@@ -1060,10 +1060,41 @@ export class PostsService {
       prisma.postFavorite.count({ where: { userId } }),
     ]);
 
+    // Get reactions for all posts in parallel
+    const postIds = favorites.map((fav) => fav.post.id);
+    const [reactionsCounts, userReactions] = await Promise.all([
+      Promise.all(
+        postIds.map(async (postId) => {
+          const [joy, trust, skeptic] = await Promise.all([
+            prisma.postReaction.count({ where: { postId, type: 'JOY' as any } }),
+            prisma.postReaction.count({ where: { postId, type: 'TRUST' as any } }),
+            prisma.postReaction.count({ where: { postId, type: 'SKEPTIC' as any } }),
+          ]);
+          return {
+            postId,
+            reactions: { JOY: joy, TRUST: trust, SKEPTIC: skeptic },
+          };
+        })
+      ),
+      userId
+        ? prisma.postReaction.findMany({
+            where: { userId, postId: { in: postIds } },
+            select: { postId: true, type: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const reactionsMap = new Map(reactionsCounts.map((r) => [r.postId, r.reactions]));
+    const userReactionsMap = new Map(
+      userReactions.map((r) => [r.postId, r.type as 'JOY' | 'TRUST' | 'SKEPTIC'])
+    );
+
     return {
       favorites: favorites.map((fav) => {
         const mapped = mapPostEntity(fav.post as any);
         const liked = (fav.post.likes ?? []).some((like: any) => like.userId === userId);
+        const reactions = reactionsMap.get(fav.post.id) ?? { JOY: 0, TRUST: 0, SKEPTIC: 0 };
+        const userReaction = userReactionsMap.get(fav.post.id) ?? null;
         return {
           id: fav.id,
           createdAt: fav.createdAt,
@@ -1071,6 +1102,8 @@ export class PostsService {
             ...mapped,
             isLiked: liked,
             isSaved: true,
+            reactions,
+            userReaction,
           },
         };
       }),

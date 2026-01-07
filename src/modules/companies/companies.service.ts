@@ -387,6 +387,15 @@ export class CompaniesService {
     };
   }
 
+  // Get company by ID (for support tickets)
+  async getCompanyById(id: string): Promise<{ id: string; name: string; slug: string } | null> {
+    const company = await prisma.company.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true },
+    });
+    return company;
+  }
+
   // Get company by slug
   async getCompanyBySlug(slug: string): Promise<CompanyWithMembers | null> {
     const now = new Date();

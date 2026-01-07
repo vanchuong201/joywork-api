@@ -43,7 +43,10 @@ export class TicketsService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    if (userMembership) {
+    // Allow support tickets to JoyWork company even if user is a member
+    const isJoyWorkCompany = config.JOYWORK_COMPANY_ID && data.companyId === config.JOYWORK_COMPANY_ID;
+    
+    if (userMembership && !isJoyWorkCompany) {
       throw new AppError('Bạn không thể gửi ticket tới công ty của mình', 400, 'TICKET_SELF_TARGET');
     }
 

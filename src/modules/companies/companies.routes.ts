@@ -362,6 +362,41 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     },
   }, companiesController.getCompanySummary.bind(companiesController));
 
+  // Get company by ID (minimal info for support)
+  fastify.get('/by-id/:id', {
+    schema: {
+      description: 'Get company by ID (minimal info)',
+      tags: ['Companies'],
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Company ID' },
+        },
+        required: ['id'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    slug: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getCompanyById.bind(companiesController));
+
   // Get company by slug
   fastify.get('/:slug', {
     schema: {
