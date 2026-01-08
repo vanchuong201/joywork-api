@@ -157,11 +157,11 @@ export class PostsService {
   async createPost(companyId: string, userId: string, data: CreatePostInput): Promise<Post> {
     const { images, publishNow, publishedAt, jobIds, hashtags, ...postData } = data;
 
+    // Allow OWNER, ADMIN, and MEMBER to create posts
     const membership = await prisma.companyMember.findFirst({
       where: {
         userId,
         companyId,
-        role: { in: ['OWNER', 'ADMIN'] },
       },
     });
 
@@ -1046,6 +1046,9 @@ export class PostsService {
                 },
               },
               _count: { select: { likes: true } },
+              postJobs: {
+                include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
+              },
               hashtags: {
                 include: {
                   hashtag: {
