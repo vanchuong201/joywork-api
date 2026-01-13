@@ -63,6 +63,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         website: { type: 'string', nullable: true },
                         linkedin: { type: 'string', nullable: true },
                         github: { type: 'string', nullable: true },
+                        cvUrl: { type: 'string', nullable: true },
                         status: { type: 'string', nullable: true },
                         knowledge: { type: 'array', items: { type: 'string' }, nullable: true },
                         skills: { type: 'array', items: { type: 'string' }, nullable: true },

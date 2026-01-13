@@ -8,6 +8,7 @@ import {
   uploadCompanyPostImageSchema,
   uploadCompanyLogoSchema,
   uploadCompanyCoverSchema,
+  uploadProfileCVSchema,
 } from './uploads.schema';
 
 export class UploadsController {
@@ -72,6 +73,15 @@ export class UploadsController {
     const payload = uploadCompanyCoverSchema.parse(request.body);
 
     const data = await this.uploadsService.uploadCompanyCover(userId, payload);
+
+    return reply.status(201).send({ data });
+  }
+
+  async uploadProfileCV(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const payload = uploadProfileCVSchema.parse(request.body);
+
+    const data = await this.uploadsService.uploadProfileCV(userId, payload);
 
     return reply.status(201).send({ data });
   }

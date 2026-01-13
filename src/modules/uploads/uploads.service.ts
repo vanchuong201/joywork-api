@@ -11,11 +11,18 @@ import {
   UploadCompanyPostImageInput,
   UploadCompanyLogoInput,
   UploadCompanyCoverInput,
+  UploadProfileCVInput,
 } from './uploads.schema';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const AVATAR_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+const CV_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_CV_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
 
 function getExtensionFromMime(mime: string): string | null {
   if (mime === 'image/jpeg') return '.jpg';
@@ -440,6 +447,81 @@ export class UploadsService {
     return {
       key,
       assetUrl: buildS3ObjectUrl(key),
+    };
+  }
+
+  async uploadProfileCV(userId: string, input: UploadProfileCVInput) {
+    const { fileName, fileType, fileData, previousKey } = input;
+
+    if (!ALLOWED_CV_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận PDF, DOC, DOCX', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+
+    if (!buffer.length) {
+      throw new AppError('Tệp không được rỗng', 400, 'EMPTY_FILE');
+    }
+
+    if (buffer.length > CV_MAX_FILE_SIZE) {
+      throw new AppError('Kích thước tệp vượt quá giới hạn 10MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const extFromMime = (() => {
+      if (fileType === 'application/pdf') return '.pdf';
+      if (fileType === 'application/msword') return '.doc';
+      if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return '.docx';
+      return null;
+    })();
+    
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    
+    const extension = extFromMime ?? fallbackExt ?? '.pdf';
+    const key = `users/${userId}/cv/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: getS3BucketName(),
+        Key: key,
+        Body: buffer,
+        ContentType: fileType,
+        ContentLength: buffer.length,
+      }));
+    } catch (error) {
+      console.error('Failed to upload CV to S3', error);
+      throw new AppError('Không thể tải CV lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    if (previousKey && previousKey.startsWith(`users/${userId}/cv/`)) {
+      try {
+        await deleteS3Objects([previousKey]);
+      } catch (error) {
+        console.error('Failed to delete previous CV', error);
+      }
+    }
+
+    const assetUrl = buildS3ObjectUrl(key);
+
+    // Update database
+    const updated = await prisma.userProfile.upsert({
+      where: { userId },
+      update: { cvUrl: assetUrl },
+      create: {
+        userId,
+        cvUrl: assetUrl,
+      },
+      select: { id: true, userId: true, cvUrl: true },
+    });
+    console.log(`[Upload] Updated UserProfile.cvUrl for userId=${userId}, cvUrl=${updated.cvUrl}`);
+
+    return {
+      key,
+      assetUrl,
     };
   }
 }

@@ -133,6 +133,7 @@ export class UserProfileService {
         website: user.profile.website,
         linkedin: user.profile.linkedin,
         github: user.profile.github,
+        cvUrl: user.profile.cvUrl,
         status: user.profile.status,
         createdAt: user.profile.createdAt,
         updatedAt: user.profile.updatedAt,

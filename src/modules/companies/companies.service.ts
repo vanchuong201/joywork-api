@@ -811,8 +811,8 @@ export class CompaniesService {
     // Cleanup expired invitations for this email
     const now = new Date();
     await prisma.companyInvitation.deleteMany({
-      where: {
-        companyId,
+        where: {
+            companyId,
         email: data.email,
         expiresAt: { lt: now },
       },

@@ -136,6 +136,43 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post(
+    '/profile/cv',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tải file CV người dùng trực tiếp lên S3 thông qua máy chủ',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['fileName', 'fileType', 'fileData'],
+          properties: {
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp (application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document)', minLength: 1 },
+            fileData: { type: 'string', description: 'Dữ liệu file dạng base64' },
+            previousKey: { type: 'string' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadProfileCV.bind(uploadsController),
+  );
+
+  fastify.post(
     '/company/post-image',
     {
       preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
