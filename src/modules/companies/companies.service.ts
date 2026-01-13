@@ -327,11 +327,25 @@ export class CompaniesService {
       throw new AppError('You do not have permission to update this company', 403, 'FORBIDDEN');
     }
 
-    // Check if new slug conflicts (if provided)
+    // Normalize and check if new slug conflicts (if provided)
     if (data['slug']) {
+      // Normalize slug: lowercase, replace spaces with hyphens, remove invalid characters
+      const normalizedSlug = data['slug']
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      if (!normalizedSlug || normalizedSlug.length < 2) {
+        throw new AppError('Slug must be at least 2 characters and contain only lowercase letters, numbers, and hyphens', 400, 'INVALID_SLUG');
+      }
+
+      // Check if slug conflicts with existing company
       const existingCompany = await prisma.company.findFirst({
         where: {
-          slug: data['slug'],
+          slug: normalizedSlug,
           id: { not: companyId },
         },
       });
@@ -339,6 +353,9 @@ export class CompaniesService {
       if (existingCompany) {
         throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
       }
+
+      // Update slug with normalized value
+      data['slug'] = normalizedSlug;
     }
 
     // Update company
@@ -469,6 +486,9 @@ export class CompaniesService {
           ...(company.profile.story != null ? { story: company.profile.story as any } : {}),
           ...(company.profile.culture != null ? { culture: company.profile.culture as any } : {}),
           ...(company.profile.awards != null ? { awards: company.profile.awards as any } : {}),
+          ...(company.profile.sectionVisibility != null 
+            ? { sectionVisibility: company.profile.sectionVisibility as Record<string, boolean> } 
+            : {}),
           createdAt: company.profile.createdAt,
           updatedAt: company.profile.updatedAt,
         }
@@ -546,6 +566,20 @@ export class CompaniesService {
     const cleanData = Object.fromEntries(
         Object.entries(data).filter(([, v]) => v !== undefined)
     );
+
+    // Normalize sectionVisibility to ensure all values are booleans
+    if (cleanData.sectionVisibility && typeof cleanData.sectionVisibility === 'object') {
+        const normalizedVisibility: Record<string, boolean> = {};
+        Object.entries(cleanData.sectionVisibility).forEach(([key, value]) => {
+            // Convert string "true"/"false" or boolean to boolean
+            if (typeof value === 'string') {
+                normalizedVisibility[key] = value === 'true' || value === '1';
+            } else {
+                normalizedVisibility[key] = Boolean(value);
+            }
+        });
+        cleanData.sectionVisibility = normalizedVisibility;
+    }
 
     const profile = await prisma.companyProfile.upsert({
         where: { companyId },

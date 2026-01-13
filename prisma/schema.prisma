@@ -17,7 +17,7 @@ model User {
   password      String
   name          String?
   slug          String?  @unique
-  avatar        String?  // Avatar for account (separate from profile avatar)
+  avatar        String? // Avatar for account (separate from profile avatar)
   phone         String?
   emailVerified Boolean  @default(false)
   role          UserRole @default(USER)
@@ -275,6 +275,9 @@ model CompanyProfile {
 
   // Section: GIẢI THƯỞNG
   awards Json? // [{ year, name, org }]
+
+  // Section visibility control
+  sectionVisibility Json? // { sectionKey: boolean } - Controls which sections are visible
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -160,6 +160,7 @@ export const updateCompanyProfileSchema = z.object({
   story: z.any().optional(),
   culture: z.any().optional(),
   awards: z.any().optional(),
+  sectionVisibility: z.record(z.string(), z.boolean()).optional(), // Map section keys to visibility boolean (Zod v4 syntax)
 });
 
 // Upload verification contacts CSV
