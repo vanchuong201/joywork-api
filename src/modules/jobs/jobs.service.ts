@@ -120,6 +120,12 @@ export class JobsService {
     }
 
     // Create job
+    const deadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
+    // Force deadline to end of day if provided
+    if (deadline) {
+      deadline.setHours(23, 59, 59, 999);
+    }
+
     const jobData: any = {
         companyId,
       title: data.title,
@@ -130,7 +136,7 @@ export class JobsService {
       experienceLevel: data.experienceLevel,
       skills: data.skills,
       isActive: data.isActive ?? true,
-        applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
+        applicationDeadline: deadline,
       requirements: data.requirements ?? null,
       responsibilities: data.responsibilities ?? null,
       benefits: data.benefits ?? null,
@@ -241,7 +247,16 @@ export class JobsService {
     if (data.skills !== undefined) updateData.skills = data.skills;
     if (data.tags !== undefined) updateData.tags = data.tags;
     // Handle applicationDeadline: allow setting to null when explicitly cleared
-    if (data.applicationDeadline !== undefined) updateData.applicationDeadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
+    if (data.applicationDeadline !== undefined) {
+      if (data.applicationDeadline) {
+        const deadline = new Date(data.applicationDeadline);
+        // Force deadline to end of day
+        deadline.setHours(23, 59, 59, 999);
+        updateData.applicationDeadline = deadline;
+      } else {
+        updateData.applicationDeadline = null;
+      }
+    }
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     
     const updatedJob = await prisma.job.update({
@@ -561,7 +576,7 @@ export class JobsService {
     });
 
     if (existingApplication) {
-      throw new AppError('You have already applied for this job', 409, 'ALREADY_APPLIED');
+      throw new AppError('Bạn đã ứng tuyển cho việc làm này', 409, 'ALREADY_APPLIED');
     }
 
     // Create application

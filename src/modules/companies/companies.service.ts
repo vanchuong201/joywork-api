@@ -330,7 +330,12 @@ export class CompaniesService {
     // Normalize and check if new slug conflicts (if provided)
     if (data['slug']) {
       // Normalize slug: lowercase, replace spaces with hyphens, remove invalid characters
-      const normalizedSlug = data['slug']
+      const slugValue = data['slug'];
+      if (typeof slugValue !== 'string') {
+          throw new AppError('Slug must be a string', 400, 'INVALID_SLUG_TYPE');
+      }
+
+      const normalizedSlug = slugValue
         .toLowerCase()
         .trim()
         .replace(/\s+/g, '-')
@@ -486,8 +491,8 @@ export class CompaniesService {
           ...(company.profile.story != null ? { story: company.profile.story as any } : {}),
           ...(company.profile.culture != null ? { culture: company.profile.culture as any } : {}),
           ...(company.profile.awards != null ? { awards: company.profile.awards as any } : {}),
-          ...(company.profile.sectionVisibility != null 
-            ? { sectionVisibility: company.profile.sectionVisibility as Record<string, boolean> } 
+          ...(company.profile.sectionVisibility != null
+            ? { sectionVisibility: (company.profile.sectionVisibility as Record<string, boolean>) }
             : {}),
           createdAt: company.profile.createdAt,
           updatedAt: company.profile.updatedAt,
@@ -568,9 +573,11 @@ export class CompaniesService {
     );
 
     // Normalize sectionVisibility to ensure all values are booleans
-    if (cleanData.sectionVisibility && typeof cleanData.sectionVisibility === 'object') {
+    const visibility = cleanData['sectionVisibility'];
+    if (visibility && typeof visibility === 'object') {
+        const visibilityObj = visibility as Record<string, unknown>;
         const normalizedVisibility: Record<string, boolean> = {};
-        Object.entries(cleanData.sectionVisibility).forEach(([key, value]) => {
+        Object.entries(visibilityObj).forEach(([key, value]) => {
             // Convert string "true"/"false" or boolean to boolean
             if (typeof value === 'string') {
                 normalizedVisibility[key] = value === 'true' || value === '1';
@@ -578,7 +585,7 @@ export class CompaniesService {
                 normalizedVisibility[key] = Boolean(value);
             }
         });
-        cleanData.sectionVisibility = normalizedVisibility;
+        cleanData['sectionVisibility'] = normalizedVisibility;
     }
 
     const profile = await prisma.companyProfile.upsert({

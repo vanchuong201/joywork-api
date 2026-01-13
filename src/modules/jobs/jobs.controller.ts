@@ -84,7 +84,7 @@ export class JobsController {
     
     return reply.status(201).send({
       data: {
-        message: 'Application submitted successfully',
+        message: 'Ứng tuyển thành công',
       },
     });
   }
