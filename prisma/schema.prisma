@@ -344,21 +344,27 @@ model Post {
   @@map("posts")
 }
 
-// Post images (gallery)
+// Post images (gallery) - supports both images and videos
 model PostImage {
-  id         String  @id @default(cuid())
+  id         String      @id @default(cuid())
   postId     String
-  url        String
+  url         String
   storageKey String?
   width      Int?
   height     Int?
-  order      Int     @default(0)
+  order      Int         @default(0)
+  type       MediaType   @default(IMAGE) // IMAGE or VIDEO
 
   // Relations
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@map("post_images")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
 }
 
 model PostAuditLog {

@@ -15,9 +15,11 @@ import {
 } from './uploads.schema';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
 const AVATAR_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 const CV_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']); // mp4, webm, mov
 const ALLOWED_CV_MIME_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -28,7 +30,14 @@ function getExtensionFromMime(mime: string): string | null {
   if (mime === 'image/jpeg') return '.jpg';
   if (mime === 'image/png') return '.png';
   if (mime === 'image/webp') return '.webp';
+  if (mime === 'video/mp4') return '.mp4';
+  if (mime === 'video/webm') return '.webm';
+  if (mime === 'video/quicktime') return '.mov';
   return null;
+}
+
+function isVideoType(mime: string): boolean {
+  return ALLOWED_VIDEO_TYPES.has(mime);
 }
 
 function sanitizeFileName(name: string): string {
@@ -250,11 +259,14 @@ export class UploadsService {
     });
 
     if (!membership) {
-      throw new AppError('Bạn không có quyền tải ảnh cho công ty này', 403, 'FORBIDDEN');
+      throw new AppError('Bạn không có quyền tải media cho công ty này', 403, 'FORBIDDEN');
     }
 
-    if (!ALLOWED_MIME_TYPES.has(fileType)) {
-      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
+    const isVideo = isVideoType(fileType);
+    const isImage = ALLOWED_MIME_TYPES.has(fileType);
+
+    if (!isImage && !isVideo) {
+      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP, MP4, WEBM, MOV', 400, 'UNSUPPORTED_FILE_TYPE');
     }
 
     const buffer = Buffer.from(fileData, 'base64');
@@ -263,8 +275,10 @@ export class UploadsService {
       throw new AppError('Tệp không được rỗng', 400, 'EMPTY_FILE');
     }
 
-    if (buffer.length > MAX_FILE_SIZE) {
-      throw new AppError('Kích thước tệp vượt quá giới hạn 8MB', 400, 'FILE_TOO_LARGE');
+    const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_FILE_SIZE;
+    if (buffer.length > maxSize) {
+      const sizeLimit = isVideo ? '50MB' : '8MB';
+      throw new AppError(`Kích thước tệp vượt quá giới hạn ${sizeLimit}`, 400, 'FILE_TOO_LARGE');
     }
 
     const extFromMime = getExtensionFromMime(fileType);
@@ -286,21 +300,22 @@ export class UploadsService {
         ContentLength: buffer.length,
       }));
     } catch (error) {
-      console.error('Failed to upload company post image to S3', error);
-      throw new AppError('Không thể tải ảnh lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+      console.error('Failed to upload company post media to S3', error);
+      throw new AppError('Không thể tải media lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
     if (previousKey && previousKey.startsWith(`companies/${companyId}/posts/`)) {
       try {
         await deleteS3Objects([previousKey]);
       } catch (error) {
-        console.error('Failed to delete previous company post image', error);
+        console.error('Failed to delete previous company post media', error);
       }
     }
 
     return {
       key,
       assetUrl: buildS3ObjectUrl(key),
+      type: isVideo ? 'VIDEO' : 'IMAGE',
     };
   }
 

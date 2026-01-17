@@ -57,7 +57,7 @@ export interface Post {
     slug: string;
     logoUrl?: string;
   };
-  images?: Array<{ id: string; url: string; width?: number | null; height?: number | null; order: number }>;
+  images?: Array<{ id: string; url: string; width?: number | null; height?: number | null; order: number; type: string }>;
   likes: Array<{
     id: string;
     userId: string;
@@ -122,6 +122,7 @@ function mapPostEntity(post: any): Post {
           width: image.width ?? undefined,
           height: image.height ?? undefined,
           order: image.order ?? undefined,
+          type: image.type ?? 'IMAGE',
         }))
       : undefined,
     likes: post.likes.map((like: any) => ({
@@ -175,6 +176,7 @@ export class PostsService {
       width: image.width ?? null,
       height: image.height ?? null,
       order: image.order ?? index,
+      type: image.type ?? 'IMAGE',
     }));
 
     const resolvedPublishedAt = publishedAt
@@ -257,7 +259,7 @@ export class PostsService {
           },
         },
         images: {
-          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
+          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true, type: true },
           orderBy: { order: 'asc' },
         },
         postJobs: {
@@ -370,6 +372,7 @@ export class PostsService {
         width: img.width as number | undefined,
         height: img.height as number | undefined,
         order: img.order as number | undefined,
+        type: (img.type as 'IMAGE' | 'VIDEO') ?? 'IMAGE',
       }));
       // Cập nhật coverUrl theo bộ ảnh mới:
       // - Nếu còn ảnh: lấy ảnh đầu tiên làm cover
@@ -402,6 +405,7 @@ export class PostsService {
               width,
               height,
               order: ord,
+              type: d.type,
             },
           });
         } else {
@@ -415,6 +419,7 @@ export class PostsService {
               width,
               height,
               order: ord,
+              type: d.type,
             },
           });
         }
@@ -526,7 +531,7 @@ export class PostsService {
           },
         },
         images: {
-          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
+          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true, type: true },
           orderBy: { order: 'asc' },
         },
         postJobs: {
@@ -595,7 +600,7 @@ export class PostsService {
           },
         },
         images: {
-          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
+          select: { id: true, url: true, width: true, height: true, order: true, storageKey: true, type: true },
           orderBy: { order: 'asc' },
         },
         hashtags: {
@@ -715,7 +720,7 @@ export class PostsService {
             },
           },
           images: {
-            select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
+            select: { id: true, url: true, width: true, height: true, order: true, storageKey: true, type: true },
             orderBy: { order: 'asc' },
           },
           postJobs: {
@@ -901,7 +906,7 @@ export class PostsService {
             },
           },
           images: {
-            select: { id: true, url: true, width: true, height: true, order: true, storageKey: true },
+            select: { id: true, url: true, width: true, height: true, order: true, storageKey: true, type: true },
             orderBy: { order: 'asc' },
           },
           postJobs: {
@@ -1038,7 +1043,7 @@ export class PostsService {
           post: {
             include: {
               company: { select: { id: true, name: true, slug: true, logoUrl: true } },
-              images: { select: { id: true, url: true, width: true, height: true, order: true }, orderBy: { order: 'asc' } },
+              images: { select: { id: true, url: true, width: true, height: true, order: true, type: true }, orderBy: { order: 'asc' } },
               createdBy: { select: { id: true, email: true, name: true } },
               likes: {
                 include: {

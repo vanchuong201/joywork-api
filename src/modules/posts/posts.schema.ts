@@ -6,6 +6,7 @@ const postImageInputSchema = z.object({
   width: z.number().int().min(1).max(10000).optional(),
   height: z.number().int().min(1).max(10000).optional(),
   order: z.number().int().min(0).max(99).optional(),
+  type: z.enum(['IMAGE', 'VIDEO']).default('IMAGE').optional(),
 });
 
 // Create post schema
@@ -17,7 +18,7 @@ export const createPostSchema = z.object({
   visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
   publishedAt: z.string().datetime().optional(),
   publishNow: z.boolean().default(true),
-  images: z.array(postImageInputSchema).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
+  images: z.array(postImageInputSchema).max(8, 'Tối đa 8 media cho mỗi bài viết').optional(),
   jobIds: z.array(z.string()).max(10).optional(),
   // Hashtags: tối đa 5 hashtag, user có thể gõ tự do, backend sẽ normalize
   hashtags: z
@@ -48,8 +49,9 @@ export const updatePostSchema = z.object({
       width: z.number().int().min(1).max(10000).optional(),
       height: z.number().int().min(1).max(10000).optional(),
       order: z.number().int().min(0).max(99).optional(),
+      type: z.enum(['IMAGE', 'VIDEO']).default('IMAGE').optional(),
     })
-  ).max(8, 'Tối đa 8 ảnh cho mỗi bài viết').optional(),
+  ).max(8, 'Tối đa 8 media cho mỗi bài viết').optional(),
   jobIds: z.array(z.string()).max(10).optional(),
   hashtags: z
     .array(
