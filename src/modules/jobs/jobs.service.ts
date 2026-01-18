@@ -127,54 +127,74 @@ export class JobsService {
     }
 
     const jobData: any = {
-        companyId,
+      companyId,
       title: data.title,
-      description: data.description,
+      location: data.location ?? null,
       remote: data.remote,
       currency: data.currency,
       employmentType: data.employmentType,
       experienceLevel: data.experienceLevel,
-      skills: data.skills,
+      tags: data.tags ?? [],
       isActive: data.isActive ?? true,
-        applicationDeadline: deadline,
-      requirements: data.requirements ?? null,
-      responsibilities: data.responsibilities ?? null,
-      benefits: data.benefits ?? null,
-      location: data.location ?? null,
+      applicationDeadline: deadline,
       salaryMin: data.salaryMin ?? null,
       salaryMax: data.salaryMax ?? null,
-      tags: data.tags ?? [],
+      // Required JD fields
+      generalInfo: data.generalInfo,
+      mission: data.mission,
+      tasks: data.tasks,
+      knowledge: data.knowledge,
+      skills: data.skills,
+      attitude: data.attitude,
+      // Optional JD fields
+      kpis: data.kpis ?? null,
+      authority: data.authority ?? null,
+      relationships: data.relationships ?? null,
+      careerPath: data.careerPath ?? null,
+      benefitsIncome: data.benefitsIncome ?? null,
+      benefitsPerks: data.benefitsPerks ?? null,
+      contact: data.contact ?? null,
     };
     
-    const job = await prisma.job.create({
-      data: jobData,
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            logoUrl: true,
+    let job;
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H5',location:'jobs.service.ts:createJob',message:'about to create job',data:{companyId,keys:Object.keys(jobData),hasLegacyFields:{description:Object.prototype.hasOwnProperty.call(jobData,'description'),requirements:Object.prototype.hasOwnProperty.call(jobData,'requirements')},hasNewFields:{generalInfo:!!jobData.generalInfo,mission:!!jobData.mission,tasks:!!jobData.tasks,knowledge:!!jobData.knowledge,skills:!!jobData.skills,attitude:!!jobData.attitude}},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      job = await prisma.job.create({
+        data: jobData,
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              applications: true,
+            },
           },
         },
-        _count: {
-          select: {
-            applications: true,
-          },
-        },
-      },
-    });
+      });
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H5',location:'jobs.service.ts:createJob',message:'prisma create failed',data:{errorName:error?.name,code:error?.code,message:error?.message,meta:error?.meta},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      throw error;
+    }
 
     const result: any = {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
-      description: job.description,
+      location: job.location,
       remote: job.remote,
       currency: job.currency,
       employmentType: job.employmentType,
       experienceLevel: job.experienceLevel,
-      skills: job.skills,
       tags: job.tags,
       isActive: job.isActive,
       createdAt: job.createdAt,
@@ -185,15 +205,26 @@ export class JobsService {
         slug: job.company.slug,
       },
       _count: job._count,
+      // Required JD fields
+      generalInfo: job.generalInfo,
+      mission: job.mission,
+      tasks: job.tasks,
+      knowledge: job.knowledge,
+      skills: job.skills,
+      attitude: job.attitude,
     };
     
-    if (job.requirements) result.requirements = job.requirements;
-    if (job.responsibilities) result.responsibilities = job.responsibilities;
-    if (job.benefits) result.benefits = job.benefits;
-    if (job.location) result.location = job.location;
+    // Optional fields
     if (job.salaryMin !== null) result.salaryMin = job.salaryMin;
     if (job.salaryMax !== null) result.salaryMax = job.salaryMax;
     if (job.applicationDeadline) result.applicationDeadline = job.applicationDeadline;
+    if (job.kpis) result.kpis = job.kpis;
+    if (job.authority) result.authority = job.authority;
+    if (job.relationships) result.relationships = job.relationships;
+    if (job.careerPath) result.careerPath = job.careerPath;
+    if (job.benefitsIncome) result.benefitsIncome = job.benefitsIncome;
+    if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
+    if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
     
     return result;
@@ -230,34 +261,45 @@ export class JobsService {
       updatedAt: new Date(),
     };
     
+    // Basic info
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.requirements !== undefined) updateData.requirements = data.requirements ?? null;
-    if (data.responsibilities !== undefined) updateData.responsibilities = data.responsibilities ?? null;
-    if (data.benefits !== undefined) updateData.benefits = data.benefits ?? null;
     if (data.location !== undefined) updateData.location = data.location ?? null;
     if (data.remote !== undefined) updateData.remote = data.remote;
-    // Handle salaryMin/salaryMax: allow setting to null when explicitly cleared
     if (data.salaryMin !== undefined) updateData.salaryMin = data.salaryMin;
     if (data.salaryMax !== undefined) updateData.salaryMax = data.salaryMax;
-    // Currency: only update if a valid value is provided (not null/empty)
     if (data.currency !== undefined && data.currency !== null) updateData.currency = data.currency;
     if (data.employmentType !== undefined) updateData.employmentType = data.employmentType;
     if (data.experienceLevel !== undefined) updateData.experienceLevel = data.experienceLevel;
-    if (data.skills !== undefined) updateData.skills = data.skills;
     if (data.tags !== undefined) updateData.tags = data.tags;
-    // Handle applicationDeadline: allow setting to null when explicitly cleared
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    
+    // Handle applicationDeadline
     if (data.applicationDeadline !== undefined) {
       if (data.applicationDeadline) {
         const deadline = new Date(data.applicationDeadline);
-        // Force deadline to end of day (using UTC to avoid timezone issues)
         deadline.setUTCHours(23, 59, 59, 999);
         updateData.applicationDeadline = deadline;
       } else {
         updateData.applicationDeadline = null;
       }
     }
-    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    
+    // Required JD fields
+    if (data.generalInfo !== undefined) updateData.generalInfo = data.generalInfo;
+    if (data.mission !== undefined) updateData.mission = data.mission;
+    if (data.tasks !== undefined) updateData.tasks = data.tasks;
+    if (data.knowledge !== undefined) updateData.knowledge = data.knowledge;
+    if (data.skills !== undefined) updateData.skills = data.skills;
+    if (data.attitude !== undefined) updateData.attitude = data.attitude;
+    
+    // Optional JD fields
+    if (data.kpis !== undefined) updateData.kpis = data.kpis ?? null;
+    if (data.authority !== undefined) updateData.authority = data.authority ?? null;
+    if (data.relationships !== undefined) updateData.relationships = data.relationships ?? null;
+    if (data.careerPath !== undefined) updateData.careerPath = data.careerPath ?? null;
+    if (data.benefitsIncome !== undefined) updateData.benefitsIncome = data.benefitsIncome ?? null;
+    if (data.benefitsPerks !== undefined) updateData.benefitsPerks = data.benefitsPerks ?? null;
+    if (data.contact !== undefined) updateData.contact = data.contact ?? null;
     
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
@@ -283,12 +325,11 @@ export class JobsService {
       id: updatedJob.id,
       companyId: updatedJob.companyId,
       title: updatedJob.title,
-      description: updatedJob.description,
+      location: updatedJob.location,
       remote: updatedJob.remote,
       currency: updatedJob.currency,
       employmentType: updatedJob.employmentType,
       experienceLevel: updatedJob.experienceLevel,
-      skills: updatedJob.skills,
       tags: updatedJob.tags,
       isActive: updatedJob.isActive,
       createdAt: updatedJob.createdAt,
@@ -299,15 +340,26 @@ export class JobsService {
         slug: updatedJob.company.slug,
       },
       _count: updatedJob._count,
+      // Required JD fields
+      generalInfo: updatedJob.generalInfo,
+      mission: updatedJob.mission,
+      tasks: updatedJob.tasks,
+      knowledge: updatedJob.knowledge,
+      skills: updatedJob.skills,
+      attitude: updatedJob.attitude,
     };
     
-    if (updatedJob.requirements) result.requirements = updatedJob.requirements;
-    if (updatedJob.responsibilities) result.responsibilities = updatedJob.responsibilities;
-    if (updatedJob.benefits) result.benefits = updatedJob.benefits;
-    if (updatedJob.location) result.location = updatedJob.location;
+    // Optional fields
     if (updatedJob.salaryMin !== null) result.salaryMin = updatedJob.salaryMin;
     if (updatedJob.salaryMax !== null) result.salaryMax = updatedJob.salaryMax;
     if (updatedJob.applicationDeadline) result.applicationDeadline = updatedJob.applicationDeadline;
+    if (updatedJob.kpis) result.kpis = updatedJob.kpis;
+    if (updatedJob.authority) result.authority = updatedJob.authority;
+    if (updatedJob.relationships) result.relationships = updatedJob.relationships;
+    if (updatedJob.careerPath) result.careerPath = updatedJob.careerPath;
+    if (updatedJob.benefitsIncome) result.benefitsIncome = updatedJob.benefitsIncome;
+    if (updatedJob.benefitsPerks) result.benefitsPerks = updatedJob.benefitsPerks;
+    if (updatedJob.contact) result.contact = updatedJob.contact;
     if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
     
     return result;
@@ -356,12 +408,11 @@ export class JobsService {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
-      description: job.description,
+      location: job.location,
       remote: job.remote,
       currency: job.currency,
       employmentType: job.employmentType,
       experienceLevel: job.experienceLevel,
-      skills: job.skills,
       tags: job.tags,
       isActive: job.isActive,
       createdAt: job.createdAt,
@@ -373,15 +424,26 @@ export class JobsService {
       },
       _count: job._count,
       hasApplied,
+      // Required JD fields
+      generalInfo: job.generalInfo,
+      mission: job.mission,
+      tasks: job.tasks,
+      knowledge: job.knowledge,
+      skills: job.skills,
+      attitude: job.attitude,
     };
     
-    if (job.requirements) result.requirements = job.requirements;
-    if (job.responsibilities) result.responsibilities = job.responsibilities;
-    if (job.benefits) result.benefits = job.benefits;
-    if (job.location) result.location = job.location;
+    // Optional fields
     if (job.salaryMin !== null) result.salaryMin = job.salaryMin;
     if (job.salaryMax !== null) result.salaryMax = job.salaryMax;
     if (job.applicationDeadline) result.applicationDeadline = job.applicationDeadline;
+    if (job.kpis) result.kpis = job.kpis;
+    if (job.authority) result.authority = job.authority;
+    if (job.relationships) result.relationships = job.relationships;
+    if (job.careerPath) result.careerPath = job.careerPath;
+    if (job.benefitsIncome) result.benefitsIncome = job.benefitsIncome;
+    if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
+    if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
     
     return result;
@@ -415,8 +477,12 @@ export class JobsService {
     if (q) {
       where.OR = [
         { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-        { requirements: { contains: q, mode: 'insensitive' } },
+        { generalInfo: { contains: q, mode: 'insensitive' } },
+        { mission: { contains: q, mode: 'insensitive' } },
+        { tasks: { contains: q, mode: 'insensitive' } },
+        { knowledge: { contains: q, mode: 'insensitive' } },
+        { skills: { contains: q, mode: 'insensitive' } },
+        { attitude: { contains: q, mode: 'insensitive' } },
       ];
     }
 
@@ -447,8 +513,12 @@ export class JobsService {
     }
 
     if (skills) {
-      const skillArray = skills.split(',').map(s => s.trim());
-      where.skills = { hasSome: skillArray };
+      // Search in skills text field (rich text/markdown)
+      const skillTerms = skills.split(',').map(s => s.trim());
+      where.OR = where.OR || [];
+      skillTerms.forEach(term => {
+        where.OR.push({ skills: { contains: term, mode: 'insensitive' } });
+      });
     }
 
     if (companyId) {
@@ -503,12 +573,11 @@ export class JobsService {
         id: job.id,
         companyId: job.companyId,
         title: job.title,
-        description: job.description,
+        location: job.location,
         remote: job.remote,
         currency: job.currency,
         employmentType: job.employmentType,
         experienceLevel: job.experienceLevel,
-        skills: job.skills,
         tags: job.tags,
         isActive: job.isActive,
         createdAt: job.createdAt,
@@ -520,15 +589,26 @@ export class JobsService {
         },
         _count: job._count,
         hasApplied,
+        // Required JD fields
+        generalInfo: job.generalInfo,
+        mission: job.mission,
+        tasks: job.tasks,
+        knowledge: job.knowledge,
+        skills: job.skills,
+        attitude: job.attitude,
       };
       
-      if (job.requirements) jobResult.requirements = job.requirements;
-      if (job.responsibilities) jobResult.responsibilities = job.responsibilities;
-      if (job.benefits) jobResult.benefits = job.benefits;
-      if (job.location) jobResult.location = job.location;
+      // Optional fields
       if (job.salaryMin !== null) jobResult.salaryMin = job.salaryMin;
       if (job.salaryMax !== null) jobResult.salaryMax = job.salaryMax;
       if (job.applicationDeadline) jobResult.applicationDeadline = job.applicationDeadline;
+      if (job.kpis) jobResult.kpis = job.kpis;
+      if (job.authority) jobResult.authority = job.authority;
+      if (job.relationships) jobResult.relationships = job.relationships;
+      if (job.careerPath) jobResult.careerPath = job.careerPath;
+      if (job.benefitsIncome) jobResult.benefitsIncome = job.benefitsIncome;
+      if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
+      if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
       
       jobsWithApplications.push(jobResult);

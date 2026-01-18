@@ -452,10 +452,6 @@ model Job {
   id                  String          @id @default(cuid())
   companyId           String
   title               String
-  description         String
-  requirements        String?
-  responsibilities    String?
-  benefits            String?
   location            String?
   remote              Boolean         @default(false)
   salaryMin           Int?
@@ -463,10 +459,27 @@ model Job {
   currency            String          @default("VND")
   employmentType      EmploymentType  @default(FULL_TIME)
   experienceLevel     ExperienceLevel @default(MID)
-  skills              String[]
   tags                String[]
   applicationDeadline DateTime?
   isActive            Boolean         @default(true)
+  
+  // JD chuẩn - Required fields
+  generalInfo         String          @db.Text // "1. Thông tin chung" - markdown/rich text
+  mission             String          @db.Text // "2. Sứ mệnh/Vai trò" - markdown/rich text
+  tasks               String          @db.Text // "3. Nhiệm vụ chuyên môn" - markdown/rich text
+  knowledge           String          @db.Text // "5. Yêu cầu - Kiến thức" - markdown/rich text
+  skills              String          @db.Text // "5. Yêu cầu - Kỹ năng" - markdown/rich text
+  attitude            String          @db.Text // "5. Yêu cầu - Thái độ" - markdown/rich text
+  
+  // JD chuẩn - Optional fields
+  kpis                String?         @db.Text // "4. Kết quả chuyên môn" - markdown/rich text
+  authority           String?         @db.Text // "6. Quyền hạn" - markdown/rich text
+  relationships      String?         @db.Text // "7. Quan hệ công việc" - markdown/rich text
+  careerPath          String?         @db.Text // "8. Lộ trình phát triển" - markdown/rich text
+  benefitsIncome      String?         // "9. Quyền lợi - Thu nhập" - plain text
+  benefitsPerks       String?         @db.Text // "9. Quyền lợi - Phúc lợi" - markdown/rich text
+  contact             String?         // Thông tin liên hệ - plain text
+  
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 

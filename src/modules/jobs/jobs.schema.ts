@@ -1,12 +1,9 @@
 import { z } from 'zod';
 
-// Create job schema
+// Create job schema - Standard JD format
 export const createJobSchema = z.object({
+  // Basic info
   title: z.string().min(1, 'Job title is required').max(200, 'Job title must be less than 200 characters'),
-  description: z.string().min(1, 'Job description is required').max(10000, 'Job description must be less than 10000 characters'),
-  requirements: z.string().max(5000, 'Requirements must be less than 5000 characters').optional(),
-  responsibilities: z.string().max(5000, 'Responsibilities must be less than 5000 characters').optional(),
-  benefits: z.string().max(2000, 'Benefits must be less than 2000 characters').optional(),
   location: z.string().max(100, 'Location must be less than 100 characters').optional(),
   remote: z.boolean().default(false),
   salaryMin: z.number().int().min(0).optional(),
@@ -14,19 +11,32 @@ export const createJobSchema = z.object({
   currency: z.string().length(3).default('VND'),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).default('FULL_TIME'),
   experienceLevel: z.enum(['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE']).default('MID'),
-  skills: z.array(z.string()).max(20, 'Maximum 20 skills allowed').optional(),
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional(),
   isActive: z.boolean().default(true),
+  
+  // Required JD fields (rich text/markdown)
+  generalInfo: z.string().min(1, 'Thông tin chung is required').max(5000, 'Thông tin chung must be less than 5000 characters'),
+  mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(5000, 'Sứ mệnh/Vai trò must be less than 5000 characters'),
+  tasks: z.string().min(1, 'Nhiệm vụ chuyên môn is required').max(10000, 'Nhiệm vụ chuyên môn must be less than 10000 characters'),
+  knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(5000, 'Kiến thức chuyên môn must be less than 5000 characters'),
+  skills: z.string().min(1, 'Kỹ năng cần thiết is required').max(5000, 'Kỹ năng cần thiết must be less than 5000 characters'),
+  attitude: z.string().min(1, 'Thái độ và phẩm chất is required').max(5000, 'Thái độ và phẩm chất must be less than 5000 characters'),
+  
+  // Optional JD fields
+  kpis: z.string().max(5000, 'Kết quả chuyên môn must be less than 5000 characters').optional(),
+  authority: z.string().max(5000, 'Quyền hạn must be less than 5000 characters').optional(),
+  relationships: z.string().max(5000, 'Quan hệ công việc must be less than 5000 characters').optional(),
+  careerPath: z.string().max(5000, 'Lộ trình phát triển must be less than 5000 characters').optional(),
+  benefitsIncome: z.string().max(200, 'Thu nhập must be less than 200 characters').optional(),
+  benefitsPerks: z.string().max(2000, 'Phúc lợi must be less than 2000 characters').optional(),
+  contact: z.string().max(500, 'Thông tin liên hệ must be less than 500 characters').optional(),
 });
 
-// Update job schema
+// Update job schema - Standard JD format
 export const updateJobSchema = z.object({
+  // Basic info
   title: z.string().min(1, 'Job title is required').max(200, 'Job title must be less than 200 characters').optional(),
-  description: z.string().min(1, 'Job description is required').max(10000, 'Job description must be less than 10000 characters').optional(),
-  requirements: z.string().max(5000, 'Requirements must be less than 5000 characters').optional().nullable(),
-  responsibilities: z.string().max(5000, 'Responsibilities must be less than 5000 characters').optional().nullable(),
-  benefits: z.string().max(2000, 'Benefits must be less than 2000 characters').optional().nullable(),
   location: z.string().max(100, 'Location must be less than 100 characters').optional().nullable(),
   remote: z.boolean().optional(),
   salaryMin: z.number().int().min(0).optional().nullable(),
@@ -34,10 +44,26 @@ export const updateJobSchema = z.object({
   currency: z.string().length(3).optional().nullable(),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
   experienceLevel: z.enum(['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE']).optional(),
-  skills: z.array(z.string()).max(20, 'Maximum 20 skills allowed').optional(),
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional().nullable(),
   isActive: z.boolean().optional(),
+  
+  // Required JD fields (rich text/markdown)
+  generalInfo: z.string().min(1, 'Thông tin chung is required').max(5000, 'Thông tin chung must be less than 5000 characters').optional(),
+  mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(5000, 'Sứ mệnh/Vai trò must be less than 5000 characters').optional(),
+  tasks: z.string().min(1, 'Nhiệm vụ chuyên môn is required').max(10000, 'Nhiệm vụ chuyên môn must be less than 10000 characters').optional(),
+  knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(5000, 'Kiến thức chuyên môn must be less than 5000 characters').optional(),
+  skills: z.string().min(1, 'Kỹ năng cần thiết is required').max(5000, 'Kỹ năng cần thiết must be less than 5000 characters').optional(),
+  attitude: z.string().min(1, 'Thái độ và phẩm chất is required').max(5000, 'Thái độ và phẩm chất must be less than 5000 characters').optional(),
+  
+  // Optional JD fields
+  kpis: z.string().max(5000, 'Kết quả chuyên môn must be less than 5000 characters').optional().nullable(),
+  authority: z.string().max(5000, 'Quyền hạn must be less than 5000 characters').optional().nullable(),
+  relationships: z.string().max(5000, 'Quan hệ công việc must be less than 5000 characters').optional().nullable(),
+  careerPath: z.string().max(5000, 'Lộ trình phát triển must be less than 5000 characters').optional().nullable(),
+  benefitsIncome: z.string().max(200, 'Thu nhập must be less than 200 characters').optional().nullable(),
+  benefitsPerks: z.string().max(2000, 'Phúc lợi must be less than 2000 characters').optional().nullable(),
+  contact: z.string().max(500, 'Thông tin liên hệ must be less than 500 characters').optional().nullable(),
 });
 
 // Get job schema
