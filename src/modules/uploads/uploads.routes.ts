@@ -175,6 +175,9 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/company/post-image',
     {
+      // NOTE: video upload uses base64 in JSON body, which inflates payload size by ~33%.
+      // A 50MB video becomes ~67MB base64 + JSON overhead, so we must allow larger body here.
+      bodyLimit: 100 * 1024 * 1024, // 100MB
       preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
       schema: {
         description: 'Tải ảnh bài đăng của doanh nghiệp thông qua máy chủ',
