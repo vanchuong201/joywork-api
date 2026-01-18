@@ -121,9 +121,9 @@ export class JobsService {
 
     // Create job
     const deadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
-    // Force deadline to end of day if provided
+    // Force deadline to end of day if provided (using UTC to avoid timezone issues)
     if (deadline) {
-      deadline.setHours(23, 59, 59, 999);
+      deadline.setUTCHours(23, 59, 59, 999);
     }
 
     const jobData: any = {
@@ -250,8 +250,8 @@ export class JobsService {
     if (data.applicationDeadline !== undefined) {
       if (data.applicationDeadline) {
         const deadline = new Date(data.applicationDeadline);
-        // Force deadline to end of day
-        deadline.setHours(23, 59, 59, 999);
+        // Force deadline to end of day (using UTC to avoid timezone issues)
+        deadline.setUTCHours(23, 59, 59, 999);
         updateData.applicationDeadline = deadline;
       } else {
         updateData.applicationDeadline = null;
