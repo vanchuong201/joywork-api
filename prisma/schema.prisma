@@ -207,6 +207,13 @@ model Company {
   profileStory  Json?
   highlights    Json?
   isVerified    Boolean      @default(false)
+  verificationStatus   CompanyVerificationStatus @default(UNVERIFIED)
+  verificationFileKey  String?
+  verificationFileUrl  String?
+  verificationSubmittedAt DateTime?
+  verificationReviewedAt DateTime?
+  verificationReviewedById String?
+  verificationRejectReason String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -291,6 +298,13 @@ enum CompanySize {
   MEDIUM
   LARGE
   ENTERPRISE
+}
+
+enum CompanyVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
 // CompanyMember - Many-to-many relationship between User and Company

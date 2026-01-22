@@ -1,4 +1,4 @@
-import { S3Client, DeleteObjectsCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectsCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config } from '@/config/env';
 
@@ -31,6 +31,24 @@ export async function createPresignedUploadUrl(params: {
     Key: params.key,
     ContentType: params.contentType,
     ContentLength: params.contentLength,
+  });
+
+  return getSignedUrl(s3Client, command, { expiresIn: params.expiresIn ?? 300 });
+}
+
+export async function createPresignedDownloadUrl(params: {
+  key: string;
+  expiresIn?: number;
+  downloadFileName?: string;
+  contentType?: string;
+}): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: params.key,
+    ...(params.downloadFileName
+      ? { ResponseContentDisposition: `attachment; filename="${params.downloadFileName}"` }
+      : {}),
+    ...(params.contentType ? { ResponseContentType: params.contentType } : {}),
   });
 
   return getSignedUrl(s3Client, command, { expiresIn: params.expiresIn ?? 300 });

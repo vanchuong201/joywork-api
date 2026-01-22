@@ -37,6 +37,13 @@ export interface Company {
   profileStory?: CompanyStoryBlock[];
   highlights?: CompanyHighlight[];
   isVerified: boolean;
+  verificationStatus?: string;
+  verificationFileKey?: string | null;
+  verificationFileUrl?: string | null;
+  verificationSubmittedAt?: Date | null;
+  verificationReviewedAt?: Date | null;
+  verificationReviewedById?: string | null;
+  verificationRejectReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -121,6 +128,13 @@ export interface CompanyWithMembers {
   profileStory?: CompanyStoryBlock[];
   highlights?: CompanyHighlight[];
   isVerified: boolean;
+  verificationStatus?: string;
+  verificationFileKey?: string | null;
+  verificationFileUrl?: string | null;
+  verificationSubmittedAt?: Date | null;
+  verificationReviewedAt?: Date | null;
+  verificationReviewedById?: string | null;
+  verificationRejectReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
   members: Array<{
@@ -256,6 +270,13 @@ export class CompaniesService {
       ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
       ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
+      verificationStatus: company.verificationStatus,
+      ...(company.verificationFileKey != null ? { verificationFileKey: company.verificationFileKey } : {}),
+      ...(company.verificationFileUrl != null ? { verificationFileUrl: company.verificationFileUrl } : {}),
+      ...(company.verificationSubmittedAt != null ? { verificationSubmittedAt: company.verificationSubmittedAt } : {}),
+      ...(company.verificationReviewedAt != null ? { verificationReviewedAt: company.verificationReviewedAt } : {}),
+      ...(company.verificationReviewedById != null ? { verificationReviewedById: company.verificationReviewedById } : {}),
+      ...(company.verificationRejectReason != null ? { verificationRejectReason: company.verificationRejectReason } : {}),
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
     };
@@ -521,6 +542,13 @@ export class CompaniesService {
       ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
       ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
+      verificationStatus: company.verificationStatus,
+      ...(company.verificationFileKey != null ? { verificationFileKey: company.verificationFileKey } : {}),
+      ...(company.verificationFileUrl != null ? { verificationFileUrl: company.verificationFileUrl } : {}),
+      ...(company.verificationSubmittedAt != null ? { verificationSubmittedAt: company.verificationSubmittedAt } : {}),
+      ...(company.verificationReviewedAt != null ? { verificationReviewedAt: company.verificationReviewedAt } : {}),
+      ...(company.verificationReviewedById != null ? { verificationReviewedById: company.verificationReviewedById } : {}),
+      ...(company.verificationRejectReason != null ? { verificationRejectReason: company.verificationRejectReason } : {}),
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
       members: company.members.map(member => ({

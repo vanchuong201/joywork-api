@@ -9,6 +9,7 @@ import {
   uploadCompanyLogoSchema,
   uploadCompanyCoverSchema,
   uploadProfileCVSchema,
+  uploadCompanyVerificationSchema,
 } from './uploads.schema';
 
 export class UploadsController {
@@ -84,6 +85,22 @@ export class UploadsController {
     const data = await this.uploadsService.uploadProfileCV(userId, payload);
 
     return reply.status(201).send({ data });
+  }
+
+  async uploadCompanyVerification(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const payload = uploadCompanyVerificationSchema.parse(request.body);
+
+    const data = await this.uploadsService.uploadCompanyVerificationDocument(userId, payload);
+
+    return reply.status(201).send({ data });
+  }
+
+  async getCompanyVerificationDownload(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId } = request.query as { companyId: string };
+    const data = await this.uploadsService.getCompanyVerificationDownloadUrl(userId, companyId);
+    return reply.send({ data });
   }
 }
 

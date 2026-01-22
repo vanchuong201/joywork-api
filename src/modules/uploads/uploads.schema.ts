@@ -121,6 +121,27 @@ export const uploadProfileCVSchema = z.object({
   previousKey: z.string().optional(),
 });
 
+export const uploadCompanyVerificationSchema = z.object({
+  companyId: z.string().min(1, 'Company ID is required'),
+  fileName: z
+    .string()
+    .trim()
+    .min(1, 'File name is required')
+    .max(255, 'File name is too long'),
+  fileType: z.string().min(1, 'File type is required'),
+  fileData: z
+    .string()
+    .min(1, 'File data is required')
+    .refine((value) => {
+      try {
+        return Buffer.from(value, 'base64').length > 0;
+      } catch {
+        return false;
+      }
+    }, 'Invalid base64 data'),
+  previousKey: z.string().optional(),
+});
+
 export type CreatePresignInput = z.infer<typeof createPresignSchema>;
 export type DeleteObjectInput = z.infer<typeof deleteObjectSchema>;
 export type CreateProfileAvatarPresignInput = z.infer<typeof createProfileAvatarPresignSchema>;
@@ -129,4 +150,5 @@ export type UploadCompanyPostImageInput = z.infer<typeof uploadCompanyPostImageS
 export type UploadCompanyLogoInput = z.infer<typeof uploadCompanyLogoSchema>;
 export type UploadCompanyCoverInput = z.infer<typeof uploadCompanyCoverSchema>;
 export type UploadProfileCVInput = z.infer<typeof uploadProfileCVSchema>;
+export type UploadCompanyVerificationInput = z.infer<typeof uploadCompanyVerificationSchema>;
 

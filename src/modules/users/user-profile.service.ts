@@ -127,6 +127,7 @@ export class UserProfileService {
       result.profile = {
         id: user.profile.id,
         avatar: user.profile.avatar,
+        fullName: user.profile.fullName,
         title: user.profile.title,
         headline: user.profile.headline,
         location: user.profile.location,
@@ -134,6 +135,8 @@ export class UserProfileService {
         linkedin: user.profile.linkedin,
         github: user.profile.github,
         cvUrl: user.profile.cvUrl,
+        contactEmail: user.profile.contactEmail,
+        contactPhone: user.profile.contactPhone,
         status: user.profile.status,
         createdAt: user.profile.createdAt,
         updatedAt: user.profile.updatedAt,

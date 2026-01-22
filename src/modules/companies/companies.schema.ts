@@ -96,7 +96,10 @@ const baseCompanySchema = {
 };
 
 // Create company schema
-export const createCompanySchema = z.object(baseCompanySchema);
+export const createCompanySchema = z.object({
+  ...baseCompanySchema,
+  legalName: z.string().min(2, 'Legal name must be at least 2 characters').max(200, 'Legal name must be less than 200 characters'),
+});
 
 // Update company schema
 export const updateCompanySchema = z.object({

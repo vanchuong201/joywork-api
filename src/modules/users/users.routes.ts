@@ -56,6 +56,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                       properties: {
                         id: { type: 'string' },
                         avatar: { type: 'string', nullable: true },
+                        fullName: { type: 'string', nullable: true },
                         title: { type: 'string', nullable: true },
                         headline: { type: 'string', nullable: true },
                         bio: { type: 'string', nullable: true },
@@ -64,6 +65,8 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         linkedin: { type: 'string', nullable: true },
                         github: { type: 'string', nullable: true },
                         cvUrl: { type: 'string', nullable: true },
+                        contactEmail: { type: 'string', nullable: true },
+                        contactPhone: { type: 'string', nullable: true },
                         status: { type: 'string', nullable: true },
                         knowledge: { type: 'array', items: { type: 'string' }, nullable: true },
                         skills: { type: 'array', items: { type: 'string' }, nullable: true },

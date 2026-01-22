@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { buildS3ObjectUrl, createPresignedUploadUrl, deleteS3Objects, getS3BucketName, s3Client } from '@/shared/storage/s3';
+import { buildS3ObjectUrl, createPresignedUploadUrl, createPresignedDownloadUrl, deleteS3Objects, getS3BucketName, s3Client } from '@/shared/storage/s3';
 import {
   CreatePresignInput,
   DeleteObjectInput,
@@ -12,18 +12,28 @@ import {
   UploadCompanyLogoInput,
   UploadCompanyCoverInput,
   UploadProfileCVInput,
+  UploadCompanyVerificationInput,
 } from './uploads.schema';
+import { config } from '@/config/env';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
 const AVATAR_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 const CV_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const DKKD_MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']); // mp4, webm, mov
 const ALLOWED_CV_MIME_TYPES = new Set([
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+const ALLOWED_DKKD_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
 ]);
 
 function getExtensionFromMime(mime: string): string | null {
@@ -33,6 +43,13 @@ function getExtensionFromMime(mime: string): string | null {
   if (mime === 'video/mp4') return '.mp4';
   if (mime === 'video/webm') return '.webm';
   if (mime === 'video/quicktime') return '.mov';
+  return null;
+}
+
+function getDocExtensionFromMime(mime: string): string | null {
+  if (mime === 'application/pdf') return '.pdf';
+  if (mime === 'application/msword') return '.doc';
+  if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return '.docx';
   return null;
 }
 
@@ -538,6 +555,136 @@ export class UploadsService {
       key,
       assetUrl,
     };
+  }
+
+  async uploadCompanyVerificationDocument(userId: string, input: UploadCompanyVerificationInput) {
+    const { companyId, fileName, fileType, fileData, previousKey } = input;
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('Bạn không có quyền tải giấy tờ xác thực cho công ty này', 403, 'FORBIDDEN');
+    }
+
+    if (!ALLOWED_DKKD_MIME_TYPES.has(fileType)) {
+      throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận PDF, DOC, DOCX, JPG, PNG', 400, 'UNSUPPORTED_FILE_TYPE');
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+
+    if (!buffer.length) {
+      throw new AppError('Tệp không được rỗng', 400, 'EMPTY_FILE');
+    }
+
+    if (buffer.length > DKKD_MAX_FILE_SIZE) {
+      throw new AppError('Kích thước tệp vượt quá giới hạn 15MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const extFromMime = getDocExtensionFromMime(fileType) ?? getExtensionFromMime(fileType);
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `companies/${companyId}/verification/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: getS3BucketName(),
+        Key: key,
+        Body: buffer,
+        ContentType: fileType,
+        ContentLength: buffer.length,
+      }));
+
+      await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          verificationStatus: 'PENDING',
+          verificationFileKey: key,
+          verificationFileUrl: buildS3ObjectUrl(key),
+          verificationSubmittedAt: new Date(),
+          verificationReviewedAt: null,
+          verificationReviewedById: null,
+          verificationRejectReason: null,
+          isVerified: false,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to upload verification document', error);
+      throw new AppError('Không thể tải hồ sơ xác thực, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    if (previousKey && previousKey.startsWith(`companies/${companyId}/verification/`)) {
+      try {
+        await deleteS3Objects([previousKey]);
+      } catch (error) {
+        console.error('Failed to delete previous verification document', error);
+      }
+    }
+
+    const assetUrl = buildS3ObjectUrl(key);
+
+    if (config.LARK_COMPANY_VERIFICATION_WEBHOOK) {
+      try {
+        const company = await prisma.company.findUnique({ where: { id: companyId }, select: { name: true, legalName: true, slug: true } });
+        await fetch(config.LARK_COMPANY_VERIFICATION_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            msg_type: 'text',
+            content: {
+              text: `DN đã nộp hồ sơ xác thực DKKD.\nCompany: ${company?.name ?? 'N/A'}\nLegal name: ${company?.legalName ?? 'N/A'}\nSlug: ${company?.slug ?? 'N/A'}\nCompanyId: ${companyId}\nFile: ${assetUrl}`,
+            },
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to notify Lark for company verification', error);
+      }
+    }
+
+    return { key, assetUrl };
+  }
+
+  async getCompanyVerificationDownloadUrl(userId: string, companyId: string) {
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('Bạn không có quyền tải hồ sơ xác thực của công ty này', 403, 'FORBIDDEN');
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { verificationFileKey: true },
+    });
+
+    if (!company?.verificationFileKey) {
+      throw new AppError('Chưa có hồ sơ xác thực', 404, 'FILE_NOT_FOUND');
+    }
+
+    const key = company.verificationFileKey;
+    const fileName = key.split('/').pop() || 'verification';
+    const url = await createPresignedDownloadUrl({
+      key,
+      downloadFileName: fileName,
+      expiresIn: 300,
+    });
+
+    return { url };
   }
 }
 

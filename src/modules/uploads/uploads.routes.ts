@@ -173,6 +173,78 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post(
+    '/company/verification-document',
+    {
+      bodyLimit: 30 * 1024 * 1024,
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Tải hồ sơ xác thực doanh nghiệp (DKKD)',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['companyId', 'fileName', 'fileType', 'fileData'],
+          properties: {
+            companyId: { type: 'string', description: 'ID công ty', minLength: 1 },
+            fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
+            fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
+            fileData: { type: 'string', description: 'Dữ liệu file dạng base64' },
+            previousKey: { type: 'string' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadCompanyVerification.bind(uploadsController),
+  );
+
+  fastify.get(
+    '/company/verification-document/download',
+    {
+      preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+      schema: {
+        description: 'Lấy link tải hồ sơ xác thực doanh nghiệp (DKKD)',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          required: ['companyId'],
+          properties: {
+            companyId: { type: 'string', minLength: 1 },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  url: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.getCompanyVerificationDownload.bind(uploadsController),
+  );
+
+  fastify.post(
     '/company/post-image',
     {
       // NOTE: video upload uses base64 in JSON body, which inflates payload size by ~33%.
