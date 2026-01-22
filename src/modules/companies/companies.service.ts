@@ -384,13 +384,23 @@ export class CompaniesService {
       data['slug'] = normalizedSlug;
     }
 
+    // Handle re-verification request
+    const { requestReVerification, ...dataWithoutFlag } = data;
+
     // Update company
-    const { metrics, profileStory, highlights, ...rest } = data;
+    const { metrics, profileStory, highlights, ...rest } = dataWithoutFlag;
 
     // Schema đã xử lý empty string thành null, chỉ cần omit undefined
     const updateBase = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined)
     );
+
+    // If requestReVerification is true, reset verification status to PENDING
+    const verificationUpdate: Record<string, any> = {};
+    if (requestReVerification === true) {
+      verificationUpdate.verificationStatus = 'PENDING';
+      verificationUpdate.verificationSubmittedAt = new Date();
+    }
 
     const company = await prisma.company.update({
       where: { id: companyId },
@@ -399,9 +409,28 @@ export class CompaniesService {
         ...(metrics !== undefined ? { metrics: metrics as Prisma.InputJsonValue } : {}),
         ...(profileStory !== undefined ? { profileStory: profileStory as Prisma.InputJsonValue } : {}),
         ...(highlights !== undefined ? { highlights: highlights as Prisma.InputJsonValue } : {}),
+        ...verificationUpdate,
         updatedAt: new Date(),
       },
     });
+
+    // Send Lark notification for re-verification request
+    if (requestReVerification === true && config.LARK_COMPANY_VERIFICATION_WEBHOOK) {
+      try {
+        await fetch(config.LARK_COMPANY_VERIFICATION_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            msg_type: 'text',
+            content: {
+              text: `[YÊU CẦU XÁC THỰC LẠI] DN thay đổi tên pháp lý.\nCompany: ${company.name}\nLegal name mới: ${company.legalName ?? 'N/A'}\nSlug: ${company.slug}\nCompanyId: ${companyId}\nVui lòng kiểm tra lại hồ sơ DKKD.`,
+            },
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to notify Lark for company re-verification', error);
+      }
+    }
 
     return {
       id: company.id,

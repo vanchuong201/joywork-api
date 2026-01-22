@@ -107,6 +107,8 @@ export const updateCompanySchema = z.object({
     acc[key] = (schema as z.ZodTypeAny).optional();
     return acc;
   }, {}),
+  // Flag to request re-verification when legal name changes on a verified company
+  requestReVerification: z.boolean().optional(),
 });
 
 // Get company schema
