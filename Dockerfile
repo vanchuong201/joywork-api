@@ -57,15 +57,15 @@ RUN apt-get update && apt-get install -y wget openssl && rm -rf /var/lib/apt/lis
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-# Copy Prisma schema for migrations
+# Copy Prisma schema for migrations (Prisma client already generated in builder stage and included in node_modules)
 COPY --from=builder /app/prisma ./prisma
 # Copy tsconfig.json for path resolution
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # Copy src directory for tsx to run with path aliases
 COPY --from=builder /app/src ./src
 
-# Regenerate Prisma client for production environment
-RUN npm run db:generate
+# Prisma client is already generated in builder stage and included in node_modules
+# No need to regenerate to save disk space
 
 EXPOSE 4000
 

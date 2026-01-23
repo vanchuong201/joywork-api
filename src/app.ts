@@ -41,10 +41,22 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(cookie);
   
   await app.register(cors, {
-    origin: config.FRONTEND_ORIGIN,
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return cb(null, true);
+      
+      // Check if origin matches frontend URL
+      if (origin === config.FRONTEND_ORIGIN) {
+        return cb(null, true);
+      }
+      
+      // Reject other origins
+      return cb(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['Authorization'],
   });
 
   await app.register(helmet, {

@@ -348,10 +348,13 @@ export class CompaniesService {
       throw new AppError('You do not have permission to update this company', 403, 'FORBIDDEN');
     }
 
+    // Handle re-verification request first
+    const { requestReVerification, ...dataWithoutFlag } = data;
+
     // Normalize and check if new slug conflicts (if provided)
-    if (data['slug']) {
+    if ('slug' in dataWithoutFlag && dataWithoutFlag.slug) {
       // Normalize slug: lowercase, replace spaces with hyphens, remove invalid characters
-      const slugValue = data['slug'];
+      const slugValue = dataWithoutFlag.slug;
       if (typeof slugValue !== 'string') {
           throw new AppError('Slug must be a string', 400, 'INVALID_SLUG_TYPE');
       }
@@ -381,14 +384,11 @@ export class CompaniesService {
       }
 
       // Update slug with normalized value
-      data['slug'] = normalizedSlug;
+      (dataWithoutFlag as any).slug = normalizedSlug;
     }
 
-    // Handle re-verification request
-    const { requestReVerification, ...dataWithoutFlag } = data;
-
     // Update company
-    const { metrics, profileStory, highlights, ...rest } = dataWithoutFlag;
+    const { metrics, profileStory, highlights, ...rest } = dataWithoutFlag as any;
 
     // Schema đã xử lý empty string thành null, chỉ cần omit undefined
     const updateBase = Object.fromEntries(
@@ -398,8 +398,8 @@ export class CompaniesService {
     // If requestReVerification is true, reset verification status to PENDING
     const verificationUpdate: Record<string, any> = {};
     if (requestReVerification === true) {
-      verificationUpdate.verificationStatus = 'PENDING';
-      verificationUpdate.verificationSubmittedAt = new Date();
+      verificationUpdate['verificationStatus'] = 'PENDING';
+      verificationUpdate['verificationSubmittedAt'] = new Date();
     }
 
     const company = await prisma.company.update({
