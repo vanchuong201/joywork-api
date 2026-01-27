@@ -78,6 +78,17 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           applicationDeadline: { type: 'string', format: 'date-time', description: 'Application deadline' },
           isActive: { type: 'boolean', default: true, description: 'Job is active' },
+          department: { type: 'string', maxLength: 100, description: 'Department / Bộ phận' },
+          jobLevel: { 
+            type: 'string', 
+            enum: ['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE'],
+            description: 'Job level / Cấp bậc'
+          },
+          educationLevel: { 
+            type: 'string', 
+            enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
+            description: 'Education level / Học vấn'
+          },
         },
       },
       response: {
@@ -116,6 +127,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     tags: { type: 'array', items: { type: 'string' } },
                     applicationDeadline: { type: 'string', format: 'date-time', nullable: true },
                     isActive: { type: 'boolean' },
+                    department: { type: 'string', nullable: true },
+                    jobLevel: { type: 'string', nullable: true },
+                    educationLevel: { type: 'string', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
                     company: {
@@ -253,6 +267,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     tags: { type: 'array', items: { type: 'string' } },
                     applicationDeadline: { type: 'string', format: 'date-time', nullable: true },
                     isActive: { type: 'boolean' },
+                    department: { type: 'string', nullable: true },
+                    jobLevel: { type: 'string', nullable: true },
+                    educationLevel: { type: 'string', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
                     company: {
@@ -351,6 +368,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       tags: { type: 'array', items: { type: 'string' } },
                       applicationDeadline: { type: 'string', format: 'date-time', nullable: true },
                       isActive: { type: 'boolean' },
+                      department: { type: 'string', nullable: true },
+                      jobLevel: { type: 'string', nullable: true },
+                      educationLevel: { type: 'string', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
                       company: {
@@ -781,6 +801,19 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           applicationDeadline: { type: 'string', format: 'date-time', nullable: true, description: 'Application deadline' },
           isActive: { type: 'boolean', description: 'Job is active' },
+          department: { type: 'string', maxLength: 100, nullable: true, description: 'Department / Bộ phận' },
+          jobLevel: { 
+            type: 'string', 
+            enum: ['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE'],
+            nullable: true,
+            description: 'Job level / Cấp bậc'
+          },
+          educationLevel: { 
+            type: 'string', 
+            enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
+            nullable: true,
+            description: 'Education level / Học vấn'
+          },
         },
       },
       response: {
@@ -819,6 +852,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     tags: { type: 'array', items: { type: 'string' } },
                     applicationDeadline: { type: 'string', format: 'date-time', nullable: true },
                     isActive: { type: 'boolean' },
+                    department: { type: 'string', nullable: true },
+                    jobLevel: { type: 'string', nullable: true },
+                    educationLevel: { type: 'string', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
                     company: {

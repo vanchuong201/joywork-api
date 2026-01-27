@@ -139,6 +139,10 @@ export class JobsService {
       applicationDeadline: deadline,
       salaryMin: data.salaryMin ?? null,
       salaryMax: data.salaryMax ?? null,
+      // Header fields
+      department: data.department ?? null,
+      jobLevel: data.jobLevel ?? null,
+      educationLevel: data.educationLevel ?? null,
       // Required JD fields
       generalInfo: data.generalInfo,
       mission: data.mission,
@@ -203,10 +207,14 @@ export class JobsService {
       company: {
         id: job.company.id,
         name: job.company.name,
-        legalName: job.company.legalName,
+        ...(job.company.legalName ? { legalName: job.company.legalName } : {}),
         slug: job.company.slug,
       },
       _count: job._count,
+      // Header fields
+      department: job.department,
+      jobLevel: job.jobLevel,
+      educationLevel: job.educationLevel,
       // Required JD fields
       generalInfo: job.generalInfo,
       mission: job.mission,
@@ -274,6 +282,10 @@ export class JobsService {
     if (data.experienceLevel !== undefined) updateData.experienceLevel = data.experienceLevel;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    // Header fields
+    if (data.department !== undefined) updateData.department = data.department ?? null;
+    if (data.jobLevel !== undefined) updateData.jobLevel = data.jobLevel ?? null;
+    if (data.educationLevel !== undefined) updateData.educationLevel = data.educationLevel ?? null;
     
     // Handle applicationDeadline
     if (data.applicationDeadline !== undefined) {
@@ -311,6 +323,7 @@ export class JobsService {
           select: {
             id: true,
             name: true,
+            legalName: true,
             slug: true,
             logoUrl: true,
           },
@@ -339,9 +352,14 @@ export class JobsService {
       company: {
         id: updatedJob.company.id,
         name: updatedJob.company.name,
+        ...(updatedJob.company.legalName ? { legalName: updatedJob.company.legalName } : {}),
         slug: updatedJob.company.slug,
       },
       _count: updatedJob._count,
+      // Header fields
+      department: updatedJob.department,
+      jobLevel: updatedJob.jobLevel,
+      educationLevel: updatedJob.educationLevel,
       // Required JD fields
       generalInfo: updatedJob.generalInfo,
       mission: updatedJob.mission,
@@ -423,11 +441,15 @@ export class JobsService {
       company: {
         id: job.company.id,
         name: job.company.name,
-        legalName: job.company.legalName,
+        ...(job.company.legalName ? { legalName: job.company.legalName } : {}),
         slug: job.company.slug,
       },
       _count: job._count,
       hasApplied,
+      // Header fields
+      department: job.department,
+      jobLevel: job.jobLevel,
+      educationLevel: job.educationLevel,
       // Required JD fields
       generalInfo: job.generalInfo,
       mission: job.mission,
@@ -590,10 +612,15 @@ export class JobsService {
         company: {
           id: job.company.id,
           name: job.company.name,
+          ...(job.company.legalName ? { legalName: job.company.legalName } : {}),
           slug: job.company.slug,
         },
         _count: job._count,
         hasApplied,
+        // Header fields
+        department: job.department,
+        jobLevel: job.jobLevel,
+        educationLevel: job.educationLevel,
         // Required JD fields
         generalInfo: job.generalInfo,
         mission: job.mission,
@@ -615,7 +642,6 @@ export class JobsService {
       if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
       if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
-      if (job.company.legalName) jobResult.company.legalName = job.company.legalName;
       
       jobsWithApplications.push(jobResult);
     }

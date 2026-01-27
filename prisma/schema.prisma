@@ -478,6 +478,11 @@ model Job {
   applicationDeadline DateTime?
   isActive            Boolean         @default(true)
   
+  // Header fields
+  department          String?         // Bộ phận
+  jobLevel            JobLevel?        // Cấp bậc
+  educationLevel      EducationLevel?  // Học vấn
+  
   // JD chuẩn - Required fields
   generalInfo         String          @db.Text // "1. Thông tin chung" - markdown/rich text
   mission             String          @db.Text // "2. Sứ mệnh/Vai trò" - markdown/rich text
@@ -536,6 +541,24 @@ enum ExperienceLevel {
   SENIOR
   LEAD
   EXECUTIVE
+}
+
+enum JobLevel {
+  STAFF
+  TEAM_LEAD
+  SUPERVISOR
+  MANAGER
+  DIRECTOR
+  EXECUTIVE
+}
+
+enum EducationLevel {
+  NONE
+  HIGH_SCHOOL
+  COLLEGE
+  BACHELOR
+  MASTER
+  PHD
 }
 
 // Application model - Job applications

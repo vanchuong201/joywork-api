@@ -1,4 +1,4 @@
-import { PrismaClient, EmploymentType, ExperienceLevel } from '@prisma/client';
+import { PrismaClient, EmploymentType, ExperienceLevel, JobLevel, EducationLevel } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -353,6 +353,9 @@ const jobTemplates = [
 const locations = ['Hà Nội', 'Ho Chi Minh', 'Da Nang', 'Can Tho', 'Hai Phong'];
 const employmentTypes = Object.values(EmploymentType);
 const experienceLevels = Object.values(ExperienceLevel);
+const jobLevels: (JobLevel | null)[] = [...Object.values(JobLevel), null];
+const educationLevels: (EducationLevel | null)[] = [...Object.values(EducationLevel), null];
+const departments = ['Engineering', 'Product', 'Design', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations', 'Data', 'DevOps', null];
 
 async function main() {
   console.log('🌱 Starting job seeding...');
@@ -412,6 +415,9 @@ async function main() {
             currency: template.currency,
             employmentType: sample(employmentTypes),
             experienceLevel: sample(experienceLevels),
+            department: sample(departments),
+            jobLevel: sample(jobLevels),
+            educationLevel: sample(educationLevels),
             tags: ['Hiring', 'Opportunity', 'Growth'].sort(() => 0.5 - Math.random()).slice(0, 3),
             applicationDeadline: Math.random() < 0.7 
               ? new Date(Date.now() + randInt(15, 60) * 24 * 60 * 60 * 1000)

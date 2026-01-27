@@ -14,6 +14,10 @@ export const createJobSchema = z.object({
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional(),
   isActive: z.boolean().default(true),
+  // Header fields
+  department: z.string().max(100, 'Department must be less than 100 characters').optional(),
+  jobLevel: z.enum(['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE']).optional(),
+  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional(),
   
   // Required JD fields (rich text/markdown)
   generalInfo: z.string().min(1, 'Thông tin chung is required').max(5000, 'Thông tin chung must be less than 5000 characters'),
@@ -47,6 +51,10 @@ export const updateJobSchema = z.object({
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional().nullable(),
   isActive: z.boolean().optional(),
+  // Header fields
+  department: z.string().max(100, 'Department must be less than 100 characters').optional().nullable(),
+  jobLevel: z.enum(['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE']).optional().nullable(),
+  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional().nullable(),
   
   // Required JD fields (rich text/markdown)
   generalInfo: z.string().min(1, 'Thông tin chung is required').max(5000, 'Thông tin chung must be less than 5000 characters').optional(),
