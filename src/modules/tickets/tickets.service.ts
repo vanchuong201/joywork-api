@@ -11,7 +11,7 @@ import {
   UpdateTicketStatusInput,
 } from './tickets.schema';
 
-const MAX_OPEN_TICKETS_PER_COMPANY = 3;
+const MAX_OPEN_TICKETS_PER_COMPANY = 5;
 const MAX_TICKETS_PER_DAY = 5;
 const DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -143,13 +143,19 @@ export class TicketsService {
         },
       });
 
-      if (!membership) {
-        throw new AppError('Bạn không có quyền xem ticket của công ty này', 403, 'FORBIDDEN');
+      if (membership) {
+        // User is a company member - can see all tickets for this company
+        isCompanyContext = true;
+        where = { companyId };
+      } else {
+        // User is an applicant - can only see their own tickets with this company
+        where = {
+          companyId,
+          applicantId: userId,
+        };
       }
-
-      isCompanyContext = true;
-      where = { companyId };
     } else {
+      // No companyId - return all tickets for the applicant
       where = { applicantId: userId };
     }
 

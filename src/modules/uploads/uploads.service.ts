@@ -15,6 +15,7 @@ import {
   UploadCompanyVerificationInput,
 } from './uploads.schema';
 import { config } from '@/config/env';
+import { emailService } from '@/shared/services/email.service';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
@@ -633,9 +634,15 @@ export class UploadsService {
 
     const assetUrl = buildS3ObjectUrl(key);
 
+    // Get company info and owner email for notifications
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true, legalName: true, slug: true },
+    });
+
+    // Send Lark notification
     if (config.LARK_COMPANY_VERIFICATION_WEBHOOK) {
       try {
-        const company = await prisma.company.findUnique({ where: { id: companyId }, select: { name: true, legalName: true, slug: true } });
         await fetch(config.LARK_COMPANY_VERIFICATION_WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -649,6 +656,36 @@ export class UploadsService {
       } catch (error) {
         console.error('Failed to notify Lark for company verification', error);
       }
+    }
+
+    // Send email to owner
+    try {
+      const ownerMember = await prisma.companyMember.findFirst({
+        where: {
+          companyId,
+          role: 'OWNER',
+        },
+        include: {
+          user: {
+            select: {
+              email: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (ownerMember?.user?.email) {
+        const manageUrl = `${config.FRONTEND_ORIGIN}/companies/${company?.slug}/manage`;
+        await emailService.sendCompanyVerificationSubmittedEmail(ownerMember.user.email, {
+          companyName: company?.name || 'Doanh nghiệp của bạn',
+          ownerName: ownerMember.user.name,
+          manageUrl,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send verification submitted email', error);
+      // Don't throw - email failure shouldn't block the upload
     }
 
     return { key, assetUrl };

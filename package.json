@@ -15,6 +15,7 @@
     "test:email": "tsx scripts/test-email.ts",
     "check:ses": "tsx scripts/check-ses-status.ts",
     "verify:email": "tsx scripts/verify-email.ts",
+    "seed:jobs": "tsx scripts/seed-jobs.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "lint": "eslint src --ext .ts",

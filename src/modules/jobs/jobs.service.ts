@@ -168,6 +168,7 @@ export class JobsService {
             select: {
               id: true,
               name: true,
+              legalName: true,
               slug: true,
               logoUrl: true,
             },
@@ -202,6 +203,7 @@ export class JobsService {
       company: {
         id: job.company.id,
         name: job.company.name,
+        legalName: job.company.legalName,
         slug: job.company.slug,
       },
       _count: job._count,
@@ -374,6 +376,7 @@ export class JobsService {
           select: {
             id: true,
             name: true,
+            legalName: true,
             slug: true,
             logoUrl: true,
           },
@@ -420,6 +423,7 @@ export class JobsService {
       company: {
         id: job.company.id,
         name: job.company.name,
+        legalName: job.company.legalName,
         slug: job.company.slug,
       },
       _count: job._count,
@@ -537,6 +541,7 @@ export class JobsService {
             select: {
               id: true,
               name: true,
+              legalName: true,
               slug: true,
               logoUrl: true,
             },
@@ -610,6 +615,7 @@ export class JobsService {
       if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
       if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
+      if (job.company.legalName) jobResult.company.legalName = job.company.legalName;
       
       jobsWithApplications.push(jobResult);
     }

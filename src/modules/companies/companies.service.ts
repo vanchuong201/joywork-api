@@ -414,21 +414,55 @@ export class CompaniesService {
       },
     });
 
-    // Send Lark notification for re-verification request
-    if (requestReVerification === true && config.LARK_COMPANY_VERIFICATION_WEBHOOK) {
+    // Send Lark notification and email for re-verification request
+    if (requestReVerification === true) {
+      // Send Lark notification
+      if (config.LARK_COMPANY_VERIFICATION_WEBHOOK) {
+        try {
+          await fetch(config.LARK_COMPANY_VERIFICATION_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              msg_type: 'text',
+              content: {
+                text: `[YÊU CẦU XÁC THỰC LẠI] DN thay đổi tên pháp lý.\nCompany: ${company.name}\nLegal name mới: ${company.legalName ?? 'N/A'}\nSlug: ${company.slug}\nCompanyId: ${companyId}\nVui lòng kiểm tra lại hồ sơ DKKD.`,
+              },
+            }),
+          });
+        } catch (error) {
+          console.error('Failed to notify Lark for company re-verification', error);
+        }
+      }
+
+      // Send email to owner
       try {
-        await fetch(config.LARK_COMPANY_VERIFICATION_WEBHOOK, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            msg_type: 'text',
-            content: {
-              text: `[YÊU CẦU XÁC THỰC LẠI] DN thay đổi tên pháp lý.\nCompany: ${company.name}\nLegal name mới: ${company.legalName ?? 'N/A'}\nSlug: ${company.slug}\nCompanyId: ${companyId}\nVui lòng kiểm tra lại hồ sơ DKKD.`,
+        const ownerMember = await prisma.companyMember.findFirst({
+          where: {
+            companyId,
+            role: 'OWNER',
+          },
+          include: {
+            user: {
+              select: {
+                email: true,
+                name: true,
+              },
             },
-          }),
+          },
         });
+
+        if (ownerMember?.user?.email && company.legalName) {
+          const manageUrl = `${config.FRONTEND_ORIGIN}/companies/${company.slug}/manage`;
+          await emailService.sendCompanyReVerificationRequestedEmail(ownerMember.user.email, {
+            companyName: company.name,
+            ownerName: ownerMember.user.name,
+            newLegalName: company.legalName,
+            manageUrl,
+          });
+        }
       } catch (error) {
-        console.error('Failed to notify Lark for company re-verification', error);
+        console.error('Failed to send re-verification requested email', error);
+        // Don't throw - email failure shouldn't block the update
       }
     }
 

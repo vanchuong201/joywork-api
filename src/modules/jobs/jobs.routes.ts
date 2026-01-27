@@ -123,6 +123,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       properties: {
                         id: { type: 'string' },
                         name: { type: 'string' },
+                        legalName: { type: 'string', nullable: true },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
                       },
@@ -259,6 +260,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       properties: {
                         id: { type: 'string' },
                         name: { type: 'string' },
+                        legalName: { type: 'string', nullable: true },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
                       },
@@ -356,6 +358,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                         properties: {
                           id: { type: 'string' },
                           name: { type: 'string' },
+                          legalName: { type: 'string', nullable: true },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
                         },
@@ -823,6 +826,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       properties: {
                         id: { type: 'string' },
                         name: { type: 'string' },
+                        legalName: { type: 'string', nullable: true },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
                       },

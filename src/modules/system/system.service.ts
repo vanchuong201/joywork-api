@@ -1,6 +1,8 @@
 import { prisma } from '@/shared/database/prisma';
 import { Prisma, CompanyVerificationStatus } from '@prisma/client';
 import { createPresignedDownloadUrl } from '@/shared/storage/s3';
+import { emailService } from '@/shared/services/email.service';
+import { config } from '@/config/env';
 
 export interface SystemOverview {
   users: number;
@@ -88,7 +90,7 @@ export class SystemService {
   }
 
   async approveCompanyVerification(companyId: string, adminId: string) {
-    return prisma.company.update({
+    const company = await prisma.company.update({
       where: { id: companyId },
       data: {
         verificationStatus: 'VERIFIED',
@@ -99,14 +101,48 @@ export class SystemService {
       },
       select: {
         id: true,
+        name: true,
+        slug: true,
         verificationStatus: true,
         isVerified: true,
       },
     });
+
+    // Send email to owner
+    try {
+      const ownerMember = await prisma.companyMember.findFirst({
+        where: {
+          companyId,
+          role: 'OWNER',
+        },
+        include: {
+          user: {
+            select: {
+              email: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (ownerMember?.user?.email) {
+        const manageUrl = `${config.FRONTEND_ORIGIN}/companies/${company.slug}/manage`;
+        await emailService.sendCompanyVerificationApprovedEmail(ownerMember.user.email, {
+          companyName: company.name,
+          ownerName: ownerMember.user.name,
+          manageUrl,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send verification approved email', error);
+      // Don't throw - email failure shouldn't block the approval
+    }
+
+    return company;
   }
 
   async rejectCompanyVerification(companyId: string, adminId: string, reason?: string | null) {
-    return prisma.company.update({
+    const company = await prisma.company.update({
       where: { id: companyId },
       data: {
         verificationStatus: 'REJECTED',
@@ -117,11 +153,46 @@ export class SystemService {
       },
       select: {
         id: true,
+        name: true,
+        slug: true,
         verificationStatus: true,
         isVerified: true,
         verificationRejectReason: true,
       },
     });
+
+    // Send email to owner
+    try {
+      const ownerMember = await prisma.companyMember.findFirst({
+        where: {
+          companyId,
+          role: 'OWNER',
+        },
+        include: {
+          user: {
+            select: {
+              email: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (ownerMember?.user?.email) {
+        const manageUrl = `${config.FRONTEND_ORIGIN}/companies/${company.slug}/manage`;
+        await emailService.sendCompanyVerificationRejectedEmail(ownerMember.user.email, {
+          companyName: company.name,
+          ownerName: ownerMember.user.name,
+          rejectReason: company.verificationRejectReason,
+          manageUrl,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send verification rejected email', error);
+      // Don't throw - email failure shouldn't block the rejection
+    }
+
+    return company;
   }
 
   async getCompanyVerificationDownloadUrl(companyId: string) {

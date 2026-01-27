@@ -553,6 +553,376 @@ Trân trọng,
       text,
     });
   }
+
+  async sendCompanyVerificationSubmittedEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      ownerName?: string | null;
+      manageUrl: string;
+    },
+  ): Promise<void> {
+    const ownerLabel = payload.ownerName || 'bạn';
+    const subject = `[JOYWork] Đã nhận hồ sơ xác thực DKKD của ${payload.companyName}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xác thực DKKD - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #ff6b00; margin-bottom: 20px;">Đã nhận hồ sơ xác thực DKKD</h2>
+    
+    <p>Chào ${ownerLabel},</p>
+    
+    <p>Chúng tôi đã nhận được hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp <strong>${payload.companyName}</strong>.</p>
+    
+    <p>Đội ngũ vận hành JOYWork sẽ xem xét và phê duyệt hồ sơ của bạn trong thời gian sớm nhất. Kết quả xác thực sẽ được gửi về email này.</p>
+    
+    <p style="margin: 30px 0;">
+      Bạn có thể theo dõi trạng thái xác thực tại trang quản lý doanh nghiệp:
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem trạng thái xác thực</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+        Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 13px; color: #999;">
+      <strong>Lưu ý:</strong><br/>
+      - Thời gian xử lý thông thường là 1-3 ngày làm việc.<br/>
+      - Nếu cần hỗ trợ, vui lòng liên hệ đội ngũ JOYWork.
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Đã nhận hồ sơ xác thực DKKD
+
+Chào ${ownerLabel},
+
+Chúng tôi đã nhận được hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp ${payload.companyName}.
+
+Đội ngũ vận hành JOYWork sẽ xem xét và phê duyệt hồ sơ của bạn trong thời gian sớm nhất. Kết quả xác thực sẽ được gửi về email này.
+
+Theo dõi trạng thái xác thực tại: ${payload.manageUrl}
+
+Lưu ý: Thời gian xử lý thông thường là 1-3 ngày làm việc.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendCompanyVerificationApprovedEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      ownerName?: string | null;
+      manageUrl: string;
+    },
+  ): Promise<void> {
+    const ownerLabel = payload.ownerName || 'bạn';
+    const subject = `[JOYWork] Xác thực DKKD thành công - ${payload.companyName}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xác thực thành công - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #10b981; margin-bottom: 20px;">✓ Xác thực DKKD thành công</h2>
+    
+    <p>Chào ${ownerLabel},</p>
+    
+    <p>Chúng tôi vui mừng thông báo rằng hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp <strong>${payload.companyName}</strong> đã được phê duyệt thành công.</p>
+    
+    <p style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0;">
+      <strong>Doanh nghiệp của bạn đã được xác thực!</strong><br/>
+      Trạng thái xác thực này sẽ được hiển thị trên trang công khai của doanh nghiệp, giúp tăng độ tin cậy với ứng viên và đối tác.
+    </p>
+    
+    <p style="margin: 30px 0;">
+      Bạn có thể quản lý thông tin doanh nghiệp tại:
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Quản lý doanh nghiệp</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+        Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 13px; color: #999;">
+      <strong>Lưu ý:</strong><br/>
+      - Nếu bạn thay đổi tên pháp lý đầy đủ của doanh nghiệp, bạn sẽ cần xác thực lại.<br/>
+      - Mọi thay đổi về thông tin xác thực sẽ được thông báo qua email này.
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Xác thực DKKD thành công
+
+Chào ${ownerLabel},
+
+Chúng tôi vui mừng thông báo rằng hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp ${payload.companyName} đã được phê duyệt thành công.
+
+Doanh nghiệp của bạn đã được xác thực! Trạng thái xác thực này sẽ được hiển thị trên trang công khai của doanh nghiệp.
+
+Quản lý doanh nghiệp tại: ${payload.manageUrl}
+
+Lưu ý: Nếu bạn thay đổi tên pháp lý đầy đủ của doanh nghiệp, bạn sẽ cần xác thực lại.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendCompanyVerificationRejectedEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      ownerName?: string | null;
+      rejectReason?: string | null;
+      manageUrl: string;
+    },
+  ): Promise<void> {
+    const ownerLabel = payload.ownerName || 'bạn';
+    const subject = `[JOYWork] Yêu cầu bổ sung hồ sơ xác thực DKKD - ${payload.companyName}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yêu cầu bổ sung hồ sơ - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #ef4444; margin-bottom: 20px;">Yêu cầu bổ sung hồ sơ xác thực</h2>
+    
+    <p>Chào ${ownerLabel},</p>
+    
+    <p>Chúng tôi đã xem xét hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp <strong>${payload.companyName}</strong>.</p>
+    
+    <p style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0;">
+      <strong>Hồ sơ cần được bổ sung hoặc chỉnh sửa.</strong>
+    </p>
+    
+    ${payload.rejectReason ? `
+    <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin: 20px 0; border-radius: 4px;">
+      <p style="margin: 0 0 8px 0; font-weight: 600; color: #111827;">Lý do:</p>
+      <p style="margin: 0; color: #374151;">${payload.rejectReason}</p>
+    </div>
+    ` : `
+    <p style="color: #6b7280;">Vui lòng kiểm tra lại hồ sơ và đảm bảo:</p>
+    <ul style="color: #6b7280; padding-left: 20px;">
+      <li>File DKKD rõ ràng, đầy đủ thông tin</li>
+      <li>Tên pháp lý đầy đủ khớp với thông tin trên DKKD</li>
+      <li>File không bị mờ, thiếu trang hoặc không đọc được</li>
+    </ul>
+    `}
+    
+    <p style="margin: 30px 0;">
+      Bạn có thể tải lại hồ sơ xác thực tại trang quản lý doanh nghiệp:
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Tải lại hồ sơ xác thực</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+        Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 13px; color: #999;">
+      <strong>Lưu ý:</strong><br/>
+      - Sau khi tải lại hồ sơ, đội ngũ vận hành sẽ xem xét lại trong 1-3 ngày làm việc.<br/>
+      - Nếu cần hỗ trợ, vui lòng liên hệ đội ngũ JOYWork.
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Yêu cầu bổ sung hồ sơ xác thực DKKD
+
+Chào ${ownerLabel},
+
+Chúng tôi đã xem xét hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp ${payload.companyName}.
+
+Hồ sơ cần được bổ sung hoặc chỉnh sửa.
+
+${payload.rejectReason ? `Lý do: ${payload.rejectReason}` : 'Vui lòng kiểm tra lại hồ sơ và đảm bảo file DKKD rõ ràng, đầy đủ thông tin và tên pháp lý đầy đủ khớp với thông tin trên DKKD.'}
+
+Tải lại hồ sơ xác thực tại: ${payload.manageUrl}
+
+Lưu ý: Sau khi tải lại hồ sơ, đội ngũ vận hành sẽ xem xét lại trong 1-3 ngày làm việc.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendCompanyReVerificationRequestedEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      ownerName?: string | null;
+      newLegalName: string;
+      manageUrl: string;
+    },
+  ): Promise<void> {
+    const ownerLabel = payload.ownerName || 'bạn';
+    const subject = `[JOYWork] Yêu cầu xác thực lại DKKD - ${payload.companyName}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yêu cầu xác thực lại - JOYWork</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #f59e0b; margin-bottom: 20px;">Yêu cầu xác thực lại DKKD</h2>
+    
+    <p>Chào ${ownerLabel},</p>
+    
+    <p>Chúng tôi nhận thấy bạn đã thay đổi <strong>Tên pháp lý đầy đủ</strong> của doanh nghiệp <strong>${payload.companyName}</strong>.</p>
+    
+    <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0 0 8px 0; font-weight: 600;">Tên pháp lý mới:</p>
+      <p style="margin: 0; color: #92400e;">${payload.newLegalName}</p>
+    </div>
+    
+    <p>Vì tên pháp lý đã thay đổi, doanh nghiệp của bạn cần xác thực lại bằng cách tải lên hồ sơ DKKD mới phù hợp với tên pháp lý hiện tại.</p>
+    
+    <p style="margin: 30px 0;">
+      Vui lòng tải lên hồ sơ DKKD mới tại trang quản lý doanh nghiệp:
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Tải hồ sơ DKKD mới</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+        Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+    </p>
+    
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    
+    <p style="font-size: 13px; color: #999;">
+      <strong>Lưu ý:</strong><br/>
+      - Trạng thái xác thực hiện tại đã được đặt về "Chờ xác thực".<br/>
+      - Đội ngũ vận hành sẽ xem xét hồ sơ mới trong 1-3 ngày làm việc sau khi bạn tải lên.<br/>
+      - Kết quả xác thực sẽ được gửi về email này.
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWork</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Yêu cầu xác thực lại DKKD
+
+Chào ${ownerLabel},
+
+Chúng tôi nhận thấy bạn đã thay đổi Tên pháp lý đầy đủ của doanh nghiệp ${payload.companyName}.
+
+Tên pháp lý mới: ${payload.newLegalName}
+
+Vì tên pháp lý đã thay đổi, doanh nghiệp của bạn cần xác thực lại bằng cách tải lên hồ sơ DKKD mới phù hợp với tên pháp lý hiện tại.
+
+Tải hồ sơ DKKD mới tại: ${payload.manageUrl}
+
+Lưu ý:
+- Trạng thái xác thực hiện tại đã được đặt về "Chờ xác thực".
+- Đội ngũ vận hành sẽ xem xét hồ sơ mới trong 1-3 ngày làm việc sau khi bạn tải lên.
+- Kết quả xác thực sẽ được gửi về email này.
+
+Trân trọng,
+Đội ngũ JOYWork
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export const emailService = new EmailService();
