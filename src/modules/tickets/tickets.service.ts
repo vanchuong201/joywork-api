@@ -1,7 +1,9 @@
-import { TicketStatus } from '@prisma/client';
+import { TicketStatus, NotificationType } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
+import { notificationService } from '@/shared/services/notification.service';
+import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { config } from '@/config/env';
 import {
   CreateTicketInput,
@@ -287,7 +289,7 @@ export class TicketsService {
         companySlug: ticket.company.slug,
       }).catch(() => {});
     } else if (companyMembership) {
-      this.notifyApplicant(ticket.applicant.email, {
+      this.notifyApplicant(ticket.applicant.id, {
         companyName: ticket.company.name,
         title: ticket.title,
         content: params.content,
@@ -426,24 +428,56 @@ export class TicketsService {
       companySlug: string;
     },
   ) {
-    const owners = await prisma.companyMember.findMany({
+    // Get both OWNER and ADMIN members
+    const members = await prisma.companyMember.findMany({
       where: {
         companyId,
-        role: 'OWNER',
+        role: { in: ['OWNER', 'ADMIN'] },
       },
       include: {
         user: {
-          select: { email: true, name: true },
+          select: { id: true, email: true, name: true },
         },
       },
     });
 
     const ticketUrl = `${config.FRONTEND_ORIGIN}/tickets/${payload.ticketId}?company=${payload.companySlug}`;
+    const applicantName = payload.applicantName || 'Ứng viên';
 
+    // Create in-app notifications for all OWNER and ADMIN members
+    const userIds = members.map((m) => m.user.id);
+    if (userIds.length > 0) {
+      notificationService
+        .createNotificationsForUsers(userIds, {
+          type: NotificationType.TICKET_MESSAGE,
+          title: `Tin nhắn mới từ ${applicantName}`,
+          content: `${applicantName} đã gửi tin nhắn trong ticket: "${payload.title}"`,
+          metadata: {
+            ticketId: payload.ticketId,
+            companyId,
+            companySlug: payload.companySlug,
+            applicantEmail: payload.applicantEmail,
+            applicantName: payload.applicantName,
+          },
+          relatedEntityType: 'TICKET',
+          relatedEntityId: payload.ticketId,
+        })
+        .catch(() => {});
+    }
+
+    // Get verified emails for all members
+    const verifiedEmails = await getVerifiedEmailsForUsers(userIds);
+
+    // Send email notifications (only to members with verified email)
     await Promise.all(
-      owners
-        .filter((owner) => owner.user.email)
-        .map((owner) => {
+      members
+        .map((member) => {
+          const verifiedEmail = verifiedEmails.get(member.user.id);
+          if (!verifiedEmail) {
+            // Skip if no verified email available
+            return Promise.resolve();
+          }
+
           const basePayload: {
             ownerName?: string | null;
             applicantName?: string | null;
@@ -452,7 +486,7 @@ export class TicketsService {
             content: string;
             ticketUrl: string;
           } = {
-            ownerName: owner.user.name ?? null,
+            ownerName: member.user.name ?? null,
             applicantEmail: payload.applicantEmail,
             title: payload.title,
             content: payload.content,
@@ -462,14 +496,14 @@ export class TicketsService {
             basePayload.applicantName = payload.applicantName;
           }
           return emailService
-            .sendCompanyTicketOwnerEmail(owner.user.email, basePayload)
+            .sendCompanyTicketOwnerEmail(verifiedEmail, basePayload)
             .catch(() => {});
         }),
     );
   }
 
   private async notifyApplicant(
-    applicantEmail: string,
+    applicantId: string,
     payload: {
       companyName: string;
       title: string;
@@ -478,14 +512,37 @@ export class TicketsService {
       companySlug: string;
     },
   ) {
-    if (!applicantEmail) return;
     const ticketUrl = `${config.FRONTEND_ORIGIN}/tickets/${payload.ticketId}`;
-    await emailService.sendCompanyTicketApplicantEmail(applicantEmail, {
-      companyName: payload.companyName,
-      title: payload.title,
-      content: payload.content,
-      ticketUrl,
-    });
+
+    // Create in-app notification for applicant
+    notificationService
+      .createNotification({
+        userId: applicantId,
+        type: NotificationType.TICKET_MESSAGE,
+        title: `Phản hồi từ ${payload.companyName}`,
+        content: `${payload.companyName} đã phản hồi trong ticket: "${payload.title}"`,
+        metadata: {
+          ticketId: payload.ticketId,
+          companySlug: payload.companySlug,
+          companyName: payload.companyName,
+        },
+        relatedEntityType: 'TICKET',
+        relatedEntityId: payload.ticketId,
+      })
+      .catch(() => {});
+
+    // Get verified email for applicant (check emailVerified or Google account)
+    const verifiedEmail = await getVerifiedEmailForUser(applicantId);
+
+    // Send email notification (only if verified email is available)
+    if (verifiedEmail) {
+      await emailService.sendCompanyTicketApplicantEmail(verifiedEmail, {
+        companyName: payload.companyName,
+        title: payload.title,
+        content: payload.content,
+        ticketUrl,
+      }).catch(() => {});
+    }
   }
 }
 

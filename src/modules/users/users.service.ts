@@ -47,6 +47,7 @@ export class UsersService {
     const result: any = {
       id: user.id,
       email: user.email,
+      emailVerified: user.emailVerified, // Include email verification status
       role: user.role,
       createdAt: user.createdAt,
       avatar: user.avatar || null, // Account avatar - always include (even if null)

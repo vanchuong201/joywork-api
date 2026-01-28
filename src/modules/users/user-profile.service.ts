@@ -227,6 +227,7 @@ export class UserProfileService {
     const result: any = {
       id: user.id,
       email: user.email,
+      emailVerified: user.emailVerified, // Include email verification status
       phone: user.phone,
       name: user.name,
       slug: user.slug,

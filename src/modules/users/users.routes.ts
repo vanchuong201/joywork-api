@@ -154,6 +154,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                   properties: {
                     id: { type: 'string' },
                     email: { type: 'string' },
+                    emailVerified: { type: 'boolean' },
                     name: { type: 'string', nullable: true },
                     slug: { type: 'string', nullable: true }, // User slug
                     avatar: { type: 'string', nullable: true }, // Account avatar (User.avatar)
@@ -207,6 +208,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                   properties: {
                     id: { type: 'string' },
                     email: { type: 'string' },
+                    emailVerified: { type: 'boolean' },
                     phone: { type: 'string', nullable: true },
                     name: { type: 'string', nullable: true },
                     slug: { type: 'string', nullable: true },

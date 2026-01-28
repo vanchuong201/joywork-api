@@ -45,6 +45,7 @@ model User {
   tickets                 CompanyTicket[]          @relation("TicketApplicant")
   ticketMessages          CompanyTicketMessage[]
   sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
+  notifications           Notification[]
 
   @@index([slug])
   @@map("users")
@@ -187,36 +188,36 @@ model UserEducation {
 
 // Company model
 model Company {
-  id            String       @id @default(cuid())
-  name          String
-  legalName     String?
-  slug          String       @unique
-  tagline       String?
-  description   String?
-  logoUrl       String?
-  coverUrl      String?
-  website       String?
-  location      String?
-  email         String?
-  phone         String?
-  industry      String?
-  size          CompanySize?
-  foundedYear   Int?
-  headcount     Int?
-  headcountNote String?
-  metrics       Json?
-  profileStory  Json?
-  highlights    Json?
-  isVerified    Boolean      @default(false)
-  verificationStatus   CompanyVerificationStatus @default(UNVERIFIED)
-  verificationFileKey  String?
-  verificationFileUrl  String?
-  verificationSubmittedAt DateTime?
-  verificationReviewedAt DateTime?
+  id                       String                    @id @default(cuid())
+  name                     String
+  legalName                String?
+  slug                     String                    @unique
+  tagline                  String?
+  description              String?
+  logoUrl                  String?
+  coverUrl                 String?
+  website                  String?
+  location                 String?
+  email                    String?
+  phone                    String?
+  industry                 String?
+  size                     CompanySize?
+  foundedYear              Int?
+  headcount                Int?
+  headcountNote            String?
+  metrics                  Json?
+  profileStory             Json?
+  highlights               Json?
+  isVerified               Boolean                   @default(false)
+  verificationStatus       CompanyVerificationStatus @default(UNVERIFIED)
+  verificationFileKey      String?
+  verificationFileUrl      String?
+  verificationSubmittedAt  DateTime?
+  verificationReviewedAt   DateTime?
   verificationReviewedById String?
   verificationRejectReason String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 
   // Relations
   profile     CompanyProfile?
@@ -361,14 +362,14 @@ model Post {
 
 // Post images (gallery) - supports both images and videos
 model PostImage {
-  id         String      @id @default(cuid())
+  id         String    @id @default(cuid())
   postId     String
-  url         String
+  url        String
   storageKey String?
   width      Int?
   height     Int?
-  order      Int         @default(0)
-  type       MediaType   @default(IMAGE) // IMAGE or VIDEO
+  order      Int       @default(0)
+  type       MediaType @default(IMAGE) // IMAGE or VIDEO
 
   // Relations
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -477,31 +478,31 @@ model Job {
   tags                String[]
   applicationDeadline DateTime?
   isActive            Boolean         @default(true)
-  
+
   // Header fields
-  department          String?         // Bộ phận
-  jobLevel            JobLevel?        // Cấp bậc
-  educationLevel      EducationLevel?  // Học vấn
-  
+  department     String? // Bộ phận
+  jobLevel       JobLevel? // Cấp bậc
+  educationLevel EducationLevel? // Học vấn
+
   // JD chuẩn - Required fields
-  generalInfo         String          @db.Text // "1. Thông tin chung" - markdown/rich text
-  mission             String          @db.Text // "2. Sứ mệnh/Vai trò" - markdown/rich text
-  tasks               String          @db.Text // "3. Nhiệm vụ chuyên môn" - markdown/rich text
-  knowledge           String          @db.Text // "5. Yêu cầu - Kiến thức" - markdown/rich text
-  skills              String          @db.Text // "5. Yêu cầu - Kỹ năng" - markdown/rich text
-  attitude            String          @db.Text // "5. Yêu cầu - Thái độ" - markdown/rich text
-  
+  generalInfo String @db.Text // "1. Thông tin chung" - markdown/rich text
+  mission     String @db.Text // "2. Sứ mệnh/Vai trò" - markdown/rich text
+  tasks       String @db.Text // "3. Nhiệm vụ chuyên môn" - markdown/rich text
+  knowledge   String @db.Text // "5. Yêu cầu - Kiến thức" - markdown/rich text
+  skills      String @db.Text // "5. Yêu cầu - Kỹ năng" - markdown/rich text
+  attitude    String @db.Text // "5. Yêu cầu - Thái độ" - markdown/rich text
+
   // JD chuẩn - Optional fields
-  kpis                String?         @db.Text // "4. Kết quả chuyên môn" - markdown/rich text
-  authority           String?         @db.Text // "6. Quyền hạn" - markdown/rich text
-  relationships      String?         @db.Text // "7. Quan hệ công việc" - markdown/rich text
-  careerPath          String?         @db.Text // "8. Lộ trình phát triển" - markdown/rich text
-  benefitsIncome      String?         // "9. Quyền lợi - Thu nhập" - plain text
-  benefitsPerks       String?         @db.Text // "9. Quyền lợi - Phúc lợi" - markdown/rich text
-  contact             String?         // Thông tin liên hệ - plain text
-  
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  kpis           String? @db.Text // "4. Kết quả chuyên môn" - markdown/rich text
+  authority      String? @db.Text // "6. Quyền hạn" - markdown/rich text
+  relationships  String? @db.Text // "7. Quan hệ công việc" - markdown/rich text
+  careerPath     String? @db.Text // "8. Lộ trình phát triển" - markdown/rich text
+  benefitsIncome String? // "9. Quyền lợi - Thu nhập" - plain text
+  benefitsPerks  String? @db.Text // "9. Quyền lợi - Phúc lợi" - markdown/rich text
+  contact        String? // Thông tin liên hệ - plain text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -848,4 +849,38 @@ model UserSocialAccount {
   @@unique([provider, providerId])
   @@index([userId])
   @@map("user_social_accounts")
+}
+
+// Notification model - In-app notifications
+model Notification {
+  id                String           @id @default(cuid())
+  userId            String
+  type              NotificationType
+  title             String
+  content           String
+  metadata          Json? // Additional data (e.g., ticketId, companyId, etc.)
+  isRead            Boolean          @default(false)
+  relatedEntityType String? // e.g., "TICKET", "APPLICATION", "JOB", etc.
+  relatedEntityId   String? // ID of the related entity
+  createdAt         DateTime         @default(now())
+  readAt            DateTime?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([relatedEntityType, relatedEntityId])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  TICKET_MESSAGE // New message in ticket
+  TICKET_CREATED // New ticket created
+  APPLICATION_STATUS // Application status changed
+  JOB_APPLICATION // New job application
+  COMPANY_FOLLOW // Someone followed company
+  POST_LIKE // Post liked
+  POST_COMMENT // Post commented
+  SYSTEM // System notification
 }

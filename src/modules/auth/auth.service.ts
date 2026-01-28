@@ -475,10 +475,18 @@ export class AuthService {
             400,
             'SOCIAL_EMAIL_ALREADY_EXISTS',
           );
-    }
+        }
 
         // Email được provider cung cấp -> cho phép tự động link
         user = existingUserByEmail;
+        
+        // Nếu email từ provider trùng với email user và user chưa verify, thì verify email
+        if (emailFromProvider && email.toLowerCase() === user.email.toLowerCase() && emailVerified && !user.emailVerified) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { emailVerified: true },
+          });
+        }
       } else {
         // Tạo user mới
         const randomPassword = randomUUID();
@@ -542,6 +550,16 @@ export class AuthService {
   async linkSocialAccount(userId: string, params: { provider: string; providerId: string; email?: string | null }) {
     const { provider, providerId, email } = params;
 
+    // Get user to check email
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, emailVerified: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
     // Check if already linked
     const existingLink = await prisma.userSocialAccount.findUnique({
       where: {
@@ -562,6 +580,17 @@ export class AuthService {
             // bỏ qua nếu cột email chưa tồn tại
           }
         }
+        
+        // Nếu email Google trùng với email user và user chưa verify, thì verify email
+        // Use the email from params or from existing link
+        const emailToCheck = email || existingLink.email;
+        if (emailToCheck && emailToCheck.toLowerCase() === user.email.toLowerCase() && !user.emailVerified) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { emailVerified: true },
+          });
+        }
+        
         return;
       }
       throw new AppError('Tài khoản này đã được liên kết với người dùng khác', 400, 'SOCIAL_ALREADY_LINKED');
@@ -575,6 +604,14 @@ export class AuthService {
       // Fallback nếu migration chưa được áp dụng
       await prisma.userSocialAccount.create({
         data: { userId, provider, providerId },
+      });
+    }
+
+    // Nếu email Google trùng với email user và user chưa verify, thì verify email
+    if (email && email.toLowerCase() === user.email.toLowerCase() && !user.emailVerified) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { emailVerified: true },
       });
     }
   }
