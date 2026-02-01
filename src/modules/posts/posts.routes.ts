@@ -495,7 +495,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
         properties: {
           type: { 
             type: 'string', 
-            enum: ['STORY', 'ANNOUNCEMENT', 'EVENT'],
+            enum: ['STORY', 'ANNOUNCEMENT', 'EVENT', 'STATEMENT'],
             description: 'Filter by post type'
           },
           companyId: { type: 'string', description: 'Filter by company ID' },
@@ -528,6 +528,21 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      statementId: { type: 'string', nullable: true },
+                      statementSnapshot: {
+                        type: 'object',
+                        nullable: true,
+                        additionalProperties: false,
+                        properties: {
+                          title: { type: 'string' },
+                          description: { type: 'string', nullable: true },
+                          percentYes: { type: 'number' },
+                          totalRecipients: { type: 'number' },
+                          yesCount: { type: 'number' },
+                          respondedCount: { type: 'number' },
+                          snapshotAt: { type: 'string', format: 'date-time' },
+                        },
+                      },
                       createdBy: {
                         type: 'object',
                         nullable: true,

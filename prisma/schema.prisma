@@ -343,12 +343,15 @@ model Post {
   type        PostType       @default(STORY)
   visibility  PostVisibility @default(PUBLIC)
   publishedAt DateTime?
+  statementId String?
+  statementSnapshot Json?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   // Relations
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy     User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  statement     CompanyStatement? @relation(fields: [statementId], references: [id], onDelete: SetNull)
   likes         Like[]
   postReactions PostReaction[]
   images        PostImage[]
@@ -455,6 +458,7 @@ enum PostType {
   STORY
   ANNOUNCEMENT
   EVENT
+  STATEMENT
 }
 
 enum PostVisibility {
@@ -811,6 +815,7 @@ model CompanyStatement {
 
   company    Company                     @relation("CompanyToStatements", fields: [companyId], references: [id], onDelete: Cascade)
   recipients CompanyStatementRecipient[]
+  posts      Post[]
 
   @@map("company_statements")
 }

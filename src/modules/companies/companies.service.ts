@@ -10,7 +10,9 @@ import {
   UpdateCompanyProfileInput,
   UploadVerificationContactsCsvInput,
   SendCompanyStatementsInput,
+  CreatePostFromStatementInput,
 } from './companies.schema';
+import { PostsService } from '@/modules/posts/posts.service';
 import crypto from 'crypto';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
@@ -1484,12 +1486,21 @@ export class CompaniesService {
 
     const { listId, statements } = input;
 
-    const [company, list] = await Promise.all([
-      prisma.company.findUnique({
-        where: { id: companyId },
-        select: { id: true, name: true, slug: true },
-      }),
-      prisma.companyVerificationList.findFirst({
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, name: true, slug: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    // Nếu có listId, validate và load list
+    let list: any = null;
+    let contacts: any[] = [];
+    
+    if (listId) {
+      list = await prisma.companyVerificationList.findFirst({
         where: { id: listId, companyId },
         include: {
           items: {
@@ -1498,28 +1509,24 @@ export class CompaniesService {
             },
           },
         },
-      }),
-    ]);
+      });
 
-    if (!company) {
-      throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
-    }
+      if (!list) {
+        throw new AppError(
+          'Danh sách email xác thực không tồn tại',
+          404,
+          'VERIFICATION_LIST_NOT_FOUND',
+        );
+      }
 
-    if (!list) {
-      throw new AppError(
-        'Danh sách email xác thực không tồn tại',
-        404,
-        'VERIFICATION_LIST_NOT_FOUND',
-      );
-    }
-
-    const contacts = list.items.map((i: any) => i.contact);
-    if (!contacts.length) {
-      throw new AppError(
-        'Danh sách email không có nhân viên nào. Vui lòng kiểm tra lại tệp CSV.',
-        400,
-        'VERIFICATION_LIST_EMPTY',
-      );
+      contacts = list.items.map((i: any) => i.contact);
+      if (!contacts.length) {
+        throw new AppError(
+          'Danh sách email không có nhân viên nào. Vui lòng kiểm tra lại tệp CSV.',
+          400,
+          'VERIFICATION_LIST_EMPTY',
+        );
+      }
     }
 
     const now = new Date();
@@ -1535,55 +1542,60 @@ export class CompaniesService {
               description: s.description ?? null,
               isPublic: s.isPublic ?? true,
               status: 'ACTIVE',
-              sentAt: now,
-              expiresAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // +3 ngày
+              // Chỉ set sentAt và expiresAt nếu có verification list
+              sentAt: listId ? now : null,
+              expiresAt: listId ? new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000) : null, // +3 ngày
             },
           }),
         ),
       );
 
-      // 2. Tạo recipient cho từng statement-contact
-      for (const stmt of stmts) {
-        for (const item of list.items) {
-          await tx.companyStatementRecipient.create({
-            data: {
-              statementId: stmt.id,
-              contactId: item.contactId,
-              sentAt: now,
-            },
-          });
+      // 2. Tạo recipient cho từng statement-contact (chỉ khi có list)
+      if (listId && list) {
+        for (const stmt of stmts) {
+          for (const item of list.items) {
+            await tx.companyStatementRecipient.create({
+              data: {
+                statementId: stmt.id,
+                contactId: item.contactId,
+                sentAt: now,
+              },
+            });
+          }
         }
       }
 
       return stmts;
     });
 
-    // 3. Gửi email cho từng contact (ngoài transaction)
-    const verifyBaseUrl = `${config.FRONTEND_ORIGIN}/verify/company/${company.slug}`;
+    // 3. Gửi email cho từng contact (chỉ khi có list)
+    if (listId && contacts.length > 0) {
+      const verifyBaseUrl = `${config.FRONTEND_ORIGIN}/verify/company/${company.slug}`;
 
-    for (const contact of contacts as any[]) {
-      const verifyUrl = `${verifyBaseUrl}?token=${encodeURIComponent(
-        contact.token,
-      )}`;
+      for (const contact of contacts as any[]) {
+        const verifyUrl = `${verifyBaseUrl}?token=${encodeURIComponent(
+          contact.token,
+        )}`;
 
-      try {
-        await emailService.sendCompanyStatementsVerificationEmail(contact.email, {
-          companyName: company.name,
-          contactName: contact.name,
-          verifyUrl,
-          statements: createdStatements.map((s: any) => ({
-            title: s.title,
-            description: s.description ?? undefined,
-            expiresAt: s.expiresAt ?? undefined,
-          })),
-        });
-      } catch (error) {
-        console.error(
-          'Failed to send statement verification email',
-          contact.email,
-          error,
-        );
-        // Không throw để tránh fail cả batch; log là đủ
+        try {
+          await emailService.sendCompanyStatementsVerificationEmail(contact.email, {
+            companyName: company.name,
+            contactName: contact.name,
+            verifyUrl,
+            statements: createdStatements.map((s: any) => ({
+              title: s.title,
+              description: s.description ?? undefined,
+              expiresAt: s.expiresAt ?? undefined,
+            })),
+          });
+        } catch (error) {
+          console.error(
+            'Failed to send statement verification email',
+            contact.email,
+            error,
+          );
+          // Không throw để tránh fail cả batch; log là đủ
+        }
       }
     }
 
@@ -1597,7 +1609,7 @@ export class CompaniesService {
         expiresAt: s.expiresAt,
       })),
       recipientsCount: contacts.length,
-      listId: list.id,
+      listId: listId ?? null,
     };
   }
 
@@ -1884,5 +1896,76 @@ export class CompaniesService {
     return {
       statements,
     };
+  }
+
+  async createPostFromStatement(
+    companyId: string,
+    userId: string,
+    input: CreatePostFromStatementInput,
+  ) {
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const { statementId, content, type = 'STATEMENT' } = input;
+
+    // Get statement with stats
+    const statements = await this.getStatementsWithStats(companyId, false);
+    const statement = statements.find((s: any) => s.id === statementId);
+
+    if (!statement) {
+      throw new AppError('Statement not found', 404, 'STATEMENT_NOT_FOUND');
+    }
+
+    // Create snapshot data
+    const snapshot = {
+      title: statement.title,
+      description: statement.description,
+      percentYes: statement.percentYes ?? 0,
+      totalRecipients: statement.totalRecipients ?? 0,
+      yesCount: statement.yesCount ?? 0,
+      respondedCount: statement.respondedCount ?? 0,
+      snapshotAt: new Date().toISOString(),
+    };
+
+    // Build post content (only additional text)
+    const postContent = (content ?? '').trim();
+
+    // Create post using PostsService
+    const postsService = new PostsService();
+    const post = await postsService.createPost(companyId, userId, {
+      title: `Tuyên bố: ${statement.title}`,
+      content: postContent,
+      type: type as any,
+      visibility: 'PUBLIC',
+      publishNow: true,
+    });
+
+    // Update post with statementId and snapshot
+    const updatedPost = await prisma.post.update({
+      where: { id: post.id },
+      data: {
+        statementId,
+        statementSnapshot: snapshot as any,
+      },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return updatedPost;
   }
 }

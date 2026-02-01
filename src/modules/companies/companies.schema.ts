@@ -178,7 +178,7 @@ export const uploadVerificationContactsCsvSchema = z.object({
 
 // Send company statements for verification
 export const sendCompanyStatementsSchema = z.object({
-  listId: z.string().min(1, 'Verification list ID is required'),
+  listId: z.string().min(1, 'Verification list ID is required').optional(),
   statements: z
     .array(
       z.object({
@@ -187,7 +187,7 @@ export const sendCompanyStatementsSchema = z.object({
         isPublic: z.boolean().optional().default(true),
       }),
     )
-    .min(1, 'Cần ít nhất 1 tuyên bố để gửi xác thực'),
+    .min(1, 'Cần ít nhất 1 tuyên bố'),
 });
 
 // Reorder company statements
@@ -198,6 +198,13 @@ export const reorderCompanyStatementsSchema = z.object({
       order: z.number().int().min(0, 'Order must be non-negative'),
     }),
   ),
+});
+
+// Create post from statement
+export const createPostFromStatementSchema = z.object({
+  statementId: z.string().min(1, 'Statement ID is required'),
+  content: z.string().max(10000, 'Content must be less than 10000 characters').optional(),
+  type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT', 'STATEMENT']).default('STATEMENT').optional(),
 });
 
 // Types
@@ -212,6 +219,7 @@ export type UpdateCompanyProfileInput = z.infer<typeof updateCompanyProfileSchem
 export type UploadVerificationContactsCsvInput = z.infer<typeof uploadVerificationContactsCsvSchema>;
 export type SendCompanyStatementsInput = z.infer<typeof sendCompanyStatementsSchema>;
 export type ReorderCompanyStatementsInput = z.infer<typeof reorderCompanyStatementsSchema>;
+export type CreatePostFromStatementInput = z.infer<typeof createPostFromStatementSchema>;
 
 // List followers of a company
 export const listCompanyFollowersSchema = z.object({

@@ -46,6 +46,8 @@ export interface Post {
   publishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  statementId?: string | null;
+  statementSnapshot?: any;
   createdBy?: {
     id: string;
     email: string;
@@ -107,6 +109,8 @@ function mapPostEntity(post: any): Post {
     publishedAt: post.publishedAt ?? undefined,
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
+    statementId: post.statementId ?? null,
+    statementSnapshot: post.statementSnapshot ?? null,
     createdBy: post.createdBy
       ? {
           id: post.createdBy.id,

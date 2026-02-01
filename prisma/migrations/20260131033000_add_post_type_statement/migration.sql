@@ -1,0 +1,2 @@
+-- Add STATEMENT to PostType enum
+ALTER TYPE "PostType" ADD VALUE IF NOT EXISTS 'STATEMENT';

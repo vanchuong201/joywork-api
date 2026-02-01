@@ -1243,9 +1243,9 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['listId', 'statements'],
+        required: ['statements'],
         properties: {
-          listId: { type: 'string', description: 'Verification list ID' },
+          listId: { type: 'string', description: 'Verification list ID (optional - if not provided, statement will be created without verification)' },
           statements: {
             type: 'array',
             items: {
@@ -1424,6 +1424,67 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       },
     },
   }, companiesController.reorderCompanyStatements.bind(companiesController));
+
+  // Create post from statement
+  fastify.post('/:companyId/statements/:statementId/create-post', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Create a post from a company statement',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+          statementId: { type: 'string', description: 'Statement ID' },
+        },
+        required: ['companyId', 'statementId'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: 'Additional content for the post (optional)' },
+          type: { type: 'string', enum: ['STORY', 'ANNOUNCEMENT', 'EVENT', 'STATEMENT'], default: 'STATEMENT', description: 'Post type' },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                post: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    companyId: { type: 'string' },
+                    title: { type: 'string' },
+                    content: { type: 'string' },
+                    statementId: { type: 'string', nullable: true },
+                    statementSnapshot: {
+                      type: 'object',
+                      nullable: true,
+                      additionalProperties: false,
+                      properties: {
+                        title: { type: 'string' },
+                        description: { type: 'string', nullable: true },
+                        percentYes: { type: 'number' },
+                        totalRecipients: { type: 'number' },
+                        yesCount: { type: 'number' },
+                        respondedCount: { type: 'number' },
+                        snapshotAt: { type: 'string', format: 'date-time' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.createPostFromStatement.bind(companiesController));
 
   // Public endpoints for statements verification (no auth)
   fastify.get('/public/:slug/statements/verify', {

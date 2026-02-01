@@ -121,9 +121,9 @@ export class JobsService {
 
     // Create job
     const deadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
-    // Force deadline to end of day if provided (using UTC to avoid timezone issues)
+    // Lưu deadline là 12:00 UTC của ngày đó để hiển thị đúng ngày ở mọi múi giờ (tránh 15/1 thành 16/1)
     if (deadline) {
-      deadline.setUTCHours(23, 59, 59, 999);
+      deadline.setUTCHours(12, 0, 0, 0);
     }
 
     const jobData: any = {
@@ -291,7 +291,7 @@ export class JobsService {
     if (data.applicationDeadline !== undefined) {
       if (data.applicationDeadline) {
         const deadline = new Date(data.applicationDeadline);
-        deadline.setUTCHours(23, 59, 59, 999);
+        deadline.setUTCHours(12, 0, 0, 0);
         updateData.applicationDeadline = deadline;
       } else {
         updateData.applicationDeadline = null;
@@ -672,10 +672,7 @@ export class JobsService {
       throw new AppError('Job is no longer active', 400, 'JOB_INACTIVE');
     }
 
-    // Check if application deadline has passed
-    if (job.applicationDeadline && job.applicationDeadline < new Date()) {
-      throw new AppError('Application deadline has passed', 400, 'DEADLINE_PASSED');
-    }
+    // Cho phép apply kể cả đã hết hạn (không chặn theo applicationDeadline)
 
     // Check if user has already applied
     const existingApplication = await prisma.application.findUnique({

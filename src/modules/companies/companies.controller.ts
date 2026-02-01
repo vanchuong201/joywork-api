@@ -11,6 +11,7 @@ import {
   updateCompanyProfileSchema,
   sendCompanyStatementsSchema,
   ReorderCompanyStatementsInput,
+  createPostFromStatementSchema,
 } from './companies.schema';
 import { z } from 'zod';
 
@@ -362,6 +363,21 @@ export class CompaniesController {
 
     return reply.send({
       data: result,
+    });
+  }
+
+  async createPostFromStatement(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId, statementId } = request.params as { companyId: string; statementId: string };
+    const data = createPostFromStatementSchema.parse(request.body);
+    
+    const post = await this.companiesService.createPostFromStatement(companyId, userId, {
+      ...data,
+      statementId,
+    });
+    
+    return reply.status(201).send({
+      data: { post },
     });
   }
 
