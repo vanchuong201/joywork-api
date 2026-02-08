@@ -66,8 +66,8 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           experienceLevel: { 
             type: 'string', 
-            enum: ['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE'],
-            default: 'MID',
+            enum: ['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10'],
+            default: 'NO_EXPERIENCE',
             description: 'Experience level required'
           },
           tags: { 
@@ -81,7 +81,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           department: { type: 'string', maxLength: 100, description: 'Department / Bộ phận' },
           jobLevel: { 
             type: 'string', 
-            enum: ['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE'],
+            enum: ['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE'],
             description: 'Job level / Cấp bậc'
           },
           educationLevel: { 
@@ -318,7 +318,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           experienceLevel: { 
             type: 'string', 
-            enum: ['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE'],
+            enum: ['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10'],
             description: 'Filter by experience level'
           },
           salaryMin: { type: 'number', minimum: 0, description: 'Minimum salary filter' },
@@ -790,7 +790,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           experienceLevel: { 
             type: 'string', 
-            enum: ['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE'],
+            enum: ['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10'],
             description: 'Experience level required'
           },
           tags: { 
@@ -802,17 +802,25 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           applicationDeadline: { type: 'string', format: 'date-time', nullable: true, description: 'Application deadline' },
           isActive: { type: 'boolean', description: 'Job is active' },
           department: { type: 'string', maxLength: 100, nullable: true, description: 'Department / Bộ phận' },
-          jobLevel: { 
-            type: 'string', 
-            enum: ['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE'],
-            nullable: true,
-            description: 'Job level / Cấp bậc'
+          jobLevel: {
+            anyOf: [
+              {
+                type: 'string',
+                enum: ['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE'],
+              },
+              { type: 'null' },
+            ],
+            description: 'Job level / Cấp bậc',
           },
-          educationLevel: { 
-            type: 'string', 
-            enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
-            nullable: true,
-            description: 'Education level / Học vấn'
+          educationLevel: {
+            anyOf: [
+              {
+                type: 'string',
+                enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
+              },
+              { type: 'null' },
+            ],
+            description: 'Education level / Học vấn',
           },
         },
       },

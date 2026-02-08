@@ -26,7 +26,7 @@ const jobTemplates = [
     salaryMax: 40000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'Backend Engineer (Node.js)',
@@ -42,7 +42,7 @@ const jobTemplates = [
     salaryMax: 35000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Product Manager',
@@ -58,7 +58,7 @@ const jobTemplates = [
     salaryMax: 50000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'UI/UX Designer',
@@ -74,7 +74,7 @@ const jobTemplates = [
     salaryMax: 30000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Data Engineer',
@@ -90,7 +90,7 @@ const jobTemplates = [
     salaryMax: 40000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'DevOps Engineer',
@@ -106,7 +106,7 @@ const jobTemplates = [
     salaryMax: 45000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'QA Engineer',
@@ -122,7 +122,7 @@ const jobTemplates = [
     salaryMax: 25000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'JUNIOR' as ExperienceLevel,
+    experienceLevel: 'Y1_2' as ExperienceLevel,
   },
   {
     title: 'Marketing Manager',
@@ -138,7 +138,7 @@ const jobTemplates = [
     salaryMax: 35000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Business Analyst',
@@ -154,7 +154,7 @@ const jobTemplates = [
     salaryMax: 28000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'HR Manager',
@@ -170,7 +170,7 @@ const jobTemplates = [
     salaryMax: 38000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'Mobile Developer (React Native)',
@@ -186,7 +186,7 @@ const jobTemplates = [
     salaryMax: 35000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Fullstack Developer',
@@ -202,7 +202,7 @@ const jobTemplates = [
     salaryMax: 30000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Sales Executive',
@@ -218,7 +218,7 @@ const jobTemplates = [
     salaryMax: 30000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'JUNIOR' as ExperienceLevel,
+    experienceLevel: 'Y1_2' as ExperienceLevel,
   },
   {
     title: 'Content Writer',
@@ -234,7 +234,7 @@ const jobTemplates = [
     salaryMax: 20000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'JUNIOR' as ExperienceLevel,
+    experienceLevel: 'Y1_2' as ExperienceLevel,
   },
   {
     title: 'Customer Success Manager',
@@ -250,7 +250,7 @@ const jobTemplates = [
     salaryMax: 35000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Finance Manager',
@@ -266,7 +266,7 @@ const jobTemplates = [
     salaryMax: 45000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'Intern - Software Engineering',
@@ -282,7 +282,7 @@ const jobTemplates = [
     salaryMax: 8000000,
     currency: 'VND',
     employmentType: 'INTERNSHIP' as EmploymentType,
-    experienceLevel: 'ENTRY' as ExperienceLevel,
+    experienceLevel: 'NO_EXPERIENCE' as ExperienceLevel,
   },
   {
     title: 'Lead Software Engineer',
@@ -298,7 +298,7 @@ const jobTemplates = [
     salaryMax: 60000000,
     currency: 'VND',
     employmentType: 'FULL_TIME' as EmploymentType,
-    experienceLevel: 'LEAD' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
   {
     title: 'Part-time Content Creator',
@@ -314,7 +314,7 @@ const jobTemplates = [
     salaryMax: 15000000,
     currency: 'VND',
     employmentType: 'PART_TIME' as EmploymentType,
-    experienceLevel: 'JUNIOR' as ExperienceLevel,
+    experienceLevel: 'Y1_2' as ExperienceLevel,
   },
   {
     title: 'Freelance Graphic Designer',
@@ -330,7 +330,7 @@ const jobTemplates = [
     salaryMax: 20000000,
     currency: 'VND',
     employmentType: 'FREELANCE' as EmploymentType,
-    experienceLevel: 'MID' as ExperienceLevel,
+    experienceLevel: 'Y2_3' as ExperienceLevel,
   },
   {
     title: 'Contract Project Manager',
@@ -346,7 +346,7 @@ const jobTemplates = [
     salaryMax: 40000000,
     currency: 'VND',
     employmentType: 'CONTRACT' as EmploymentType,
-    experienceLevel: 'SENIOR' as ExperienceLevel,
+    experienceLevel: 'Y5_10' as ExperienceLevel,
   },
 ];
 

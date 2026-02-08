@@ -10,13 +10,13 @@ export const createJobSchema = z.object({
   salaryMax: z.number().int().min(0).optional(),
   currency: z.string().length(3).default('VND'),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).default('FULL_TIME'),
-  experienceLevel: z.enum(['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE']).default('MID'),
+  experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).default('NO_EXPERIENCE'),
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional(),
   isActive: z.boolean().default(true),
   // Header fields
   department: z.string().max(100, 'Department must be less than 100 characters').optional(),
-  jobLevel: z.enum(['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE']).optional(),
+  jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional(),
   educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional(),
   
   // Required JD fields (rich text/markdown)
@@ -47,13 +47,13 @@ export const updateJobSchema = z.object({
   salaryMax: z.number().int().min(0).optional().nullable(),
   currency: z.string().length(3).optional().nullable(),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
-  experienceLevel: z.enum(['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE']).optional(),
+  experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).optional(),
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional().nullable(),
   isActive: z.boolean().optional(),
   // Header fields
   department: z.string().max(100, 'Department must be less than 100 characters').optional().nullable(),
-  jobLevel: z.enum(['STAFF', 'TEAM_LEAD', 'SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE']).optional().nullable(),
+  jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional().nullable(),
   educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional().nullable(),
   
   // Required JD fields (rich text/markdown)
@@ -85,7 +85,7 @@ export const searchJobsSchema = z.object({
   location: z.string().optional(),
   remote: z.coerce.boolean().optional(),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
-  experienceLevel: z.enum(['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'LEAD', 'EXECUTIVE']).optional(),
+  experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).optional(),
   salaryMin: z.coerce.number().int().min(0).optional(),
   salaryMax: z.coerce.number().int().min(0).optional(),
   skills: z.string().optional(), // Comma-separated skills
