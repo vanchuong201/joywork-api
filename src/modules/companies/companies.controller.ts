@@ -335,6 +335,20 @@ export class CompaniesController {
     });
   }
 
+  async deleteCompanyStatement(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { companyId, statementId } = request.params as {
+      companyId: string;
+      statementId: string;
+    };
+
+    const result = await this.companiesService.deleteCompanyStatement(companyId, userId, statementId);
+
+    return reply.send({
+      data: result,
+    });
+  }
+
   // Public verification flows
   async getStatementsForVerificationView(
     request: FastifyRequest,

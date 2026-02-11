@@ -1340,6 +1340,37 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     },
   }, companiesController.getCompanyStatements.bind(companiesController));
 
+  // Delete statement (statements are immutable; delete + recreate instead)
+  fastify.delete('/:companyId/statements/:statementId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Delete a company statement',
+      tags: ['Companies'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          companyId: { type: 'string', description: 'Company ID' },
+          statementId: { type: 'string', description: 'Statement ID' },
+        },
+        required: ['companyId', 'statementId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.deleteCompanyStatement.bind(companiesController));
+
   // Update statement (e.g. toggle isPublic)
   fastify.patch('/:companyId/statements/:statementId', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],

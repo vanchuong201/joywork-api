@@ -1666,33 +1666,38 @@ export class CompaniesService {
   }
 
   async updateCompanyStatement(
-    companyId: string,
-    userId: string,
-    statementId: string,
-    data: { isPublic?: boolean },
+    _companyId: string,
+    _userId: string,
+    _statementId: string,
+    _data: { isPublic?: boolean },
   ) {
+    // Business rule: statements are immutable after creation.
+    // If a company needs to change anything, they must delete and create a new statement.
+    throw new AppError(
+      'Tuyên bố đã tạo không thể chỉnh sửa. Vui lòng xóa và tạo tuyên bố mới.',
+      400,
+      'STATEMENT_IMMUTABLE',
+    );
+  }
+
+  async deleteCompanyStatement(companyId: string, userId: string, statementId: string) {
     await this.ensureAdminOrOwner(userId, companyId);
 
-    const stmt = await prisma.companyStatement.findUnique({
-      where: { id: statementId },
-      select: { id: true, companyId: true },
+    const stmt = await prisma.companyStatement.findFirst({
+      where: { id: statementId, companyId },
+      select: { id: true },
     });
 
-    if (!stmt || stmt.companyId !== companyId) {
+    if (!stmt) {
       throw new AppError('Statement not found', 404, 'STATEMENT_NOT_FOUND');
     }
 
-    const updated = await prisma.companyStatement.update({
+    // Deleting a statement will cascade-delete recipients and set related posts.statementId to NULL
+    await prisma.companyStatement.delete({
       where: { id: statementId },
-      data: {
-        ...(typeof data.isPublic === 'boolean' ? { isPublic: data.isPublic } : {}),
-      },
     });
 
-    return {
-      id: updated.id,
-      isPublic: updated.isPublic,
-    };
+    return { id: statementId };
   }
 
   // =========================
@@ -1863,22 +1868,16 @@ export class CompaniesService {
   }
 
   async reorderCompanyStatements(
-    companyId: string,
-    userId: string,
-    orders: { id: string; order: number }[],
+    _companyId: string,
+    _userId: string,
+    _orders: { id: string; order: number }[],
   ) {
-    await this.ensureAdminOrOwner(userId, companyId);
-
-    const transaction = orders.map((item) =>
-      prisma.companyStatement.update({
-        where: { id: item.id, companyId },
-        data: { order: item.order },
-      }),
+    // Business rule: statements are immutable after creation (including reordering).
+    throw new AppError(
+      'Tuyên bố đã tạo không thể chỉnh sửa. Vui lòng xóa và tạo tuyên bố mới.',
+      400,
+      'STATEMENT_IMMUTABLE',
     );
-
-    await prisma.$transaction(transaction);
-
-    return { success: true };
   }
 
   async getPublicCompanyStatements(slug: string) {
