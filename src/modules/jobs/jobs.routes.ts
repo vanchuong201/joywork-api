@@ -709,6 +709,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                         properties: {
                           id: { type: 'string' },
                           title: { type: 'string' },
+                          isActive: { type: 'boolean' },
                           location: { type: 'string', nullable: true },
                           remote: { type: 'boolean' },
                           employmentType: { type: 'string' },

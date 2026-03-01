@@ -1014,6 +1014,7 @@ export class JobsService {
         job: {
           id: fav.job.id,
           title: fav.job.title,
+          isActive: fav.job.isActive,
           ...(fav.job.location ? { location: fav.job.location } : {}),
           remote: fav.job.remote,
           employmentType: fav.job.employmentType,
