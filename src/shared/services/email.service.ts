@@ -21,7 +21,7 @@ const sesClient = hasValidAwsCredentials
 class EmailService {
   private getFromAddress(): string {
     const fromEmail = config.EMAIL_SENDER || config.EMAIL_FROM || 'noreply@joywork.vn';
-    const fromName = config.FROM_NAME || 'JoyWork';
+    const fromName = config.FROM_NAME || 'JOYWORK';
     return `${fromName} <${fromEmail}>`;
   }
 
@@ -119,7 +119,7 @@ class EmailService {
     verificationUrl: string,
   ): Promise<void> {
     const userName = name || 'bạn';
-    const subject = 'Chào mừng bạn đến với JOYWork! Xác nhận email của bạn ngay';
+    const subject = 'Chào mừng bạn đến với JOYWORK! Xác nhận email của bạn ngay';
 
     const html = `
 <!DOCTYPE html>
@@ -127,33 +127,33 @@ class EmailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xác nhận email - JOYWork</title>
+  <title>Xác nhận email - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px;">
-    <h1 style="color: #ff6b00; margin-bottom: 20px;">Chào mừng đến với JOYWork!</h1>
+    <h1 style="color: #295892; margin-bottom: 20px;">Chào mừng đến với JOYWORK!</h1>
     
     <p>Chào ${userName},</p>
     
-    <p>Chúng tôi rất vui mừng chào đón bạn đến với JOYWork – nơi bạn có thể giúp Doanh nghiệp của mình xây dựng hồ sơ xuất sắc hoặc khám phá và kết nối với các nhà tuyển dụng phù hợp.</p>
+    <p>Chúng tôi rất vui mừng chào đón bạn đến với JOYWORK – nơi bạn có thể giúp Doanh nghiệp của mình xây dựng hồ sơ xuất sắc hoặc khám phá và kết nối với các nhà tuyển dụng phù hợp.</p>
     
     <p style="margin: 30px 0;">
-      Hãy <strong><u><a href="${verificationUrl}" style="color: #ff6b00; text-decoration: underline;">Xác nhận Email</a></u></strong> của bạn để kích hoạt tài khoản.
+      Hãy <strong><u><a href="${verificationUrl}" style="color: #295892; text-decoration: underline;">Xác nhận Email</a></u></strong> của bạn để kích hoạt tài khoản.
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${verificationUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xác nhận Email</a>
+      <a href="${verificationUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xác nhận Email</a>
     </div>
     
-    <p>Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWork ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.</p>
+    <p>Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWORK ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.</p>
     
-    <p>Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một <u><a href="https://momtech-docs.gitbook.io/joywork/" style="color: #ff6b00;">Tài liệu</a></u> <strong>Hướng dẫn sử dụng JOYWork</strong>.</p>
+    <p>Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một <u><a href="https://momtech-docs.gitbook.io/joywork/" style="color: #295892;">Tài liệu</a></u> <strong>Hướng dẫn sử dụng JOYWORK</strong>.</p>
     
     <p>Chúng tôi rất mong bạn sẽ có những trải nghiệm tuyệt vời trên nền tảng!</p>
     
     <p style="margin-top: 30px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -167,22 +167,22 @@ class EmailService {
     `;
 
     const text = `
-Chào mừng đến với JOYWork!
+Chào mừng đến với JOYWORK!
 
 Chào ${userName},
 
-Chúng tôi rất vui mừng chào đón bạn đến với JOYWork – nơi bạn có thể giúp Doanh nghiệp của mình xây dựng hồ sơ xuất sắc hoặc khám phá và kết nối với các nhà tuyển dụng phù hợp.
+Chúng tôi rất vui mừng chào đón bạn đến với JOYWORK – nơi bạn có thể giúp Doanh nghiệp của mình xây dựng hồ sơ xuất sắc hoặc khám phá và kết nối với các nhà tuyển dụng phù hợp.
 
 Hãy Xác nhận Email của bạn để kích hoạt tài khoản: ${verificationUrl}
 
-Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWork ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.
+Sau khi xác nhận, bạn có thể bắt đầu sử dụng JOYWORK ngay lập tức và trải nghiệm các tính năng cơ bản của chúng tôi.
 
-Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một Tài liệu Hướng dẫn sử dụng JOYWork.
+Để giúp bạn làm quen nhanh với nền tảng, chúng tôi đã chuẩn bị một Tài liệu Hướng dẫn sử dụng JOYWORK.
 
 Chúng tôi rất mong bạn sẽ có những trải nghiệm tuyệt vời trên nền tảng!
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -199,7 +199,7 @@ Trân trọng,
     resetUrl: string,
   ): Promise<void> {
     const userName = name || 'bạn';
-    const subject = 'Đặt lại mật khẩu JOYWork';
+    const subject = 'Đặt lại mật khẩu JOYWORK';
 
     const html = `
 <!DOCTYPE html>
@@ -207,22 +207,22 @@ Trân trọng,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đặt lại mật khẩu - JOYWork</title>
+  <title>Đặt lại mật khẩu - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px;">
-    <h1 style="color: #ff6b00; margin-bottom: 20px;">Đặt lại mật khẩu</h1>
+    <h1 style="color: #295892; margin-bottom: 20px;">Đặt lại mật khẩu</h1>
     
     <p>Chào ${userName},</p>
     
-    <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản JOYWork của bạn.</p>
+    <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản JOYWORK của bạn.</p>
     
     <p style="margin: 30px 0;">
       Nhấn vào nút bên dưới để đặt lại mật khẩu của bạn:
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${resetUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Đặt lại mật khẩu</a>
+      <a href="${resetUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Đặt lại mật khẩu</a>
     </div>
     
     <p>Hoặc sao chép và dán link sau vào trình duyệt:</p>
@@ -234,7 +234,7 @@ Trân trọng,
     
     <p style="margin-top: 30px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -248,18 +248,18 @@ Trân trọng,
     `;
 
     const text = `
-Đặt lại mật khẩu JOYWork
+Đặt lại mật khẩu JOYWORK
 
 Chào ${userName},
 
-Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản JOYWork của bạn.
+Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản JOYWORK của bạn.
 
 Nhấn vào link sau để đặt lại mật khẩu: ${resetUrl}
 
 Lưu ý: Link này sẽ hết hạn sau 1 giờ. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -281,7 +281,7 @@ Trân trọng,
       ticketUrl: string;
     },
   ): Promise<void> {
-    const subject = `[JOYWork] Ticket mới từ ứng viên: ${payload.title}`;
+    const subject = `[JOYWORK] Ticket mới từ ứng viên: ${payload.title}`;
     const ownerLabel = payload.ownerName ?? 'bạn';
     const applicantLabel = payload.applicantName ?? payload.applicantEmail;
 
@@ -294,12 +294,12 @@ Trân trọng,
   <p>Bạn vừa nhận được một ticket mới từ <strong>${applicantLabel}</strong>.</p>
   <p><strong>Tiêu đề:</strong> ${payload.title}</p>
   <p><strong>Nội dung:</strong></p>
-  <blockquote style="border-left: 4px solid #ff6b00; margin: 16px 0; padding-left: 12px;">
+  <blockquote style="border-left: 4px solid #295892; margin: 16px 0; padding-left: 12px;">
     ${payload.content.replace(/\n/g, '<br />')}
   </blockquote>
   <p>Bấm vào đường dẫn sau để trả lời ticket:</p>
-  <p><a href="${payload.ticketUrl}" style="color: #ff6b00;">${payload.ticketUrl}</a></p>
-  <p>Trân trọng,<br/>Đội ngũ JOYWork</p>
+  <p><a href="${payload.ticketUrl}" style="color: #295892;">${payload.ticketUrl}</a></p>
+  <p>Trân trọng,<br/>Đội ngũ JOYWORK</p>
 </body>
 </html>
 `;
@@ -333,7 +333,7 @@ Trả lời ticket tại: ${payload.ticketUrl}
       ticketUrl: string;
     },
   ): Promise<void> {
-    const subject = `[JOYWork] ${payload.companyName} đã phản hồi ticket của bạn`;
+    const subject = `[JOYWORK] ${payload.companyName} đã phản hồi ticket của bạn`;
 
     const html = `
 <!DOCTYPE html>
@@ -343,11 +343,11 @@ Trả lời ticket tại: ${payload.ticketUrl}
   <p>Chào bạn,</p>
   <p>Doanh nghiệp <strong>${payload.companyName}</strong> vừa phản hồi ticket <em>${payload.title}</em>.</p>
   <p><strong>Nội dung:</strong></p>
-  <blockquote style="border-left: 4px solid #ff6b00; margin: 16px 0; padding-left: 12px;">
+  <blockquote style="border-left: 4px solid #295892; margin: 16px 0; padding-left: 12px;">
     ${payload.content.replace(/\n/g, '<br />')}
   </blockquote>
-  <p>Bạn có thể xem và trả lời tại: <a href="${payload.ticketUrl}" style="color: #ff6b00;">${payload.ticketUrl}</a></p>
-  <p>Trân trọng,<br/>Đội ngũ JOYWork</p>
+  <p>Bạn có thể xem và trả lời tại: <a href="${payload.ticketUrl}" style="color: #295892;">${payload.ticketUrl}</a></p>
+  <p>Trân trọng,<br/>Đội ngũ JOYWORK</p>
 </body>
 </html>
 `;
@@ -378,7 +378,7 @@ Xem chi tiết tại: ${payload.ticketUrl}
     role: string,
     acceptUrl: string
   ): Promise<void> {
-    const subject = `Lời mời tham gia ${companyName} trên JOYWork`;
+    const subject = `Lời mời tham gia ${companyName} trên JOYWORK`;
     
     const roleText = role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên';
 
@@ -388,38 +388,38 @@ Xem chi tiết tại: ${payload.ticketUrl}
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lời mời tham gia Doanh nghiệp - JOYWork</title>
+  <title>Lời mời tham gia Doanh nghiệp - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
-    <h2 style="color: #ff6b00; margin-bottom: 20px;">Lời mời tham gia ${companyName}</h2>
+    <h2 style="color: #295892; margin-bottom: 20px;">Lời mời tham gia ${companyName}</h2>
     
     <p>Chào bạn,</p>
     
-    <p><strong>${inviterName}</strong> đã mời bạn tham gia vào đội ngũ của <strong>${companyName}</strong> trên JOYWork với vai trò <strong>${roleText}</strong>.</p>
+    <p><strong>${inviterName}</strong> đã mời bạn tham gia vào đội ngũ của <strong>${companyName}</strong> trên JOYWORK với vai trò <strong>${roleText}</strong>.</p>
     
     <p>Nếu bạn chấp nhận lời mời này, hãy nhấn vào nút bên dưới để tham gia ngay:</p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${acceptUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Chấp nhận lời mời</a>
+      <a href="${acceptUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Chấp nhận lời mời</a>
     </div>
 
     <p style="font-size: 14px; color: #666;">
         Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
-        <a href="${acceptUrl}" style="color: #ff6b00;">${acceptUrl}</a>
+        <a href="${acceptUrl}" style="color: #295892;">${acceptUrl}</a>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     
     <p style="font-size: 13px; color: #999;">
       <strong>Lưu ý:</strong><br/>
-      - Nếu bạn chưa có tài khoản JOYWork với email <strong>${to}</strong>, bạn sẽ được yêu cầu đăng ký tài khoản mới.<br/>
+      - Nếu bạn chưa có tài khoản JOYWORK với email <strong>${to}</strong>, bạn sẽ được yêu cầu đăng ký tài khoản mới.<br/>
       - Nếu bạn không muốn tham gia hoặc cho rằng đây là nhầm lẫn, vui lòng bỏ qua email này.
     </p>
 
     <p style="margin-top: 20px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
   </div>
 </body>
@@ -427,21 +427,21 @@ Xem chi tiết tại: ${payload.ticketUrl}
     `;
 
     const text = `
-Lời mời tham gia ${companyName} trên JOYWork
+Lời mời tham gia ${companyName} trên JOYWORK
 
 Chào bạn,
 
-${inviterName} đã mời bạn tham gia vào đội ngũ của ${companyName} trên JOYWork với vai trò ${roleText}.
+${inviterName} đã mời bạn tham gia vào đội ngũ của ${companyName} trên JOYWORK với vai trò ${roleText}.
 
 Để chấp nhận lời mời, vui lòng truy cập đường dẫn sau:
 ${acceptUrl}
 
 Lưu ý:
-- Nếu bạn chưa có tài khoản JOYWork với email ${to}, bạn sẽ được yêu cầu đăng ký tài khoản mới.
+- Nếu bạn chưa có tài khoản JOYWORK với email ${to}, bạn sẽ được yêu cầu đăng ký tài khoản mới.
 - Nếu bạn không muốn tham gia, vui lòng bỏ qua email này.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -462,7 +462,7 @@ Trân trọng,
     },
   ): Promise<void> {
     const displayName = payload.contactName || 'bạn';
-    const subject = `[JOYWork] Xác thực các cam kết từ ${payload.companyName}`;
+    const subject = `[JOYWORK] Xác thực các cam kết từ ${payload.companyName}`;
 
     const statementsHtml = payload.statements
       .map((s) => {
@@ -494,7 +494,7 @@ Trân trọng,
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Xác thực cam kết doanh nghiệp - JOYWork</title>
+    <title>Xác thực cam kết doanh nghiệp - JOYWORK</title>
   </head>
   <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px; background-color:#f9fafb;">
     <div style="background-color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb;">
@@ -510,20 +510,20 @@ Trân trọng,
       </ul>
       <p>Để xác thực, vui lòng bấm vào nút bên dưới và lựa chọn <strong>Đúng / Không đúng</strong> cho từng cam kết.</p>
       <div style="text-align:center; margin: 24px 0;">
-        <a href="${payload.verifyUrl}" style="display:inline-block; padding: 10px 24px; background-color:#ff6b00; color:#ffffff; border-radius:999px; text-decoration:none; font-weight:600;">
+        <a href="${payload.verifyUrl}" style="display:inline-block; padding: 10px 24px; background-color:#295892; color:#ffffff; border-radius:999px; text-decoration:none; font-weight:600;">
           Xác thực các cam kết
         </a>
       </div>
       <p style="font-size:13px; color:#6b7280;">
         Nếu nút trên không hoạt động, hãy sao chép đường dẫn sau và dán vào trình duyệt của bạn:<br/>
-        <a href="${payload.verifyUrl}" style="color:#ff6b00;">${payload.verifyUrl}</a>
+        <a href="${payload.verifyUrl}" style="color:#295892;">${payload.verifyUrl}</a>
       </p>
       <p style="font-size:12px; color:#9ca3af; margin-top:24px;">
         Lưu ý: Thời gian xác thực tối đa là 3 ngày kể từ khi nhận được email này. Sau thời gian trên, liên kết có thể hết hiệu lực.
       </p>
       <p style="margin-top:24px;">
         Trân trọng,<br/>
-        <strong>Đội ngũ JOYWork</strong>
+        <strong>Đội ngũ JOYWORK</strong>
       </p>
     </div>
   </body>
@@ -543,7 +543,7 @@ ${payload.verifyUrl}
 Lưu ý: Thời gian xác thực tối đa là 3 ngày kể từ khi nhận được email này.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -563,7 +563,7 @@ Trân trọng,
     },
   ): Promise<void> {
     const ownerLabel = payload.ownerName || 'bạn';
-    const subject = `[JOYWork] Đã nhận hồ sơ xác thực DKKD của ${payload.companyName}`;
+    const subject = `[JOYWORK] Đã nhận hồ sơ xác thực DKKD của ${payload.companyName}`;
 
     const html = `
 <!DOCTYPE html>
@@ -571,29 +571,29 @@ Trân trọng,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xác thực DKKD - JOYWork</title>
+  <title>Xác thực DKKD - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
-    <h2 style="color: #ff6b00; margin-bottom: 20px;">Đã nhận hồ sơ xác thực DKKD</h2>
+    <h2 style="color: #295892; margin-bottom: 20px;">Đã nhận hồ sơ xác thực DKKD</h2>
     
     <p>Chào ${ownerLabel},</p>
     
     <p>Chúng tôi đã nhận được hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp <strong>${payload.companyName}</strong>.</p>
     
-    <p>Đội ngũ vận hành JOYWork sẽ xem xét và phê duyệt hồ sơ của bạn trong thời gian sớm nhất. Kết quả xác thực sẽ được gửi về email này.</p>
+    <p>Đội ngũ vận hành JOYWORK sẽ xem xét và phê duyệt hồ sơ của bạn trong thời gian sớm nhất. Kết quả xác thực sẽ được gửi về email này.</p>
     
     <p style="margin: 30px 0;">
       Bạn có thể theo dõi trạng thái xác thực tại trang quản lý doanh nghiệp:
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem trạng thái xác thực</a>
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem trạng thái xác thực</a>
     </div>
 
     <p style="font-size: 14px; color: #666;">
         Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
-        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+        <a href="${payload.manageUrl}" style="color: #295892;">${payload.manageUrl}</a>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -601,12 +601,12 @@ Trân trọng,
     <p style="font-size: 13px; color: #999;">
       <strong>Lưu ý:</strong><br/>
       - Thời gian xử lý thông thường là 1-3 ngày làm việc.<br/>
-      - Nếu cần hỗ trợ, vui lòng liên hệ đội ngũ JOYWork.
+      - Nếu cần hỗ trợ, vui lòng liên hệ đội ngũ JOYWORK.
     </p>
 
     <p style="margin-top: 20px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
   </div>
 </body>
@@ -620,14 +620,14 @@ Chào ${ownerLabel},
 
 Chúng tôi đã nhận được hồ sơ xác thực Giấy đăng ký kinh doanh (DKKD) của doanh nghiệp ${payload.companyName}.
 
-Đội ngũ vận hành JOYWork sẽ xem xét và phê duyệt hồ sơ của bạn trong thời gian sớm nhất. Kết quả xác thực sẽ được gửi về email này.
+Đội ngũ vận hành JOYWORK sẽ xem xét và phê duyệt hồ sơ của bạn trong thời gian sớm nhất. Kết quả xác thực sẽ được gửi về email này.
 
 Theo dõi trạng thái xác thực tại: ${payload.manageUrl}
 
 Lưu ý: Thời gian xử lý thông thường là 1-3 ngày làm việc.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -647,7 +647,7 @@ Trân trọng,
     },
   ): Promise<void> {
     const ownerLabel = payload.ownerName || 'bạn';
-    const subject = `[JOYWork] Xác thực DKKD thành công - ${payload.companyName}`;
+    const subject = `[JOYWORK] Xác thực DKKD thành công - ${payload.companyName}`;
 
     const html = `
 <!DOCTYPE html>
@@ -655,7 +655,7 @@ Trân trọng,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xác thực thành công - JOYWork</title>
+  <title>Xác thực thành công - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
@@ -675,12 +675,12 @@ Trân trọng,
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Quản lý doanh nghiệp</a>
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Quản lý doanh nghiệp</a>
     </div>
 
     <p style="font-size: 14px; color: #666;">
         Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
-        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+        <a href="${payload.manageUrl}" style="color: #295892;">${payload.manageUrl}</a>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -693,7 +693,7 @@ Trân trọng,
 
     <p style="margin-top: 20px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
   </div>
 </body>
@@ -714,7 +714,7 @@ Quản lý doanh nghiệp tại: ${payload.manageUrl}
 Lưu ý: Nếu bạn thay đổi tên pháp lý đầy đủ của doanh nghiệp, bạn sẽ cần xác thực lại.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -735,7 +735,7 @@ Trân trọng,
     },
   ): Promise<void> {
     const ownerLabel = payload.ownerName || 'bạn';
-    const subject = `[JOYWork] Yêu cầu bổ sung hồ sơ xác thực DKKD - ${payload.companyName}`;
+    const subject = `[JOYWORK] Yêu cầu bổ sung hồ sơ xác thực DKKD - ${payload.companyName}`;
 
     const html = `
 <!DOCTYPE html>
@@ -743,7 +743,7 @@ Trân trọng,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yêu cầu bổ sung hồ sơ - JOYWork</title>
+  <title>Yêu cầu bổ sung hồ sơ - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
@@ -776,12 +776,12 @@ Trân trọng,
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Tải lại hồ sơ xác thực</a>
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Tải lại hồ sơ xác thực</a>
     </div>
 
     <p style="font-size: 14px; color: #666;">
         Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
-        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+        <a href="${payload.manageUrl}" style="color: #295892;">${payload.manageUrl}</a>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -789,12 +789,12 @@ Trân trọng,
     <p style="font-size: 13px; color: #999;">
       <strong>Lưu ý:</strong><br/>
       - Sau khi tải lại hồ sơ, đội ngũ vận hành sẽ xem xét lại trong 1-3 ngày làm việc.<br/>
-      - Nếu cần hỗ trợ, vui lòng liên hệ đội ngũ JOYWork.
+      - Nếu cần hỗ trợ, vui lòng liên hệ đội ngũ JOYWORK.
     </p>
 
     <p style="margin-top: 20px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
   </div>
 </body>
@@ -817,7 +817,7 @@ Tải lại hồ sơ xác thực tại: ${payload.manageUrl}
 Lưu ý: Sau khi tải lại hồ sơ, đội ngũ vận hành sẽ xem xét lại trong 1-3 ngày làm việc.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({
@@ -838,7 +838,7 @@ Trân trọng,
     },
   ): Promise<void> {
     const ownerLabel = payload.ownerName || 'bạn';
-    const subject = `[JOYWork] Yêu cầu xác thực lại DKKD - ${payload.companyName}`;
+    const subject = `[JOYWORK] Yêu cầu xác thực lại DKKD - ${payload.companyName}`;
 
     const html = `
 <!DOCTYPE html>
@@ -846,7 +846,7 @@ Trân trọng,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yêu cầu xác thực lại - JOYWork</title>
+  <title>Yêu cầu xác thực lại - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
@@ -868,12 +868,12 @@ Trân trọng,
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #ff6b00; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Tải hồ sơ DKKD mới</a>
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Tải hồ sơ DKKD mới</a>
     </div>
 
     <p style="font-size: 14px; color: #666;">
         Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
-        <a href="${payload.manageUrl}" style="color: #ff6b00;">${payload.manageUrl}</a>
+        <a href="${payload.manageUrl}" style="color: #295892;">${payload.manageUrl}</a>
     </p>
     
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -887,7 +887,7 @@ Trân trọng,
 
     <p style="margin-top: 20px;">
       Trân trọng,<br>
-      <strong>Đội ngũ JOYWork</strong>
+      <strong>Đội ngũ JOYWORK</strong>
     </p>
   </div>
 </body>
@@ -913,7 +913,7 @@ Lưu ý:
 - Kết quả xác thực sẽ được gửi về email này.
 
 Trân trọng,
-Đội ngũ JOYWork
+Đội ngũ JOYWORK
     `;
 
     await this.sendEmail({

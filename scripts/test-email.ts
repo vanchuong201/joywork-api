@@ -57,10 +57,10 @@ async function testEmail() {
     },
   });
 
-  const fromAddress = `${config.FROM_NAME || 'JoyWork'} <${config.EMAIL_FROM}>`;
+  const fromAddress = `${config.FROM_NAME || 'JOYWORK'} <${config.EMAIL_FROM}>`;
 
   // Test email content
-  const testSubject = 'Test Email từ JOYWork';
+  const testSubject = 'Test Email từ JOYWORK';
   const testHtml = `
 <!DOCTYPE html>
 <html>
@@ -69,7 +69,7 @@ async function testEmail() {
   <title>Test Email</title>
 </head>
 <body style="font-family: Arial, sans-serif; padding: 20px;">
-  <h1 style="color: #ff6b00;">Đây là email test từ JOYWork</h1>
+  <h1 style="color: #295892;">Đây là email test từ JOYWORK</h1>
   <p>Nếu bạn nhận được email này, nghĩa là AWS SES đã được cấu hình đúng!</p>
   <p>Thời gian gửi: ${new Date().toLocaleString('vi-VN')}</p>
 </body>
@@ -77,7 +77,7 @@ async function testEmail() {
   `;
 
   const testText = `
-Đây là email test từ JOYWork
+Đây là email test từ JOYWORK
 
 Nếu bạn nhận được email này, nghĩa là AWS SES đã được cấu hình đúng!
 

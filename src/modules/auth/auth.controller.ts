@@ -416,7 +416,7 @@ export class AuthController {
   <body>
     <div class="card">
       <div class="title">Nhập email của bạn</div>
-      <p class="desc">Facebook không cung cấp email. Vui lòng nhập email để tạo tài khoản JoyWork.</p>
+      <p class="desc">Facebook không cung cấp email. Vui lòng nhập email để tạo tài khoản JOYWORK.</p>
       <form method="POST" action="${config.API_PUBLIC_URL}/api/auth/facebook/complete">
         <input type="hidden" name="token" value="${tokenForComplete}" />
         <label for="email">Email</label>
