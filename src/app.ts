@@ -40,14 +40,35 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Register plugins
   await app.register(cookie);
+
+  const allowedOrigins = new Set<string>([config.FRONTEND_ORIGIN]);
+
+  const isDevelopmentLocalOrigin = (origin: string): boolean => {
+    if (config.NODE_ENV !== 'development') return false;
+
+    try {
+      const parsed = new URL(origin);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+
+      const hostname = parsed.hostname;
+      const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(hostname);
+      const is192Range = /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname);
+      const is10Range = /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+      const is172Range = /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
+      return isLoopback || is192Range || is10Range || is172Range;
+    } catch {
+      return false;
+    }
+  };
   
   await app.register(cors, {
     origin: (origin, cb) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return cb(null, true);
       
-      // Check if origin matches frontend URL
-      if (origin === config.FRONTEND_ORIGIN) {
+      // Allow configured frontend origin and local/LAN origins in development.
+      if (allowedOrigins.has(origin) || isDevelopmentLocalOrigin(origin)) {
         return cb(null, true);
       }
       

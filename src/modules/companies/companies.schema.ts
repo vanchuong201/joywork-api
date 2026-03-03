@@ -47,6 +47,20 @@ const highlightsSchema = z.array(
   }),
 );
 
+const trainingProgramSchema = z.object({
+  title: z.string().max(120, 'Program title must be less than 120 characters').optional(),
+  desc: z.string().max(500, 'Program description must be less than 500 characters').optional(),
+});
+
+const trainingSectionSchema = z.object({
+  description: z.string().max(5000, 'Training/introduction description must be less than 5000 characters').optional(),
+  image: z.string().url('Invalid training/introduction image URL').optional(),
+  workforceSize: z.string().max(120, 'Workforce size must be less than 120 characters').optional(),
+  // Keep for backward compatibility with old payloads
+  budget: z.string().max(120, 'Training budget must be less than 120 characters').optional(),
+  programs: z.array(trainingProgramSchema).optional(),
+});
+
 // Helper để chấp nhận empty string hoặc null cho các trường optional
 // Nếu là empty string hoặc null thì không validate format, nếu có giá trị thì validate
 const optionalString = (maxLength?: number) => 
@@ -160,7 +174,7 @@ export const updateCompanyProfileSchema = z.object({
   hrJourney: z.any().optional(),
   careerPath: z.any().optional(),
   salaryAndBonus: z.any().optional(),
-  training: z.any().optional(),
+  training: trainingSectionSchema.optional(),
   leaders: z.any().optional(),
   story: z.any().optional(),
   culture: z.any().optional(),

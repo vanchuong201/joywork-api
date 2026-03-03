@@ -35,7 +35,7 @@ async function testEmail() {
   // npm run test:email -- vanchuong201@gmail.com
   // process.argv sẽ là: ['node', 'script.ts', '--', 'vanchuong201@gmail.com']
   // hoặc: ['tsx', 'script.ts', 'vanchuong201@gmail.com']
-  let testEmail = 'test@example.com';
+  let testEmail = 'vanchuong201@gmail.com';
   
   // Tìm email trong arguments (sau -- hoặc trực tiếp)
   const args = process.argv.slice(2);

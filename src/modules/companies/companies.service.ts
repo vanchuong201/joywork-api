@@ -101,7 +101,16 @@ export interface CompanyProfile {
   hrJourney?: any;
   careerPath?: any;
   salaryAndBonus?: any;
-  training?: any;
+  training?: {
+    description?: string;
+    image?: string;
+    workforceSize?: string;
+    budget?: string;
+    programs?: Array<{
+      title?: string;
+      desc?: string;
+    }>;
+  };
   leaders?: any;
   story?: any;
   culture?: any;
