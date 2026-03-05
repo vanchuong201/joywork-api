@@ -175,6 +175,11 @@ export const updateCompanyProfileSchema = z.object({
   careerPath: z.any().optional(),
   salaryAndBonus: z.any().optional(),
   training: trainingSectionSchema.optional(),
+  gallery: z.array(z.object({
+    url: z.string(),
+    type: z.enum(['image', 'video']),
+    caption: z.string().max(200).optional(),
+  })).optional(),
   leaders: z.any().optional(),
   story: z.any().optional(),
   culture: z.any().optional(),

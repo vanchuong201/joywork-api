@@ -111,6 +111,7 @@ export interface CompanyProfile {
       desc?: string;
     }>;
   };
+  gallery?: Array<{ url: string; type: 'image' | 'video'; caption?: string }>;
   leaders?: any;
   story?: any;
   culture?: any;
@@ -582,6 +583,7 @@ export class CompaniesService {
             ? { salaryAndBonus: company.profile.salaryAndBonus as any }
             : {}),
           ...(company.profile.training != null ? { training: company.profile.training as any } : {}),
+          ...(company.profile.gallery != null ? { gallery: company.profile.gallery as any } : {}),
           ...(company.profile.leaders != null ? { leaders: company.profile.leaders as any } : {}),
           ...(company.profile.story != null ? { story: company.profile.story as any } : {}),
           ...(company.profile.culture != null ? { culture: company.profile.culture as any } : {}),
@@ -1675,18 +1677,36 @@ export class CompaniesService {
   }
 
   async updateCompanyStatement(
-    _companyId: string,
-    _userId: string,
-    _statementId: string,
-    _data: { isPublic?: boolean },
+    companyId: string,
+    userId: string,
+    statementId: string,
+    data: { isPublic?: boolean },
   ) {
-    // Business rule: statements are immutable after creation.
-    // If a company needs to change anything, they must delete and create a new statement.
-    throw new AppError(
-      'Tuyên bố đã tạo không thể chỉnh sửa. Vui lòng xóa và tạo tuyên bố mới.',
-      400,
-      'STATEMENT_IMMUTABLE',
-    );
+    if (data.isPublic === undefined) {
+      throw new AppError(
+        'Tuyên bố đã tạo không thể chỉnh sửa nội dung. Chỉ có thể bật/tắt hiển thị công khai.',
+        400,
+        'STATEMENT_IMMUTABLE',
+      );
+    }
+
+    await this.ensureAdminOrOwner(userId, companyId);
+
+    const stmt = await prisma.companyStatement.findFirst({
+      where: { id: statementId, companyId },
+      select: { id: true },
+    });
+
+    if (!stmt) {
+      throw new AppError('Statement not found', 404, 'STATEMENT_NOT_FOUND');
+    }
+
+    const updated = await prisma.companyStatement.update({
+      where: { id: statementId },
+      data: { isPublic: data.isPublic },
+    });
+
+    return updated;
   }
 
   async deleteCompanyStatement(companyId: string, userId: string, statementId: string) {

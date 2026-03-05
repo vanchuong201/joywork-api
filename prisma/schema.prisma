@@ -273,6 +273,9 @@ model CompanyProfile {
   // Section: ĐÀO TẠO & PHÁT TRIỂN
   training Json? // { philosophy, programs: [], budget? }
 
+  // Section: GALLERY (Hình ảnh & Video)
+  gallery Json? // [{ url, type: 'image'|'video', caption? }]
+
   // Section: BAN LÃNH ĐẠO
   leaders Json? // [{ name, role, image, message, ... }]
 
