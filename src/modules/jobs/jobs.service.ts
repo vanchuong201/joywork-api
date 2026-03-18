@@ -144,7 +144,7 @@ export class JobsService {
       jobLevel: data.jobLevel ?? null,
       educationLevel: data.educationLevel ?? null,
       // Required JD fields
-      generalInfo: data.generalInfo,
+      generalInfo: data.generalInfo ?? '',
       mission: data.mission,
       tasks: data.tasks,
       knowledge: data.knowledge,
