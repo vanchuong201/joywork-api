@@ -22,7 +22,8 @@ export class AuthMiddleware {
 
       const token = authHeader.substring(7); // Remove 'Bearer ' prefix
       const payload = await this.authService.verifyAccessToken(token);
-      
+      await this.authService.assertUserActive(payload.userId);
+
       request.user = { userId: payload.userId };
     } catch (error) {
       if (error instanceof AppError) {
@@ -40,6 +41,7 @@ export class AuthMiddleware {
       if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
         const payload = await this.authService.verifyAccessToken(token);
+        await this.authService.assertUserActive(payload.userId);
         request.user = { userId: payload.userId };
       }
     } catch (error) {

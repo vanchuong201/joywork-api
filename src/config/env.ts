@@ -19,6 +19,11 @@ const envSchema = z.object({
   
   // Frontend
   FRONTEND_ORIGIN: z.string().url().default('http://localhost:3000'),
+  /** Optional admin dashboard origin (CORS), e.g. https://admin-cp.joywork.vn */
+  ADMIN_CP_ORIGIN: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().url().optional()
+  ),
   
   // API
   API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),

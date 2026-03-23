@@ -14,3 +14,9 @@ Follow `.cursor/rules/*.mdc` first. Use this file as the short default guide:
 - Reuse shared helpers in `src/shared` and `src/config` instead of duplicating Prisma, auth, storage, or email clients.
 - Make database changes through Prisma schema plus migrations, never by manual production schema edits.
 - Before finishing meaningful backend work, run the most relevant checks available, typically `npm run lint`, `npm run type-check`, and targeted tests when they exist.
+
+## Admin / vận hành (`/api/system`)
+
+- Toàn bộ endpoint vận hành nền tảng (overview, users, companies, reports, xác minh công ty, khóa tài khoản) nằm trong module **`src/modules/system`**, prefix **`/api/system`**, bảo vệ bằng `verifyToken` + `requireAdmin`.
+- `User.accountStatus`: `ACTIVE` | `SUSPENDED` — đăng nhập và mọi request sau JWT gọi `assertUserActive` (trừ khi chỉ verify token mà không cần; optionalAuth cũng bỏ qua user nếu assert lỗi).
+- **joywork-admin** (repo riêng) dùng JWT ADMIN qua BFF; CORS tới admin origin đã có `ADMIN_CP_ORIGIN` / tương đương khi cần.

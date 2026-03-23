@@ -43,6 +43,212 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.getOverview.bind(systemController));
 
+  fastify.get('/users', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Danh sách người dùng (admin, có phân trang)',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          q: { type: 'string' },
+          role: { type: 'string', enum: ['USER', 'ADMIN'] },
+          accountStatus: { type: 'string', enum: ['ACTIVE', 'SUSPENDED'] },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                users: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      email: { type: 'string' },
+                      name: { type: ['string', 'null'] },
+                      slug: { type: ['string', 'null'] },
+                      role: { type: 'string' },
+                      emailVerified: { type: 'boolean' },
+                      accountStatus: { type: 'string' },
+                      createdAt: { type: 'string' },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.listUsers.bind(systemController));
+
+  fastify.patch('/users/:userId/account-status', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Đặt trạng thái tài khoản (ACTIVE / SUSPENDED) — không áp dụng cho chính admin đang thao tác',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['userId'],
+        properties: {
+          userId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['accountStatus'],
+        properties: {
+          accountStatus: { type: 'string', enum: ['ACTIVE', 'SUSPENDED'] },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    accountStatus: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.patchUserAccountStatus.bind(systemController));
+
+  fastify.get('/companies', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Danh sách công ty (admin, có phân trang và đếm thành viên/tin tuyển)',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          q: { type: 'string' },
+          verificationStatus: {
+            type: 'string',
+            enum: ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'],
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                companies: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      name: { type: 'string' },
+                      slug: { type: 'string' },
+                      legalName: { type: ['string', 'null'] },
+                      verificationStatus: { type: 'string' },
+                      isVerified: { type: 'boolean' },
+                      createdAt: { type: 'string' },
+                      memberCount: { type: 'number' },
+                      jobCount: { type: 'number' },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.listCompanies.bind(systemController));
+
+  fastify.get('/reports/timeseries', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Chuỗi thời gian đăng ký user và ứng tuyển theo ngày (UTC, PostgreSQL)',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          days: { type: 'integer', minimum: 7, maximum: 90 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                days: { type: 'number' },
+                userSignups: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      date: { type: 'string' },
+                      count: { type: 'number' },
+                    },
+                  },
+                },
+                applications: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      date: { type: 'string' },
+                      count: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.getReportTimeseries.bind(systemController));
+
   fastify.get('/company-verifications', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {

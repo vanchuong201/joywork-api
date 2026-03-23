@@ -42,6 +42,9 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(cookie);
 
   const allowedOrigins = new Set<string>([config.FRONTEND_ORIGIN]);
+  if (config.ADMIN_CP_ORIGIN) {
+    allowedOrigins.add(config.ADMIN_CP_ORIGIN);
+  }
 
   const isDevelopmentLocalOrigin = (origin: string): boolean => {
     if (config.NODE_ENV !== 'development') return false;

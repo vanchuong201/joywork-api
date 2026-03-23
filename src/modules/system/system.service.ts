@@ -1,8 +1,14 @@
 import { prisma } from '@/shared/database/prisma';
-import { Prisma, CompanyVerificationStatus } from '@prisma/client';
+import { Prisma, CompanyVerificationStatus, UserAccountStatus } from '@prisma/client';
+import { AppError } from '@/shared/errors/errorHandler';
 import { createPresignedDownloadUrl } from '@/shared/storage/s3';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
+import type {
+  AdminCompaniesQuery,
+  AdminReportTimeseriesQuery,
+  AdminUsersQuery,
+} from '@/modules/system/system.schema';
 
 export interface SystemOverview {
   users: number;
@@ -12,6 +18,41 @@ export interface SystemOverview {
   applications: number;
   follows: number;
   jobFavorites: number;
+}
+
+export interface AdminPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  name: string | null;
+  slug: string | null;
+  role: string;
+  emailVerified: boolean;
+  accountStatus: string;
+  createdAt: Date;
+}
+
+export interface AdminCompanyListItem {
+  id: string;
+  name: string;
+  slug: string;
+  legalName: string | null;
+  verificationStatus: string;
+  isVerified: boolean;
+  createdAt: Date;
+  memberCount: number;
+  jobCount: number;
+}
+
+export interface ReportDayPoint {
+  date: string;
+  count: number;
 }
 
 export interface CompanyVerificationItem {
@@ -28,7 +69,212 @@ export interface CompanyVerificationItem {
   isVerified: boolean;
 }
 
+function toDateKeyUTC(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function buildDayRange(days: number): { start: Date; keys: string[] } {
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  const keys: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    keys.push(toDateKeyUTC(d));
+  }
+  return { start, keys };
+}
+
+function mapCountsToSeries(
+  keys: string[],
+  rows: { day: Date; count: number }[]
+): ReportDayPoint[] {
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    map.set(toDateKeyUTC(new Date(r.day)), Number(r.count));
+  }
+  return keys.map((date) => ({ date, count: map.get(date) ?? 0 }));
+}
+
 export class SystemService {
+  async listUsersForAdmin(query: AdminUsersQuery): Promise<{
+    users: AdminUserListItem[];
+    pagination: AdminPagination;
+  }> {
+    const { page, limit, q, role, accountStatus } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserWhereInput = {};
+    if (role) {
+      where.role = role;
+    }
+    if (accountStatus) {
+      where.accountStatus = accountStatus;
+    }
+    if (q) {
+      where.OR = [
+        { email: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, users] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          slug: true,
+          role: true,
+          emailVerified: true,
+          accountStatus: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async setUserAccountStatus(
+    actorAdminId: string,
+    targetUserId: string,
+    status: UserAccountStatus
+  ): Promise<{ id: string; email: string; accountStatus: UserAccountStatus }> {
+    if (actorAdminId === targetUserId) {
+      throw new AppError('Không thể thay đổi trạng thái tài khoản của chính bạn', 400, 'INVALID_TARGET');
+    }
+
+    try {
+      const updated = await prisma.user.update({
+        where: { id: targetUserId },
+        data: { accountStatus: status },
+        select: {
+          id: true,
+          email: true,
+          accountStatus: true,
+        },
+      });
+      return updated;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+        throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
+      }
+      throw e;
+    }
+  }
+
+  async listCompaniesForAdmin(query: AdminCompaniesQuery): Promise<{
+    companies: AdminCompanyListItem[];
+    pagination: AdminPagination;
+  }> {
+    const { page, limit, q, verificationStatus } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.CompanyWhereInput = {};
+    if (verificationStatus) {
+      where.verificationStatus = verificationStatus;
+    }
+    if (q) {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { slug: { contains: q, mode: 'insensitive' } },
+        { legalName: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, rows] = await Promise.all([
+      prisma.company.count({ where }),
+      prisma.company.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          legalName: true,
+          verificationStatus: true,
+          isVerified: true,
+          createdAt: true,
+          _count: {
+            select: { members: true, jobs: true },
+          },
+        },
+      }),
+    ]);
+
+    const companies: AdminCompanyListItem[] = rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      legalName: c.legalName ?? null,
+      verificationStatus: c.verificationStatus,
+      isVerified: c.isVerified,
+      createdAt: c.createdAt,
+      memberCount: c._count.members,
+      jobCount: c._count.jobs,
+    }));
+
+    return {
+      companies,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async getReportTimeseries(query: AdminReportTimeseriesQuery): Promise<{
+    days: number;
+    userSignups: ReportDayPoint[];
+    applications: ReportDayPoint[];
+  }> {
+    const days = query.days;
+    const { start, keys } = buildDayRange(days);
+
+    const [userRows, appRows] = await Promise.all([
+      prisma.$queryRaw<{ day: Date; count: number }[]>`
+        SELECT (date_trunc('day', "createdAt"))::date AS day, COUNT(*)::int AS count
+        FROM users
+        WHERE "createdAt" >= ${start}
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+      prisma.$queryRaw<{ day: Date; count: number }[]>`
+        SELECT (date_trunc('day', "appliedAt"))::date AS day, COUNT(*)::int AS count
+        FROM applications
+        WHERE "appliedAt" >= ${start}
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+    ]);
+
+    return {
+      days,
+      userSignups: mapCountsToSeries(keys, userRows),
+      applications: mapCountsToSeries(keys, appRows),
+    };
+  }
+
   async getOverview(): Promise<SystemOverview> {
     const [users, companies, posts, jobs, applications, follows, jobFavorites] = await Promise.all([
       prisma.user.count(),

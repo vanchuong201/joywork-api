@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import { UserAccountStatus } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { config } from '@/config/env';
 import { AppError } from '@/shared/errors/errorHandler';
@@ -26,6 +27,7 @@ export interface AuthUser {
   name: string | null;
   role: string;
   emailVerified?: boolean;
+  accountStatus?: string;
   avatar?: string | null;
   profile?: {
     avatar?: string | null;
@@ -128,6 +130,10 @@ export class AuthService {
       throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
     }
 
+    if (user.accountStatus === UserAccountStatus.SUSPENDED) {
+      throw new AppError('Tài khoản đã bị tạm khóa', 403, 'ACCOUNT_SUSPENDED');
+    }
+
     // Generate tokens
     const tokens = this.generateTokens(user.id);
 
@@ -153,10 +159,15 @@ export class AuthService {
       // Check if user still exists
       const user = await prisma.user.findUnique({
         where: { id: payload.userId },
+        select: { id: true, accountStatus: true },
       });
 
       if (!user) {
         throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
+      }
+
+      if (user.accountStatus === UserAccountStatus.SUSPENDED) {
+        throw new AppError('Tài khoản đã bị tạm khóa', 403, 'ACCOUNT_SUSPENDED');
       }
 
       // Generate new tokens
@@ -207,6 +218,7 @@ export class AuthService {
         name: true,
         role: true,
         emailVerified: true,
+        accountStatus: true,
         avatar: true, // Account avatar
         profile: {
           select: {
@@ -226,11 +238,26 @@ export class AuthService {
       name: user.name,
       role: user.role,
       emailVerified: user.emailVerified,
+      accountStatus: user.accountStatus,
       avatar: user.avatar,
       profile: user.profile ? {
         avatar: user.profile.avatar,
       } : null,
     };
+  }
+
+  /** Gọi sau khi verify JWT — chặn mọi API khi tài khoản SUSPENDED */
+  async assertUserActive(userId: string): Promise<void> {
+    const row = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { accountStatus: true },
+    });
+    if (!row) {
+      throw new AppError('Không tìm thấy người dùng', 401, 'USER_NOT_FOUND');
+    }
+    if (row.accountStatus === UserAccountStatus.SUSPENDED) {
+      throw new AppError('Tài khoản đã bị tạm khóa', 403, 'ACCOUNT_SUSPENDED');
+    }
   }
 
   // Generate JWT tokens
