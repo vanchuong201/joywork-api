@@ -57,7 +57,7 @@ export const updateJobSchema = z.object({
   educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional().nullable(),
   
   // Required JD fields (rich text/markdown)
-  generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional().nullable(),
+  generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional(),
   mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(5000, 'Sứ mệnh/Vai trò must be less than 5000 characters').optional(),
   tasks: z.string().min(1, 'Nhiệm vụ chuyên môn is required').max(10000, 'Nhiệm vụ chuyên môn must be less than 10000 characters').optional(),
   knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(5000, 'Kiến thức chuyên môn must be less than 5000 characters').optional(),

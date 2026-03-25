@@ -299,7 +299,7 @@ export class JobsService {
     }
     
     // Required JD fields
-    if (data.generalInfo !== undefined) updateData.generalInfo = data.generalInfo;
+    if (data.generalInfo !== undefined) updateData.generalInfo = data.generalInfo ?? '';
     if (data.mission !== undefined) updateData.mission = data.mission;
     if (data.tasks !== undefined) updateData.tasks = data.tasks;
     if (data.knowledge !== undefined) updateData.knowledge = data.knowledge;

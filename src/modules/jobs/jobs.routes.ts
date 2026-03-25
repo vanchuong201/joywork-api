@@ -766,7 +766,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         type: 'object',
         properties: {
           title: { type: 'string', minLength: 1, maxLength: 200, description: 'Job title' },
-          generalInfo: { type: 'string', maxLength: 10000, nullable: true, description: 'Additional information' },
+          generalInfo: { type: 'string', maxLength: 10000, description: 'Additional information' },
           mission: { type: 'string', minLength: 1, maxLength: 10000, description: 'Mission / role overview' },
           tasks: { type: 'string', minLength: 1, maxLength: 10000, description: 'Key tasks' },
           knowledge: { type: 'string', minLength: 1, maxLength: 10000, description: 'Knowledge requirements' },
