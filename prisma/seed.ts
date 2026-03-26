@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, CompanyMemberRole, PostType, PostVisibility, EmploymentType, ExperienceLevel, ApplicationStatus, MessageType } from "@prisma/client";
+import { PrismaClient, UserRole, CompanyMemberRole, PostType, PostVisibility, EmploymentType, ExperienceLevel, ApplicationStatus, MessageType, TalentPoolRequestSource, TalentPoolMemberStatus, TalentPoolRequestStatus, TalentPoolLogAction } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -29,6 +29,10 @@ async function main() {
 
   // Wipe existing data (order matters due to FKs)
   await prisma.$transaction([
+    prisma.talentPoolLog.deleteMany({}),
+    prisma.talentPoolRequest.deleteMany({}),
+    prisma.talentPoolMember.deleteMany({}),
+    prisma.companyFeatureEntitlement.deleteMany({}),
     prisma.message.deleteMany({}),
     prisma.application.deleteMany({}),
     prisma.like.deleteMany({}),
@@ -343,6 +347,71 @@ async function main() {
       });
       lastSenderCandidate = !lastSenderCandidate;
     }
+  }
+
+  // ── Talent Pool seed ──
+  const adminUser = users.find((u) => u.email === "admin@joywork.dev")!;
+
+  // Add 5 members (first 5 random users after named accounts)
+  const poolCandidates = users.slice(3, 8);
+  for (const [idx, candidate] of poolCandidates.entries()) {
+    const source = idx < 3 ? TalentPoolRequestSource.SELF_REQUEST : TalentPoolRequestSource.ADMIN_ADD;
+    await prisma.talentPoolMember.create({
+      data: {
+        userId: candidate.id,
+        status: TalentPoolMemberStatus.ACTIVE,
+        source,
+        addedById: source === TalentPoolRequestSource.ADMIN_ADD ? adminUser.id : null,
+        reason: source === TalentPoolRequestSource.ADMIN_ADD ? "Ứng viên tiềm năng được giới thiệu" : null,
+      },
+    });
+    await prisma.talentPoolLog.create({
+      data: {
+        userId: candidate.id,
+        actorId: source === TalentPoolRequestSource.ADMIN_ADD ? adminUser.id : candidate.id,
+        action: source === TalentPoolRequestSource.ADMIN_ADD ? TalentPoolLogAction.ADMIN_ADDED : TalentPoolLogAction.REQUEST_APPROVED,
+      },
+    });
+  }
+
+  // Create requests: 1 PENDING, 1 APPROVED (already member above), 1 REJECTED
+  const pendingUser = users[8];
+  const rejectedUser = users[9];
+
+  await prisma.talentPoolRequest.create({
+    data: {
+      userId: pendingUser.id,
+      status: TalentPoolRequestStatus.PENDING,
+      message: "Tôi muốn tham gia Talent Pool để có thêm cơ hội việc làm tốt.",
+    },
+  });
+  await prisma.talentPoolLog.create({
+    data: { userId: pendingUser.id, actorId: pendingUser.id, action: TalentPoolLogAction.REQUEST_CREATED },
+  });
+
+  await prisma.talentPoolRequest.create({
+    data: { userId: poolCandidates[0].id, status: TalentPoolRequestStatus.APPROVED, reviewedById: adminUser.id, reviewedAt: new Date() },
+  });
+
+  await prisma.talentPoolRequest.create({
+    data: {
+      userId: rejectedUser.id,
+      status: TalentPoolRequestStatus.REJECTED,
+      message: "Tôi có nhiều kinh nghiệm trong lĩnh vực IT.",
+      reason: "Hồ sơ chưa đầy đủ. Vui lòng bổ sung kinh nghiệm và kỹ năng chi tiết hơn.",
+      reviewedById: adminUser.id,
+      reviewedAt: new Date(),
+    },
+  });
+  await prisma.talentPoolLog.create({
+    data: { userId: rejectedUser.id, actorId: adminUser.id, action: TalentPoolLogAction.REQUEST_REJECTED, metadata: { reason: "Hồ sơ chưa đầy đủ" } },
+  });
+
+  // Entitlements: enable TALENT_POOL for first 3 companies
+  for (const c of companies.slice(0, 3)) {
+    await prisma.companyFeatureEntitlement.create({
+      data: { companyId: c.id, featureKey: "TALENT_POOL", enabled: true },
+    });
   }
 
   console.log("Seeding completed.");

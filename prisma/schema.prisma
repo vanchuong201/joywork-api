@@ -48,6 +48,14 @@ model User {
   sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
   notifications           Notification[]
 
+  // Talent Pool
+  talentPoolMember          TalentPoolMember?        @relation("TalentPoolMemberUser")
+  talentPoolMembersAddedBy  TalentPoolMember[]       @relation("TalentPoolAddedBy")
+  talentPoolRequests        TalentPoolRequest[]      @relation("TalentPoolRequestUser")
+  talentPoolRequestsReviewed TalentPoolRequest[]     @relation("TalentPoolReviewedBy")
+  talentPoolLogs            TalentPoolLog[]          @relation("TalentPoolLogUser")
+  talentPoolLogsActed       TalentPoolLog[]          @relation("TalentPoolLogActor")
+
   @@index([slug])
   @@map("users")
 }
@@ -238,6 +246,9 @@ model Company {
   verificationContacts CompanyVerificationContact[] @relation("CompanyToVerificationContacts")
   verificationLists    CompanyVerificationList[]    @relation("CompanyToVerificationLists")
   statements           CompanyStatement[]           @relation("CompanyToStatements")
+
+  // Feature entitlements (premium features)
+  featureEntitlements CompanyFeatureEntitlement[]
 
   @@map("companies")
 }
@@ -899,4 +910,102 @@ enum NotificationType {
   POST_LIKE // Post liked
   POST_COMMENT // Post commented
   SYSTEM // System notification
+}
+
+// =========================
+// Talent Pool
+// =========================
+
+enum TalentPoolMemberStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum TalentPoolRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TalentPoolRequestSource {
+  SELF_REQUEST
+  ADMIN_ADD
+}
+
+enum TalentPoolLogAction {
+  REQUEST_CREATED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  ADMIN_ADDED
+  MEMBER_REMOVED
+}
+
+model TalentPoolMember {
+  id        String                  @id @default(cuid())
+  userId    String                  @unique
+  status    TalentPoolMemberStatus  @default(ACTIVE)
+  source    TalentPoolRequestSource
+  addedById String?
+  reason    String?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  user    User  @relation("TalentPoolMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User? @relation("TalentPoolAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@map("talent_pool_members")
+}
+
+model TalentPoolRequest {
+  id           String                  @id @default(cuid())
+  userId       String
+  status       TalentPoolRequestStatus @default(PENDING)
+  message      String?
+  reason       String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  user       User  @relation("TalentPoolRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("TalentPoolReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@map("talent_pool_requests")
+}
+
+model TalentPoolLog {
+  id        String              @id @default(cuid())
+  userId    String
+  actorId   String?
+  action    TalentPoolLogAction
+  metadata  Json?
+  createdAt DateTime            @default(now())
+
+  user  User  @relation("TalentPoolLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("TalentPoolLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("talent_pool_logs")
+}
+
+// =========================
+// Company Feature Entitlements (Premium)
+// =========================
+
+model CompanyFeatureEntitlement {
+  id         String    @id @default(cuid())
+  companyId  String
+  featureKey String
+  enabled    Boolean   @default(true)
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, featureKey])
+  @@index([companyId])
+  @@map("company_feature_entitlements")
 }

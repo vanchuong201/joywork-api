@@ -19,6 +19,7 @@ import { uploadsRoutes } from '@/modules/uploads/uploads.routes';
 import { ticketsRoutes } from '@/modules/tickets/tickets.routes';
 import notificationsRoutes from '@/modules/notifications/notifications.routes';
 import { hashtagsRoutes } from '@/modules/hashtags/hashtags.routes';
+import { talentPoolRoutes } from '@/modules/talent-pool/talent-pool.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -171,6 +172,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(ticketsRoutes, { prefix: '/api/tickets' });
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });
   await app.register(hashtagsRoutes, { prefix: '/api/hashtags' });
+  await app.register(talentPoolRoutes, { prefix: '/api/talent-pool' });
 
   return app;
 }

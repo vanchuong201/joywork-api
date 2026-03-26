@@ -1,6 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { SystemService } from './system.service';
 import { SystemController } from './system.controller';
+import { SystemTalentPoolController } from './system-talent-pool.controller';
+import { TalentPoolService } from '@/modules/talent-pool/talent-pool.service';
 import { AuthMiddleware } from '@/modules/auth/auth.middleware';
 import { AuthService } from '@/modules/auth/auth.service';
 
@@ -9,6 +11,8 @@ export async function systemRoutes(fastify: FastifyInstance) {
   const authMiddleware = new AuthMiddleware(authService);
   const systemService = new SystemService();
   const systemController = new SystemController(systemService);
+  const talentPoolService = new TalentPoolService();
+  const tpController = new SystemTalentPoolController(talentPoolService);
 
   fastify.get('/overview', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
@@ -414,6 +418,135 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.getCompanyVerificationDownload.bind(systemController));
+
+  // ── Talent Pool: Requests ──
+
+  const adminPre = [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)];
+
+  fastify.get('/talent-pool/requests', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Danh sách yêu cầu tham gia Talent Pool',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          status: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED'] },
+          q: { type: 'string' },
+        },
+      },
+    },
+  }, tpController.listRequests.bind(tpController));
+
+  fastify.patch('/talent-pool/requests/:id/approve', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Duyệt yêu cầu tham gia Talent Pool',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+    },
+  }, tpController.approveRequest.bind(tpController));
+
+  fastify.patch('/talent-pool/requests/:id/reject', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Từ chối yêu cầu tham gia Talent Pool',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', maxLength: 2000 } } },
+    },
+  }, tpController.rejectRequest.bind(tpController));
+
+  // ── Talent Pool: Members ──
+
+  fastify.get('/talent-pool/members', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Danh sách thành viên Talent Pool',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          q: { type: 'string' },
+          status: { type: 'string', enum: ['ACTIVE', 'REMOVED'] },
+        },
+      },
+    },
+  }, tpController.listMembers.bind(tpController));
+
+  fastify.get('/talent-pool/members/lookup', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Tra cứu người dùng theo email (preview trước khi add)',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      querystring: { type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } },
+    },
+  }, tpController.lookupUser.bind(tpController));
+
+  fastify.post('/talent-pool/members', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Thêm thủ công thành viên vào Talent Pool',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['email', 'reason'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          reason: { type: 'string', maxLength: 2000 },
+        },
+      },
+    },
+  }, tpController.addMember.bind(tpController));
+
+  fastify.patch('/talent-pool/members/:id/remove', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Gỡ thành viên khỏi Talent Pool',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', maxLength: 2000 } } },
+    },
+  }, tpController.removeMember.bind(tpController));
+
+  // ── Talent Pool: Entitlements ──
+
+  fastify.get('/talent-pool/entitlements', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Danh sách công ty + trạng thái Talent Pool entitlement',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          q: { type: 'string' },
+        },
+      },
+    },
+  }, tpController.listEntitlements.bind(tpController));
+
+  fastify.patch('/talent-pool/entitlements/:companyId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Bật/tắt Talent Pool cho công ty',
+      tags: ['System - Talent Pool'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['companyId'], properties: { companyId: { type: 'string' } } },
+      body: { type: 'object', required: ['enabled'], properties: { enabled: { type: 'boolean' } } },
+    },
+  }, tpController.toggleEntitlement.bind(tpController));
 }
-
-

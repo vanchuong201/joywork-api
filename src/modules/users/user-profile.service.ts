@@ -115,12 +115,17 @@ export class UserProfileService {
       expectations: true,
     };
 
+    const talentPoolMember = await prisma.talentPoolMember.findUnique({
+      where: { userId: user.id },
+      select: { status: true },
+    });
+
     const result: any = {
       id: user.id,
       name: user.name,
       slug: user.slug,
-      // Email/Phone always hidden on public profile
       createdAt: user.createdAt,
+      isTalentPoolMember: talentPoolMember?.status === 'ACTIVE',
     };
 
     if (user.profile) {
