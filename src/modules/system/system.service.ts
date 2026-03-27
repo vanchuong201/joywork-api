@@ -45,6 +45,7 @@ export interface AdminCompanyListItem {
   legalName: string | null;
   verificationStatus: string;
   isVerified: boolean;
+  isPremium: boolean;
   createdAt: Date;
   memberCount: number;
   jobCount: number;
@@ -99,6 +100,8 @@ function mapCountsToSeries(
 }
 
 export class SystemService {
+  private static readonly TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
+
   async listUsersForAdmin(query: AdminUsersQuery): Promise<{
     users: AdminUserListItem[];
     pagination: AdminPagination;
@@ -216,6 +219,11 @@ export class SystemService {
           _count: {
             select: { members: true, jobs: true },
           },
+          featureEntitlements: {
+            where: { featureKey: SystemService.TALENT_POOL_FEATURE_KEY },
+            select: { enabled: true },
+            take: 1,
+          },
         },
       }),
     ]);
@@ -227,6 +235,7 @@ export class SystemService {
       legalName: c.legalName ?? null,
       verificationStatus: c.verificationStatus,
       isVerified: c.isVerified,
+      isPremium: c.featureEntitlements[0]?.enabled ?? false,
       createdAt: c.createdAt,
       memberCount: c._count.members,
       jobCount: c._count.jobs,
@@ -272,6 +281,42 @@ export class SystemService {
       days,
       userSignups: mapCountsToSeries(keys, userRows),
       applications: mapCountsToSeries(keys, appRows),
+    };
+  }
+
+  async setCompanyPremiumStatus(
+    companyId: string,
+    isPremium: boolean
+  ): Promise<{ id: string; isPremium: boolean }> {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    await prisma.companyFeatureEntitlement.upsert({
+      where: {
+        companyId_featureKey: {
+          companyId,
+          featureKey: SystemService.TALENT_POOL_FEATURE_KEY,
+        },
+      },
+      create: {
+        companyId,
+        featureKey: SystemService.TALENT_POOL_FEATURE_KEY,
+        enabled: isPremium,
+      },
+      update: {
+        enabled: isPremium,
+      },
+    });
+
+    return {
+      id: company.id,
+      isPremium,
     };
   }
 

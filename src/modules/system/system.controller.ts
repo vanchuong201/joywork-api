@@ -4,6 +4,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import {
   adminCompaniesQuerySchema,
+  adminCompanyPremiumPatchSchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
   adminUsersQuerySchema,
@@ -54,6 +55,16 @@ export class SystemController {
     }
     const result = await this.systemService.listCompaniesForAdmin(parsed.data);
     return reply.send({ data: result });
+  }
+
+  async patchCompanyPremiumStatus(request: AuthenticatedRequest, reply: FastifyReply) {
+    const { companyId } = request.params as { companyId: string };
+    const parsed = adminCompanyPremiumPatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const company = await this.systemService.setCompanyPremiumStatus(companyId, parsed.data.isPremium);
+    return reply.send({ data: { company } });
   }
 
   async getReportTimeseries(request: FastifyRequest, reply: FastifyReply) {

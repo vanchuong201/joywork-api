@@ -182,6 +182,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       legalName: { type: ['string', 'null'] },
                       verificationStatus: { type: 'string' },
                       isVerified: { type: 'boolean' },
+                      isPremium: { type: 'boolean' },
                       createdAt: { type: 'string' },
                       memberCount: { type: 'number' },
                       jobCount: { type: 'number' },
@@ -204,6 +205,48 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.listCompanies.bind(systemController));
+
+  fastify.patch('/companies/:companyId/premium', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Cập nhật trạng thái Premium của doanh nghiệp',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['isPremium'],
+        properties: {
+          isPremium: { type: 'boolean' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    isPremium: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.patchCompanyPremiumStatus.bind(systemController));
 
   fastify.get('/reports/timeseries', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],

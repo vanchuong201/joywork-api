@@ -83,7 +83,34 @@ export async function talentPoolRoutes(fastify: FastifyInstance) {
         },
       },
       response: {
-        200: { type: 'object', properties: { data: { type: 'object' } } },
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                candidates: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: true,
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                  additionalProperties: true,
+                },
+              },
+            },
+          },
+        },
       },
     },
   }, controller.listCandidates.bind(controller));

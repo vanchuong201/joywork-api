@@ -34,3 +34,9 @@ export const adminUserAccountPatchSchema = z.object({
 });
 
 export type AdminUserAccountPatch = z.infer<typeof adminUserAccountPatchSchema>;
+
+export const adminCompanyPremiumPatchSchema = z.object({
+  isPremium: z.boolean(),
+});
+
+export type AdminCompanyPremiumPatch = z.infer<typeof adminCompanyPremiumPatchSchema>;
