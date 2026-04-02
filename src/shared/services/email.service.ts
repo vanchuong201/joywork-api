@@ -923,6 +923,146 @@ Trân trọng,
       text,
     });
   }
+
+  async sendNewApplicationEmail(
+    to: string,
+    payload: {
+      recipientName?: string | null;
+      applicantName: string;
+      jobTitle: string;
+      companyName: string;
+      appliedAt: string;
+      applicationUrl: string;
+    },
+  ): Promise<void> {
+    const recipientLabel = payload.recipientName || 'bạn';
+    const subject = `[JOYWORK] Ứng viên mới ứng tuyển: ${payload.jobTitle}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ứng viên mới ứng tuyển - JOYWORK</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #295892; margin-bottom: 20px;">Có ứng viên mới ứng tuyển</h2>
+    <p>Chào ${recipientLabel},</p>
+    <p>
+      Ứng viên <strong>${payload.applicantName}</strong> vừa nộp hồ sơ cho vị trí
+      <strong>${payload.jobTitle}</strong> tại <strong>${payload.companyName}</strong>.
+    </p>
+    <p><strong>Thời gian ứng tuyển:</strong> ${payload.appliedAt}</p>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.applicationUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem hồ sơ ứng viên</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+      Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+      <a href="${payload.applicationUrl}" style="color: #295892;">${payload.applicationUrl}</a>
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWORK</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Chào ${recipientLabel},
+
+Ứng viên ${payload.applicantName} vừa nộp hồ sơ cho vị trí ${payload.jobTitle} tại ${payload.companyName}.
+Thời gian ứng tuyển: ${payload.appliedAt}
+
+Xem hồ sơ ứng viên tại: ${payload.applicationUrl}
+
+Trân trọng,
+Đội ngũ JOYWORK
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendApplicationStatusUpdateEmail(
+    to: string,
+    payload: {
+      applicantName?: string | null;
+      jobTitle: string;
+      companyName: string;
+      newStatus: string;
+      applicationUrl: string;
+    },
+  ): Promise<void> {
+    const recipientLabel = payload.applicantName || 'bạn';
+    const subject = `[JOYWORK] Cập nhật trạng thái ứng tuyển: ${payload.jobTitle}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cập nhật trạng thái ứng tuyển - JOYWORK</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #295892; margin-bottom: 20px;">Trạng thái ứng tuyển của bạn đã được cập nhật</h2>
+    <p>Chào ${recipientLabel},</p>
+    <p>
+      Doanh nghiệp <strong>${payload.companyName}</strong> vừa cập nhật trạng thái ứng tuyển của bạn
+      cho vị trí <strong>${payload.jobTitle}</strong>.
+    </p>
+    <p><strong>Trạng thái mới:</strong> ${payload.newStatus}</p>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.applicationUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem chi tiết ứng tuyển</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+      Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+      <a href="${payload.applicationUrl}" style="color: #295892;">${payload.applicationUrl}</a>
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWORK</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Chào ${recipientLabel},
+
+Doanh nghiệp ${payload.companyName} vừa cập nhật trạng thái ứng tuyển của bạn cho vị trí ${payload.jobTitle}.
+Trạng thái mới: ${payload.newStatus}
+
+Xem chi tiết tại: ${payload.applicationUrl}
+
+Trân trọng,
+Đội ngũ JOYWORK
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
   // ── Talent Pool emails (bilingual Vi–En) ──
 
   private talentPoolWrapper(title: string, bodyVi: string, bodyEn: string, ctaUrl?: string, ctaLabel?: string): string {

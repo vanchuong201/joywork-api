@@ -1,6 +1,11 @@
+import { NotificationType } from '@prisma/client';
+import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
+import { emailService } from '@/shared/services/email.service';
+import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
+import { notificationService } from '@/shared/services/notification.service';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -43,6 +48,14 @@ export interface Job {
     applications: number;
   };
 }
+
+const APPLICATION_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Đang chờ',
+  REVIEWING: 'Đang xem xét',
+  SHORTLISTED: 'Đã shortlist',
+  REJECTED: 'Từ chối',
+  HIRED: 'Đã tuyển',
+};
 
 export interface JobWithApplication extends Job {
   hasApplied: boolean;
@@ -660,6 +673,15 @@ export class JobsService {
     // Check if job exists and is active
     const job = await prisma.job.findUnique({
       where: { id: data.jobId },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!job) {
@@ -686,8 +708,17 @@ export class JobsService {
       throw new AppError('Bạn đã ứng tuyển cho việc làm này', 409, 'ALREADY_APPLIED');
     }
 
+    const applicant = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
     // Create application
-    await prisma.application.create({
+    const createdApplication = await prisma.application.create({
       data: {
         userId,
         jobId: data.jobId,
@@ -696,6 +727,65 @@ export class JobsService {
         status: 'PENDING',
       },
     });
+
+    const companyAdmins = await prisma.companyMember.findMany({
+      where: {
+        companyId: job.companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    const companyAdminIds = companyAdmins.map((member) => member.userId);
+    const applicantName = applicant?.name || applicant?.email || 'Ứng viên';
+    const manageApplicationsUrl = `${config.FRONTEND_ORIGIN}/companies/${job.company.slug}/manage?tab=applications&jobId=${job.id}`;
+    const appliedAtLabel = createdApplication.appliedAt.toLocaleString('vi-VN');
+
+    if (companyAdminIds.length > 0) {
+      notificationService
+        .createNotificationsForUsers(companyAdminIds, {
+          type: NotificationType.JOB_APPLICATION,
+          title: `Ứng viên mới cho vị trí ${job.title}`,
+          content: `${applicantName} vừa ứng tuyển vào vị trí ${job.title}.`,
+          metadata: {
+            applicationId: createdApplication.id,
+            jobId: job.id,
+            companyId: job.company.id,
+            applicantId: userId,
+          },
+          relatedEntityType: 'APPLICATION',
+          relatedEntityId: createdApplication.id,
+        })
+        .catch(() => {});
+
+      const verifiedEmails = await getVerifiedEmailsForUsers(companyAdminIds);
+      await Promise.all(
+        companyAdmins.map((member) => {
+          const verifiedEmail = verifiedEmails.get(member.userId);
+          if (!verifiedEmail) {
+            return Promise.resolve();
+          }
+
+          return emailService
+            .sendNewApplicationEmail(verifiedEmail, {
+              recipientName: member.user.name,
+              applicantName,
+              jobTitle: job.title,
+              companyName: job.company.name,
+              appliedAt: appliedAtLabel,
+              applicationUrl: manageApplicationsUrl,
+            })
+            .catch(() => {});
+        }),
+      );
+    }
   }
 
   // Get applications
@@ -840,6 +930,13 @@ export class JobsService {
             },
           },
         },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -862,6 +959,40 @@ export class JobsService {
         updatedAt: new Date(),
       },
     });
+
+    const statusLabel = APPLICATION_STATUS_LABEL[data.status] || data.status;
+    const jobTitle = application.job.title;
+    const companyName = application.job.company.name;
+    const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/applications`;
+
+    notificationService
+      .createNotification({
+        userId: application.userId,
+        type: NotificationType.APPLICATION_STATUS,
+        title: `Trạng thái ứng tuyển đã được cập nhật`,
+        content: `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel}.`,
+        metadata: {
+          applicationId: application.id,
+          jobId: application.jobId,
+          status: data.status,
+        },
+        relatedEntityType: 'APPLICATION',
+        relatedEntityId: application.id,
+      })
+      .catch(() => {});
+
+    const verifiedEmail = await getVerifiedEmailForUser(application.userId);
+    if (verifiedEmail) {
+      emailService
+        .sendApplicationStatusUpdateEmail(verifiedEmail, {
+          applicantName: application.user.name,
+          jobTitle,
+          companyName,
+          newStatus: statusLabel,
+          applicationUrl: myApplicationsUrl,
+        })
+        .catch(() => {});
+    }
   }
 
   // Get my applications
