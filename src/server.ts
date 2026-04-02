@@ -1,12 +1,14 @@
 import { createApp } from './app';
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
+import { initializeProvinceRegistry } from '@/shared/provinces';
 
 async function start() {
   try {
     // Test database connection
     await prisma.$connect();
     console.log('✅ Database connected successfully');
+    await initializeProvinceRegistry();
 
     // Create Fastify app
     const app = await createApp();

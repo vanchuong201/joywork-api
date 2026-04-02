@@ -21,6 +21,11 @@ export class SystemController {
     });
   }
 
+  async listProvinces(_request: FastifyRequest, reply: FastifyReply) {
+    const result = await this.systemService.listProvinceRegistryForAdmin();
+    return reply.send({ data: result });
+  }
+
   async listUsers(request: FastifyRequest, reply: FastifyReply) {
     const parsed = adminUsersQuerySchema.safeParse(request.query);
     if (!parsed.success) {

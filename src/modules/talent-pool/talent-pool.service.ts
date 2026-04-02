@@ -1,6 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { getProvinceNameByCode } from '@/shared/provinces';
+import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { Prisma } from '@prisma/client';
@@ -457,8 +457,9 @@ export class TalentPoolService {
     }
 
     if (location) {
+      const normalizedLocation = resolveProvinceCode(location) ?? location;
       conditions.push({
-        profile: { locations: { has: location } },
+        profile: { locations: { has: normalizedLocation } },
       });
     }
 

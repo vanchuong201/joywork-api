@@ -47,6 +47,56 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.getOverview.bind(systemController));
 
+  fastify.get('/provinces', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Danh sách tỉnh/thành và alias phục vụ matching',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                provinces: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      code: { type: 'string' },
+                      name: { type: 'string' },
+                      type: { type: 'string' },
+                      region: { type: 'string' },
+                      merged: { type: 'boolean' },
+                      isActive: { type: 'boolean' },
+                      effectiveFrom: { type: ['string', 'null'] },
+                      effectiveTo: { type: ['string', 'null'] },
+                      aliases: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            aliasText: { type: 'string' },
+                            aliasSlug: { type: 'string' },
+                            aliasType: { type: 'string' },
+                            isActive: { type: 'boolean' },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.listProvinces.bind(systemController));
+
   fastify.get('/users', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {

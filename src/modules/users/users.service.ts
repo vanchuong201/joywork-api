@@ -1,6 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { getProvinceNameByCode } from '@/shared/provinces';
+import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import {
   UpdateProfileInput,
   SearchUsersInput,
@@ -172,9 +172,10 @@ export class UsersService {
     }
 
     if (location) {
+      const normalizedLocation = resolveProvinceCode(location) ?? location;
       where.profile = {
         ...where.profile,
-        locations: { has: location },
+        locations: { has: normalizedLocation },
       };
     }
 

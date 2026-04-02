@@ -1,6 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { getProvinceNameByCode } from '@/shared/provinces';
+import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -509,7 +509,8 @@ export class JobsService {
     }
 
     if (location) {
-      where.locations = { has: location };
+      const normalizedLocation = resolveProvinceCode(location) ?? location;
+      where.locations = { has: normalizedLocation };
     }
 
     if (remote !== undefined) {

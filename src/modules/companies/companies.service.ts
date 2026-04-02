@@ -1,7 +1,7 @@
 import { Prisma, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { getProvinceNameByCode } from '@/shared/provinces';
+import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import {
   CreateCompanyInput,
   UpdateCompanyInput,
@@ -737,7 +737,8 @@ export class CompaniesService {
     }
 
     if (location) {
-      where.location = location;
+      const normalizedLocation = resolveProvinceCode(location) ?? location;
+      where.location = normalizedLocation;
     }
 
     if (size) {

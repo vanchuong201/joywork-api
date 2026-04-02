@@ -70,6 +70,26 @@ export interface CompanyVerificationItem {
   isVerified: boolean;
 }
 
+export interface AdminProvinceAliasItem {
+  id: string;
+  aliasText: string;
+  aliasSlug: string;
+  aliasType: string;
+  isActive: boolean;
+}
+
+export interface AdminProvinceRegistryItem {
+  code: string;
+  name: string;
+  type: string;
+  region: string;
+  merged: boolean;
+  isActive: boolean;
+  effectiveFrom: Date | null;
+  effectiveTo: Date | null;
+  aliases: AdminProvinceAliasItem[];
+}
+
 function toDateKeyUTC(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -505,6 +525,41 @@ export class SystemService {
     });
 
     return { url };
+  }
+
+  async listProvinceRegistryForAdmin(): Promise<{
+    provinces: AdminProvinceRegistryItem[];
+  }> {
+    const rows = await prisma.provinceRegistry.findMany({
+      include: {
+        aliases: {
+          where: { isActive: true },
+          orderBy: { aliasSlug: 'asc' },
+          select: {
+            id: true,
+            aliasText: true,
+            aliasSlug: true,
+            aliasType: true,
+            isActive: true,
+          },
+        },
+      },
+      orderBy: [{ region: 'asc' }, { name: 'asc' }],
+    });
+
+    return {
+      provinces: rows.map((row) => ({
+        code: row.code,
+        name: row.name,
+        type: row.type,
+        region: row.region,
+        merged: row.merged,
+        isActive: row.isActive,
+        effectiveFrom: row.effectiveFrom,
+        effectiveTo: row.effectiveTo,
+        aliases: row.aliases,
+      })),
+    };
   }
 }
 

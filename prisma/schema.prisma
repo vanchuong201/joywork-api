@@ -1003,3 +1003,40 @@ model CompanyFeatureEntitlement {
   @@index([companyId])
   @@map("company_feature_entitlements")
 }
+
+model ProvinceRegistry {
+  code          String   @id
+  name          String
+  type          String
+  region        String
+  merged        Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  aliases ProvinceAlias[]
+
+  @@index([region])
+  @@index([isActive])
+  @@map("province_registry")
+}
+
+model ProvinceAlias {
+  id           String   @id @default(cuid())
+  provinceCode String
+  aliasText    String
+  aliasSlug    String
+  aliasType    String   @default("MANUAL")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  province ProvinceRegistry @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+
+  @@unique([provinceCode, aliasSlug])
+  @@index([aliasSlug, isActive])
+  @@index([provinceCode])
+  @@map("province_aliases")
+}
