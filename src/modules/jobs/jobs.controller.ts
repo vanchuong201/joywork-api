@@ -20,16 +20,10 @@ export class JobsController {
   async createJob(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { companyId } = request.params as { companyId: string };
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H3',location:'jobs.controller.ts:createJob',message:'controller reached with body keys',data:{companyId,keys:request.body && typeof request.body === 'object' ? Object.keys(request.body as Record<string, unknown>) : [],hasDescription:request.body && typeof request.body === 'object' ? Object.prototype.hasOwnProperty.call(request.body as Record<string, unknown>,'description') : false},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     let data;
     try {
       data = createJobSchema.parse(request.body);
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H4',location:'jobs.controller.ts:createJob',message:'createJobSchema parse failed',data:{errorName:error?.name,issues:error?.issues,keys:request.body && typeof request.body === 'object' ? Object.keys(request.body as Record<string, unknown>) : []},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       throw error;
     }
     
@@ -44,16 +38,10 @@ export class JobsController {
   async updateJob(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { jobId } = getJobSchema.parse(request.params);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-edit-pre',hypothesisId:'H2',location:'jobs.controller.ts:updateJob',message:'update body keys before parse',data:{jobId,keys:request.body && typeof request.body === 'object' ? Object.keys(request.body as Record<string, unknown>) : [],skillsType:request.body && typeof request.body === 'object' ? typeof (request.body as any).skills : null,skillsIsArray:request.body && typeof request.body === 'object' ? Array.isArray((request.body as any).skills) : null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     let data;
     try {
       data = updateJobSchema.parse(request.body);
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-edit-pre',hypothesisId:'H3',location:'jobs.controller.ts:updateJob',message:'updateJobSchema parse failed',data:{jobId,errorName:error?.name,issues:error?.issues,skillsType:request.body && typeof request.body === 'object' ? typeof (request.body as any).skills : null,skillsIsArray:request.body && typeof request.body === 'object' ? Array.isArray((request.body as any).skills) : null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       throw error;
     }
     

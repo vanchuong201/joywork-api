@@ -1,6 +1,7 @@
 import { Prisma, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { getProvinceNameByCode } from '@/shared/provinces';
 import {
   CreateCompanyInput,
   UpdateCompanyInput,
@@ -270,7 +271,7 @@ export class CompaniesService {
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
-      ...(company.location != null ? { location: company.location } : {}),
+      ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -488,7 +489,7 @@ export class CompaniesService {
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
-      ...(company.location != null ? { location: company.location } : {}),
+      ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -606,7 +607,7 @@ export class CompaniesService {
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
-      ...(company.location != null ? { location: company.location } : {}),
+      ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -736,7 +737,7 @@ export class CompaniesService {
     }
 
     if (location) {
-      where.location = { contains: location, mode: 'insensitive' };
+      where.location = location;
     }
 
     if (size) {
@@ -767,7 +768,7 @@ export class CompaniesService {
         ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
         ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
         ...(company.website != null ? { website: company.website } : {}),
-        ...(company.location != null ? { location: company.location } : {}),
+        ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
         ...(company.email != null ? { email: company.email } : {}),
         ...(company.phone != null ? { phone: company.phone } : {}),
         ...(company.industry != null ? { industry: company.industry } : {}),
@@ -809,7 +810,7 @@ export class CompaniesService {
         ...(membership.company.logoUrl != null ? { logoUrl: membership.company.logoUrl } : {}),
         ...(membership.company.coverUrl != null ? { coverUrl: membership.company.coverUrl } : {}),
         ...(membership.company.website != null ? { website: membership.company.website } : {}),
-        ...(membership.company.location != null ? { location: membership.company.location } : {}),
+        ...(membership.company.location != null ? { location: membership.company.location, locationName: getProvinceNameByCode(membership.company.location) ?? membership.company.location } : {}),
         ...(membership.company.email != null ? { email: membership.company.email } : {}),
         ...(membership.company.phone != null ? { phone: membership.company.phone } : {}),
         ...(membership.company.industry != null ? { industry: membership.company.industry } : {}),
@@ -850,7 +851,7 @@ export class CompaniesService {
         ...(follow.company.logoUrl != null ? { logoUrl: follow.company.logoUrl } : {}),
         ...(follow.company.coverUrl != null ? { coverUrl: follow.company.coverUrl } : {}),
         ...(follow.company.website != null ? { website: follow.company.website } : {}),
-        ...(follow.company.location != null ? { location: follow.company.location } : {}),
+        ...(follow.company.location != null ? { location: follow.company.location, locationName: getProvinceNameByCode(follow.company.location) ?? follow.company.location } : {}),
         ...(follow.company.email != null ? { email: follow.company.email } : {}),
         ...(follow.company.phone != null ? { phone: follow.company.phone } : {}),
         ...(follow.company.industry != null ? { industry: follow.company.industry } : {}),
@@ -1267,7 +1268,7 @@ export class CompaniesService {
       slug: company.slug,
       ...(company.logoUrl ? { logoUrl: company.logoUrl } : {}),
       ...(company.tagline ? { tagline: company.tagline } : {}),
-      ...(company.location ? { location: company.location } : {}),
+      ...(company.location ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       followersCount,
       postsCount,
       jobsActive,

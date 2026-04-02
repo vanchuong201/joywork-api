@@ -12,17 +12,6 @@ export async function jobsRoutes(fastify: FastifyInstance) {
 
   // Create job
   fastify.post('/companies/:companyId/jobs', {
-    preValidation: [
-      async (request) => {
-        const schemaRequired =
-          (request.routeOptions?.schema as any)?.body?.required ||
-          (request.routeOptions?.schema as any)?.body?.properties?.required ||
-          null;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H1',location:'jobs.routes.ts:create:preValidation',message:'incoming body keys before schema validation',data:{bodyType:typeof request.body,keys:request.body && typeof request.body === 'object' ? Object.keys(request.body as Record<string, unknown>) : [],requiredInSchema:schemaRequired},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-      },
-    ],
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
     schema: {
       description: 'Create a new job posting for a company',
@@ -53,7 +42,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           benefitsIncome: { type: 'string', maxLength: 200, description: 'Income / salary info' },
           benefitsPerks: { type: 'string', maxLength: 2000, description: 'Benefits / perks' },
           contact: { type: 'string', maxLength: 500, description: 'Contact information' },
-          location: { type: 'string', maxLength: 100, description: 'Job location' },
+          locations: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Job location codes' },
           remote: { type: 'boolean', default: false, description: 'Remote work allowed' },
           salaryMin: { type: 'number', minimum: 0, description: 'Minimum salary' },
           salaryMax: { type: 'number', minimum: 0, description: 'Maximum salary' },
@@ -117,7 +106,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     benefitsIncome: { type: 'string', nullable: true },
                     benefitsPerks: { type: 'string', nullable: true },
                     contact: { type: 'string', nullable: true },
-                    location: { type: 'string', nullable: true },
+                    locations: { type: 'array', items: { type: 'string' } },
                     remote: { type: 'boolean' },
                     salaryMin: { type: 'number', nullable: true },
                     salaryMax: { type: 'number', nullable: true },
@@ -257,7 +246,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     benefitsIncome: { type: 'string', nullable: true },
                     benefitsPerks: { type: 'string', nullable: true },
                     contact: { type: 'string', nullable: true },
-                    location: { type: 'string', nullable: true },
+                    locations: { type: 'array', items: { type: 'string' } },
                     remote: { type: 'boolean' },
                     salaryMin: { type: 'number', nullable: true },
                     salaryMax: { type: 'number', nullable: true },
@@ -309,7 +298,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         type: 'object',
         properties: {
           q: { type: 'string', description: 'Search query' },
-          location: { type: 'string', description: 'Filter by location' },
+          location: { type: 'string', description: 'Filter by location code' },
           remote: { type: 'boolean', description: 'Filter by remote work' },
           employmentType: { 
             type: 'string', 
@@ -358,7 +347,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       benefitsIncome: { type: 'string', nullable: true },
                       benefitsPerks: { type: 'string', nullable: true },
                       contact: { type: 'string', nullable: true },
-                      location: { type: 'string', nullable: true },
+                      locations: { type: 'array', items: { type: 'string' } },
                       remote: { type: 'boolean' },
                       salaryMin: { type: 'number', nullable: true },
                       salaryMax: { type: 'number', nullable: true },
@@ -710,7 +699,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                           id: { type: 'string' },
                           title: { type: 'string' },
                           isActive: { type: 'boolean' },
-                          location: { type: 'string', nullable: true },
+                          locations: { type: 'array', items: { type: 'string' } },
                           remote: { type: 'boolean' },
                           employmentType: { type: 'string' },
                           experienceLevel: { type: 'string' },
@@ -779,7 +768,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           benefitsIncome: { type: 'string', maxLength: 200, nullable: true, description: 'Income / salary info' },
           benefitsPerks: { type: 'string', maxLength: 2000, nullable: true, description: 'Benefits / perks' },
           contact: { type: 'string', maxLength: 500, nullable: true, description: 'Contact information' },
-          location: { type: 'string', maxLength: 100, nullable: true, description: 'Job location' },
+          locations: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Job location codes' },
           remote: { type: 'boolean', description: 'Remote work allowed' },
           salaryMin: { type: 'number', minimum: 0, nullable: true, description: 'Minimum salary' },
           salaryMax: { type: 'number', minimum: 0, nullable: true, description: 'Maximum salary' },
@@ -851,7 +840,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     benefitsIncome: { type: 'string', nullable: true },
                     benefitsPerks: { type: 'string', nullable: true },
                     contact: { type: 'string', nullable: true },
-                    location: { type: 'string', nullable: true },
+                    locations: { type: 'array', items: { type: 'string' } },
                     remote: { type: 'boolean' },
                     salaryMin: { type: 'number', nullable: true },
                     salaryMax: { type: 'number', nullable: true },

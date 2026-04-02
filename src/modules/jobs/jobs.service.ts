@@ -1,5 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { getProvinceNameByCode } from '@/shared/provinces';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -19,7 +20,7 @@ export interface Job {
   requirements?: string;
   responsibilities?: string;
   benefits?: string;
-  location?: string;
+  locations: string[];
   remote: boolean;
   salaryMin?: number;
   salaryMax?: number;
@@ -87,7 +88,7 @@ export interface JobFavorite {
   job: {
     id: string;
     title: string;
-    location?: string | null;
+    locations: string[];
     remote: boolean;
     employmentType: string;
     experienceLevel: string;
@@ -129,7 +130,7 @@ export class JobsService {
     const jobData: any = {
       companyId,
       title: data.title,
-      location: data.location ?? null,
+      locations: data.locations ?? (data.location ? [data.location] : []),
       remote: data.remote,
       currency: data.currency,
       employmentType: data.employmentType,
@@ -160,42 +161,32 @@ export class JobsService {
       contact: data.contact ?? null,
     };
     
-    let job;
-    try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H5',location:'jobs.service.ts:createJob',message:'about to create job',data:{companyId,keys:Object.keys(jobData),hasLegacyFields:{description:Object.prototype.hasOwnProperty.call(jobData,'description'),requirements:Object.prototype.hasOwnProperty.call(jobData,'requirements')},hasNewFields:{generalInfo:!!jobData.generalInfo,mission:!!jobData.mission,tasks:!!jobData.tasks,knowledge:!!jobData.knowledge,skills:!!jobData.skills,attitude:!!jobData.attitude}},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      job = await prisma.job.create({
-        data: jobData,
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              legalName: true,
-              slug: true,
-              logoUrl: true,
-            },
-          },
-          _count: {
-            select: {
-              applications: true,
-            },
+    const job = await prisma.job.create({
+      data: jobData,
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            legalName: true,
+            slug: true,
+            logoUrl: true,
           },
         },
-      });
-    } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9026dbdf-4370-41c8-a2ad-ea341cdeab12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'job-create-pre',hypothesisId:'H5',location:'jobs.service.ts:createJob',message:'prisma create failed',data:{errorName:error?.name,code:error?.code,message:error?.message,meta:error?.meta},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      throw error;
-    }
+        _count: {
+          select: {
+            applications: true,
+          },
+        },
+      },
+    });
 
     const result: any = {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
-      location: job.location,
+      locations: job.locations,
+      ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
       remote: job.remote,
       currency: job.currency,
       employmentType: job.employmentType,
@@ -273,7 +264,10 @@ export class JobsService {
     
     // Basic info
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.location !== undefined) updateData.location = data.location ?? null;
+    if (data.locations !== undefined) updateData.locations = data.locations;
+    if (data.location !== undefined && data.locations === undefined) {
+      updateData.locations = data.location ? [data.location] : [];
+    }
     if (data.remote !== undefined) updateData.remote = data.remote;
     if (data.salaryMin !== undefined) updateData.salaryMin = data.salaryMin;
     if (data.salaryMax !== undefined) updateData.salaryMax = data.salaryMax;
@@ -340,7 +334,8 @@ export class JobsService {
       id: updatedJob.id,
       companyId: updatedJob.companyId,
       title: updatedJob.title,
-      location: updatedJob.location,
+      locations: updatedJob.locations,
+      ...(updatedJob.locations.length > 0 ? { location: getProvinceNameByCode(updatedJob.locations[0]) ?? updatedJob.locations[0] } : {}),
       remote: updatedJob.remote,
       currency: updatedJob.currency,
       employmentType: updatedJob.employmentType,
@@ -429,7 +424,8 @@ export class JobsService {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
-      location: job.location,
+      locations: job.locations,
+      ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
       remote: job.remote,
       currency: job.currency,
       employmentType: job.employmentType,
@@ -513,7 +509,7 @@ export class JobsService {
     }
 
     if (location) {
-      where.location = { contains: location, mode: 'insensitive' };
+      where.locations = { has: location };
     }
 
     if (remote !== undefined) {
@@ -600,7 +596,8 @@ export class JobsService {
         id: job.id,
         companyId: job.companyId,
         title: job.title,
-        location: job.location,
+        locations: job.locations,
+        ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
         remote: job.remote,
         currency: job.currency,
         employmentType: job.employmentType,
@@ -1015,7 +1012,8 @@ export class JobsService {
           id: fav.job.id,
           title: fav.job.title,
           isActive: fav.job.isActive,
-          ...(fav.job.location ? { location: fav.job.location } : {}),
+          locations: fav.job.locations,
+          ...(fav.job.locations.length > 0 ? { location: getProvinceNameByCode(fav.job.locations[0]) ?? fav.job.locations[0] } : {}),
           remote: fav.job.remote,
           employmentType: fav.job.employmentType,
           experienceLevel: fav.job.experienceLevel,

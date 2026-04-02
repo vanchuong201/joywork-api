@@ -1,5 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { getProvinceNameByCode } from '@/shared/provinces';
 import {
   UpdateProfileInput,
   SearchUsersInput,
@@ -13,7 +14,7 @@ export interface UserProfile {
   bio?: string;
   skills: string[];
   cvUrl?: string;
-  location?: string;
+  locations: string[];
   website?: string;
   linkedin?: string;
   github?: string;
@@ -67,7 +68,10 @@ export class UsersService {
       if (user.profile.headline) result.profile.headline = user.profile.headline;
       if (user.profile.bio) result.profile.bio = user.profile.bio;
       if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
-      if (user.profile.location) result.profile.location = user.profile.location;
+      result.profile.locations = user.profile.locations;
+      if (user.profile.locations.length > 0) {
+        result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
+      }
       if (user.profile.website) result.profile.website = user.profile.website;
       if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
       if (user.profile.github) result.profile.github = user.profile.github;
@@ -106,7 +110,10 @@ export class UsersService {
     if (profileInput.bio !== undefined) profileData.bio = profileInput.bio ?? null;
     if (profileInput.skills !== undefined) profileData.skills = profileInput.skills;
     if (profileInput.cvUrl !== undefined) profileData.cvUrl = profileInput.cvUrl ?? null;
-    if (profileInput.location !== undefined) profileData.location = profileInput.location ?? null;
+    if (profileInput.locations !== undefined) profileData.locations = profileInput.locations;
+    if (profileInput.location !== undefined && profileInput.locations === undefined) {
+      profileData.locations = profileInput.location ? [profileInput.location] : [];
+    }
     if (profileInput.website !== undefined) profileData.website = profileInput.website ?? null;
     if (profileInput.linkedin !== undefined) profileData.linkedin = profileInput.linkedin ?? null;
     if (profileInput.github !== undefined) profileData.github = profileInput.github ?? null;
@@ -167,7 +174,7 @@ export class UsersService {
     if (location) {
       where.profile = {
         ...where.profile,
-        location: { contains: location, mode: 'insensitive' },
+        locations: { has: location },
       };
     }
 
@@ -208,7 +215,10 @@ export class UsersService {
           if (user.profile.headline) result.profile.headline = user.profile.headline;
           if (user.profile.bio) result.profile.bio = user.profile.bio;
           if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
-          if (user.profile.location) result.profile.location = user.profile.location;
+          result.profile.locations = user.profile.locations;
+          if (user.profile.locations.length > 0) {
+            result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
+          }
           if (user.profile.website) result.profile.website = user.profile.website;
           if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
           if (user.profile.github) result.profile.github = user.profile.github;
@@ -257,7 +267,10 @@ export class UsersService {
       if (user.profile.headline) result.profile.headline = user.profile.headline;
       if (user.profile.bio) result.profile.bio = user.profile.bio;
       if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
-      if (user.profile.location) result.profile.location = user.profile.location;
+      result.profile.locations = user.profile.locations;
+      if (user.profile.locations.length > 0) {
+        result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
+      }
       if (user.profile.website) result.profile.website = user.profile.website;
       if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
       if (user.profile.github) result.profile.github = user.profile.github;

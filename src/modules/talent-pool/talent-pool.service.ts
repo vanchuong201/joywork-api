@@ -1,5 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { getProvinceNameByCode } from '@/shared/provinces';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { Prisma } from '@prisma/client';
@@ -228,7 +229,7 @@ export class TalentPoolService {
           user: {
             select: {
               id: true, email: true, name: true, slug: true,
-              profile: { select: { avatar: true, headline: true, location: true } },
+              profile: { select: { avatar: true, headline: true, locations: true } },
             },
           },
           addedBy: { select: { id: true, name: true, email: true } },
@@ -248,7 +249,7 @@ export class TalentPoolService {
       where: { email },
       select: {
         id: true, email: true, name: true, slug: true, accountStatus: true,
-        profile: { select: { avatar: true, headline: true, location: true } },
+        profile: { select: { avatar: true, headline: true, locations: true } },
         talentPoolMember: { select: { id: true, status: true } },
       },
     });
@@ -457,7 +458,7 @@ export class TalentPoolService {
 
     if (location) {
       conditions.push({
-        profile: { location: { contains: location, mode: 'insensitive' } },
+        profile: { locations: { has: location } },
       });
     }
 
@@ -480,8 +481,8 @@ export class TalentPoolService {
               profile: {
                 select: {
                   avatar: true, headline: true, bio: true, skills: true,
-                  location: true, knowledge: true, attitude: true,
-                  expectedSalary: true, workMode: true, expectedCulture: true,
+                  locations: true, knowledge: true, attitude: true,
+                  expectedSalaryMin: true, expectedSalaryMax: true, salaryCurrency: true, workMode: true, expectedCulture: true,
                   isPublic: true, visibility: true,
                 },
               },
@@ -522,10 +523,13 @@ export class TalentPoolService {
           headline: p.headline,
           bio: vis['bio'] !== false ? p.bio : null,
           skills: p.skills,
-          location: p.location,
+          locations: p.locations,
+          ...(p.locations.length > 0 ? { location: getProvinceNameByCode(p.locations[0]) ?? p.locations[0] } : {}),
           knowledge: vis['ksa'] !== false ? p.knowledge : [],
           attitude: vis['ksa'] !== false ? p.attitude : [],
-          expectedSalary: vis['expectations'] !== false ? p.expectedSalary : null,
+          expectedSalaryMin: vis['expectations'] !== false ? p.expectedSalaryMin : null,
+          expectedSalaryMax: vis['expectations'] !== false ? p.expectedSalaryMax : null,
+          salaryCurrency: vis['expectations'] !== false ? p.salaryCurrency : null,
           workMode: vis['expectations'] !== false ? p.workMode : null,
           expectedCulture: vis['expectations'] !== false ? p.expectedCulture : null,
         },

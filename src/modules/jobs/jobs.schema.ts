@@ -1,10 +1,17 @@
 import { z } from 'zod';
+import { PROVINCE_BY_CODE } from '@/shared/provinces';
+
+const locationCodeSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/, 'Invalid location code format')
+  .refine((code) => PROVINCE_BY_CODE.has(code), 'Unknown location code');
 
 // Create job schema - Standard JD format
 export const createJobSchema = z.object({
   // Basic info
   title: z.string().min(1, 'Job title is required').max(200, 'Job title must be less than 200 characters'),
-  location: z.string().max(100, 'Location must be less than 100 characters').optional(),
+  location: locationCodeSchema.optional(),
+  locations: z.array(locationCodeSchema).max(20, 'Maximum 20 locations allowed').optional(),
   remote: z.boolean().default(false),
   salaryMin: z.number().int().min(0).optional(),
   salaryMax: z.number().int().min(0).optional(),
@@ -41,7 +48,8 @@ export const createJobSchema = z.object({
 export const updateJobSchema = z.object({
   // Basic info
   title: z.string().min(1, 'Job title is required').max(200, 'Job title must be less than 200 characters').optional(),
-  location: z.string().max(100, 'Location must be less than 100 characters').optional().nullable(),
+  location: locationCodeSchema.optional().nullable(),
+  locations: z.array(locationCodeSchema).max(20, 'Maximum 20 locations allowed').optional(),
   remote: z.boolean().optional(),
   salaryMin: z.number().int().min(0).optional().nullable(),
   salaryMax: z.number().int().min(0).optional().nullable(),
@@ -82,7 +90,7 @@ export const getJobSchema = z.object({
 // Search jobs schema
 export const searchJobsSchema = z.object({
   q: z.string().min(1, 'Search query is required').optional(),
-  location: z.string().optional(),
+  location: locationCodeSchema.optional(),
   remote: z.coerce.boolean().optional(),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
   experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).optional(),

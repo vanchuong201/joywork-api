@@ -16,6 +16,7 @@
     "check:ses": "tsx scripts/check-ses-status.ts",
     "verify:email": "tsx scripts/verify-email.ts",
     "seed:jobs": "tsx scripts/seed-jobs.ts",
+    "migrate:location-codes": "tsx scripts/migrate-location-codes.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "lint": "eslint src --ext .ts",

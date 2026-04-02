@@ -1,5 +1,6 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { getProvinceNameByCode } from '@/shared/provinces';
 import {
   UpdateProfileInput,
 } from './users.schema';
@@ -135,7 +136,8 @@ export class UserProfileService {
         fullName: user.profile.fullName,
         title: user.profile.title,
         headline: user.profile.headline,
-        location: user.profile.location,
+        locations: user.profile.locations,
+        ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
         website: user.profile.website,
         linkedin: user.profile.linkedin,
         github: user.profile.github,
@@ -165,7 +167,9 @@ export class UserProfileService {
       }
 
       if (visibility.expectations) {
-        if (user.profile.expectedSalary) result.profile.expectedSalary = user.profile.expectedSalary;
+        if (user.profile.expectedSalaryMin != null) result.profile.expectedSalaryMin = user.profile.expectedSalaryMin;
+        if (user.profile.expectedSalaryMax != null) result.profile.expectedSalaryMax = user.profile.expectedSalaryMax;
+        if (user.profile.salaryCurrency) result.profile.salaryCurrency = user.profile.salaryCurrency;
         if (user.profile.workMode) result.profile.workMode = user.profile.workMode;
         if (user.profile.expectedCulture) result.profile.expectedCulture = user.profile.expectedCulture;
       }
@@ -248,7 +252,8 @@ export class UserProfileService {
             bio: user.profile.bio,
             skills: user.profile.skills,
             cvUrl: user.profile.cvUrl,
-            location: user.profile.location,
+            locations: user.profile.locations,
+            ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
             website: user.profile.website,
             linkedin: user.profile.linkedin,
             github: user.profile.github,
@@ -260,7 +265,9 @@ export class UserProfileService {
             visibility: user.profile.visibility,
             knowledge: user.profile.knowledge,
             attitude: user.profile.attitude,
-            expectedSalary: user.profile.expectedSalary,
+            expectedSalaryMin: user.profile.expectedSalaryMin,
+            expectedSalaryMax: user.profile.expectedSalaryMax,
+            salaryCurrency: user.profile.salaryCurrency,
             workMode: user.profile.workMode,
             expectedCulture: user.profile.expectedCulture,
             careerGoals: user.profile.careerGoals,
@@ -342,7 +349,7 @@ export class UserProfileService {
       'bio',
       'skills',
       'cvUrl',
-      'location',
+      'locations',
       'website',
       'linkedin',
       'github',
@@ -355,7 +362,9 @@ export class UserProfileService {
       'visibility',
       'knowledge',
       'attitude',
-      'expectedSalary',
+      'expectedSalaryMin',
+      'expectedSalaryMax',
+      'salaryCurrency',
       'workMode',
       'expectedCulture',
       'careerGoals',
@@ -366,6 +375,10 @@ export class UserProfileService {
         const value = profileInput[field as keyof typeof profileInput];
         profileData[field] = value ?? (field === 'skills' || field === 'knowledge' || field === 'attitude' || field === 'careerGoals' ? [] : null);
       }
+    }
+
+    if (profileInput.location !== undefined && profileInput.locations === undefined) {
+      profileData.locations = profileInput.location ? [profileInput.location] : [];
     }
 
     await prisma.userProfile.upsert({

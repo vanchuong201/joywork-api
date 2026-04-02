@@ -96,7 +96,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
           coverUrl: { type: 'string', format: 'uri', description: 'Company cover image URL' },
           website: { type: 'string', format: 'uri', description: 'Company website URL' },
           location: { type: 'string', maxLength: 120, description: 'Company location' },
-          industry: { type: 'string', maxLength: 80, description: 'Company industry' },
+          industry: { type: 'string', maxLength: 200, description: 'Company industry' },
           size: { 
             type: 'string', 
             enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
@@ -813,7 +813,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
           location: { type: ['string', 'null'], maxLength: 120, description: 'Company location' },
           email: { type: ['string', 'null'], description: 'Company contact email (empty string or null allowed)' },
           phone: { type: ['string', 'null'], maxLength: 50, description: 'Company contact phone number' },
-          industry: { type: 'string', maxLength: 80, description: 'Company industry' },
+          industry: { type: 'string', maxLength: 200, description: 'Company industry' },
           size: { 
             type: 'string', 
             enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],

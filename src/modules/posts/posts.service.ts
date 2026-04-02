@@ -75,6 +75,7 @@ export interface Post {
     id: string;
     title: string;
     location?: string | null;
+    locations?: string[];
     employmentType: string;
     isActive: boolean;
   }>;
@@ -142,7 +143,8 @@ function mapPostEntity(post: any): Post {
       ? post.postJobs.map((pj: any) => ({
           id: pj.job.id,
           title: pj.job.title,
-          location: pj.job.location,
+          locations: pj.job.locations,
+          ...(pj.job.locations.length > 0 ? { location: pj.job.locations[0] } : {}),
           employmentType: pj.job.employmentType,
           isActive: pj.job.isActive,
         }))
@@ -268,7 +270,7 @@ export class PostsService {
         },
         postJobs: {
           include: {
-            job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } },
+            job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } },
           },
         },
         hashtags: {
@@ -540,7 +542,7 @@ export class PostsService {
         },
         postJobs: {
           include: {
-            job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } },
+            job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } },
           },
         },
         hashtags: {
@@ -728,7 +730,7 @@ export class PostsService {
             orderBy: { order: 'asc' },
           },
           postJobs: {
-            include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
+            include: { job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } } },
           },
           hashtags: {
             include: {
@@ -914,7 +916,7 @@ export class PostsService {
             orderBy: { order: 'asc' },
           },
           postJobs: {
-            include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
+            include: { job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } } },
           },
           hashtags: {
             include: {
@@ -1056,7 +1058,7 @@ export class PostsService {
               },
               _count: { select: { likes: true } },
               postJobs: {
-                include: { job: { select: { id: true, title: true, location: true, employmentType: true, isActive: true } } },
+                include: { job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } } },
               },
               hashtags: {
                 include: {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PROVINCE_BY_CODE } from '@/shared/provinces';
 
 const metricSchema = z.object({
   id: z.string().optional(),
@@ -87,6 +88,17 @@ const optionalEmail = () =>
     ]).optional()
   );
 
+const optionalLocationCode = () =>
+  z.preprocess(
+    (val) => (val === '' ? null : val),
+    z
+      .string()
+      .regex(/^[a-z0-9-]+$/, 'Invalid location code format')
+      .refine((code) => PROVINCE_BY_CODE.has(code), 'Unknown location code')
+      .nullable()
+      .optional(),
+  );
+
 const baseCompanySchema = {
   name: z.string().min(2, 'Company name must be at least 2 characters'),
   legalName: optionalString(200),
@@ -96,11 +108,11 @@ const baseCompanySchema = {
   logoUrl: optionalUrl(),
   coverUrl: optionalUrl(),
   website: optionalUrl(),
-  location: optionalString(120),
+  location: optionalLocationCode(),
   email: optionalEmail(),
   phone: optionalString(50),
-  industry: z.string().max(80, 'Industry must be less than 80 characters').optional(),
-  size: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']).optional(),
+  industry: optionalString(200),
+  size: z.string().max(20, 'Size must be less than 20 characters').optional(),
   foundedYear: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
   headcount: z.number().int().min(1, 'Headcount must be a positive number').max(200000, 'Headcount is unrealistically high').optional(),
   headcountNote: z.string().max(200, 'Headcount note must be less than 200 characters').optional(),
@@ -144,8 +156,12 @@ export const searchCompaniesSchema = z.object({
     return val;
   }, z.string().min(1, 'Search query is required').optional()),
   industry: z.string().optional(),
-  location: z.string().optional(),
-  size: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']).optional(),
+  location: z
+    .string()
+    .regex(/^[a-z0-9-]+$/, 'Invalid location code format')
+    .refine((code) => PROVINCE_BY_CODE.has(code), 'Unknown location code')
+    .optional(),
+  size: z.string().max(20).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });

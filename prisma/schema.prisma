@@ -117,7 +117,7 @@ model UserProfile {
   bio      String?
   skills   String[]
   cvUrl    String?
-  location String?
+  locations String[] @default([])
   website  String?
   linkedin String?
   github   String?
@@ -138,9 +138,11 @@ model UserProfile {
   attitude  String[] // Array of attitude items
 
   // Expectations
-  expectedSalary  String?
-  workMode        String?
-  expectedCulture String?
+  expectedSalaryMin Int?
+  expectedSalaryMax Int?
+  salaryCurrency    String?   @default("VND")
+  workMode          String?
+  expectedCulture   String?
 
   // Career Goals
   careerGoals String[]
@@ -215,7 +217,7 @@ model Company {
   email                    String?
   phone                    String?
   industry                 String?
-  size                     CompanySize?
+  size                     String?
   foundedYear              Int?
   headcount                Int?
   headcountNote            String?
@@ -312,14 +314,6 @@ model CompanyProfile {
   updatedAt DateTime @updatedAt
 
   @@map("company_profiles")
-}
-
-enum CompanySize {
-  STARTUP
-  SMALL
-  MEDIUM
-  LARGE
-  ENTERPRISE
 }
 
 enum CompanyVerificationStatus {
@@ -492,7 +486,7 @@ model Job {
   id                  String          @id @default(cuid())
   companyId           String
   title               String
-  location            String?
+  locations           String[]        @default([])
   remote              Boolean         @default(false)
   salaryMin           Int?
   salaryMax           Int?
