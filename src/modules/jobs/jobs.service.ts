@@ -963,7 +963,7 @@ export class JobsService {
     const statusLabel = APPLICATION_STATUS_LABEL[data.status] || data.status;
     const jobTitle = application.job.title;
     const companyName = application.job.company.name;
-    const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/applications`;
+    const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/jobs/${application.jobId}`;
 
     notificationService
       .createNotification({
