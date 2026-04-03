@@ -4,6 +4,7 @@ import {
   createJobSchema,
   updateJobSchema,
   getJobSchema,
+  getRelatedJobsQuerySchema,
   searchJobsSchema,
   applyJobSchema,
   getApplicationsSchema,
@@ -70,6 +71,18 @@ export class JobsController {
 
     return reply.send({
       data: { job },
+    });
+  }
+
+  async getRelatedJobs(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { jobId } = getJobSchema.parse(request.params);
+    const { limit } = getRelatedJobsQuerySchema.parse(request.query);
+
+    const jobs = await this.jobsService.getRelatedJobs(jobId, limit, userId);
+
+    return reply.send({
+      data: { jobs },
     });
   }
 

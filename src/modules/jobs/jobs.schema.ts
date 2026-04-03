@@ -87,6 +87,10 @@ export const getJobSchema = z.object({
   jobId: z.string().cuid('Invalid job ID'),
 });
 
+export const getRelatedJobsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(10).default(10),
+});
+
 // Search jobs schema
 export const searchJobsSchema = z.object({
   q: z.string().min(1, 'Search query is required').optional(),
@@ -147,6 +151,7 @@ export const jobIdParamsSchema = z.object({
 export type CreateJobInput = z.infer<typeof createJobSchema>;
 export type UpdateJobInput = z.infer<typeof updateJobSchema>;
 export type GetJobInput = z.infer<typeof getJobSchema>;
+export type GetRelatedJobsQueryInput = z.infer<typeof getRelatedJobsQuerySchema>;
 export type SearchJobsInput = z.infer<typeof searchJobsSchema>;
 export type ApplyJobInput = z.infer<typeof applyJobSchema>;
 export type GetApplicationsInput = z.infer<typeof getApplicationsSchema>;

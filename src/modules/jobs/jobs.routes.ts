@@ -208,6 +208,96 @@ export async function jobsRoutes(fastify: FastifyInstance) {
   }, jobsController.removeFavorite.bind(jobsController));
 
   // Get job by ID
+  fastify.get('/:jobId/related', {
+    preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
+    schema: {
+      description: 'Get related jobs by location and salary',
+      tags: ['Jobs'],
+      params: {
+        type: 'object',
+        properties: {
+          jobId: { type: 'string', description: 'Job ID' },
+        },
+        required: ['jobId'],
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', minimum: 1, maximum: 10, default: 10, description: 'Max related jobs' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                jobs: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      companyId: { type: 'string' },
+                      title: { type: 'string' },
+                      generalInfo: { type: 'string' },
+                      mission: { type: 'string' },
+                      tasks: { type: 'string' },
+                      knowledge: { type: 'string' },
+                      skills: { type: 'string' },
+                      attitude: { type: 'string' },
+                      kpis: { type: 'string', nullable: true },
+                      authority: { type: 'string', nullable: true },
+                      relationships: { type: 'string', nullable: true },
+                      careerPath: { type: 'string', nullable: true },
+                      benefitsIncome: { type: 'string', nullable: true },
+                      benefitsPerks: { type: 'string', nullable: true },
+                      contact: { type: 'string', nullable: true },
+                      locations: { type: 'array', items: { type: 'string' } },
+                      remote: { type: 'boolean' },
+                      salaryMin: { type: 'number', nullable: true },
+                      salaryMax: { type: 'number', nullable: true },
+                      currency: { type: 'string' },
+                      employmentType: { type: 'string' },
+                      experienceLevel: { type: 'string' },
+                      tags: { type: 'array', items: { type: 'string' } },
+                      applicationDeadline: { type: 'string', format: 'date-time', nullable: true },
+                      isActive: { type: 'boolean' },
+                      department: { type: 'string', nullable: true },
+                      jobLevel: { type: 'string', nullable: true },
+                      educationLevel: { type: 'string', nullable: true },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      updatedAt: { type: 'string', format: 'date-time' },
+                      company: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          name: { type: 'string' },
+                          legalName: { type: 'string', nullable: true },
+                          slug: { type: 'string' },
+                          logoUrl: { type: 'string', nullable: true },
+                        },
+                      },
+                      _count: {
+                        type: 'object',
+                        properties: {
+                          applications: { type: 'number' },
+                        },
+                      },
+                      hasApplied: { type: 'boolean' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, jobsController.getRelatedJobs.bind(jobsController));
+
+  // Get job by ID
   fastify.get('/:jobId', {
     preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
     schema: {

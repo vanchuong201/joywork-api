@@ -484,6 +484,197 @@ export class JobsService {
     return result;
   }
 
+  async getRelatedJobs(jobId: string, limit = 10, userId?: string): Promise<JobWithApplication[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 10);
+    const targetJob = await prisma.job.findUnique({
+      where: { id: jobId },
+      select: {
+        id: true,
+        locations: true,
+        salaryMin: true,
+        salaryMax: true,
+      },
+    });
+
+    if (!targetJob) {
+      throw new AppError('Job not found', 404, 'JOB_NOT_FOUND');
+    }
+
+    const salaryRangeMin = targetJob.salaryMin ?? targetJob.salaryMax;
+    const salaryRangeMax = targetJob.salaryMax ?? targetJob.salaryMin;
+    const relatedConditions: any[] = [];
+
+    if (targetJob.locations.length > 0) {
+      relatedConditions.push({
+        locations: { hasSome: targetJob.locations },
+      });
+    }
+
+    if (salaryRangeMin !== null && salaryRangeMax !== null) {
+      relatedConditions.push({
+        AND: [
+          { salaryMin: { not: null } },
+          { salaryMax: { not: null } },
+          { salaryMin: { lte: salaryRangeMax } },
+          { salaryMax: { gte: salaryRangeMin } },
+        ],
+      });
+    }
+
+    const relatedWhere: any = {
+      id: { not: jobId },
+      isActive: true,
+    };
+    if (relatedConditions.length > 0) {
+      relatedWhere.OR = relatedConditions;
+    }
+
+    const candidates = await prisma.job.findMany({
+      where: relatedWhere,
+      take: safeLimit * 4,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            legalName: true,
+            slug: true,
+            logoUrl: true,
+          },
+        },
+        _count: {
+          select: {
+            applications: true,
+          },
+        },
+      },
+    });
+
+    const scoredCandidates = candidates
+      .map((candidate) => {
+        const locationMatched =
+          targetJob.locations.length > 0 &&
+          candidate.locations.some((locationCode) => targetJob.locations.includes(locationCode));
+        const salaryMatched =
+          salaryRangeMin !== null &&
+          salaryRangeMax !== null &&
+          candidate.salaryMin !== null &&
+          candidate.salaryMax !== null &&
+          candidate.salaryMin <= salaryRangeMax &&
+          candidate.salaryMax >= salaryRangeMin;
+
+        const score = (locationMatched ? 2 : 0) + (salaryMatched ? 1 : 0);
+        return { candidate, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.candidate.createdAt.getTime() - a.candidate.createdAt.getTime();
+      })
+      .map(({ candidate }) => candidate);
+
+    const initialRelated = scoredCandidates.slice(0, safeLimit);
+    const missingCount = safeLimit - initialRelated.length;
+
+    let fallbackJobs: typeof candidates = [];
+    if (missingCount > 0) {
+      fallbackJobs = await prisma.job.findMany({
+        where: {
+          id: { notIn: [jobId, ...initialRelated.map((job) => job.id)] },
+          isActive: true,
+        },
+        take: missingCount,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              legalName: true,
+              slug: true,
+              logoUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              applications: true,
+            },
+          },
+        },
+      });
+    }
+
+    const relatedJobs = [...initialRelated, ...fallbackJobs].slice(0, safeLimit);
+    const jobIds = relatedJobs.map((job) => job.id);
+
+    const appliedJobIds = new Set<string>();
+    if (userId && jobIds.length > 0) {
+      const applications = await prisma.application.findMany({
+        where: {
+          userId,
+          jobId: { in: jobIds },
+        },
+        select: {
+          jobId: true,
+        },
+      });
+      applications.forEach((application) => appliedJobIds.add(application.jobId));
+    }
+
+    return relatedJobs.map((job) => {
+      const result: any = {
+        id: job.id,
+        companyId: job.companyId,
+        title: job.title,
+        locations: job.locations,
+        ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
+        remote: job.remote,
+        currency: job.currency,
+        employmentType: job.employmentType,
+        experienceLevel: job.experienceLevel,
+        tags: job.tags,
+        isActive: job.isActive,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        company: {
+          id: job.company.id,
+          name: job.company.name,
+          ...(job.company.legalName ? { legalName: job.company.legalName } : {}),
+          slug: job.company.slug,
+        },
+        _count: job._count,
+        hasApplied: appliedJobIds.has(job.id),
+        // Header fields
+        department: job.department,
+        jobLevel: job.jobLevel,
+        educationLevel: job.educationLevel,
+        // Required JD fields
+        generalInfo: job.generalInfo,
+        mission: job.mission,
+        tasks: job.tasks,
+        knowledge: job.knowledge,
+        skills: job.skills,
+        attitude: job.attitude,
+      };
+
+      // Optional fields
+      if (job.salaryMin !== null) result.salaryMin = job.salaryMin;
+      if (job.salaryMax !== null) result.salaryMax = job.salaryMax;
+      if (job.applicationDeadline) result.applicationDeadline = job.applicationDeadline;
+      if (job.kpis) result.kpis = job.kpis;
+      if (job.authority) result.authority = job.authority;
+      if (job.relationships) result.relationships = job.relationships;
+      if (job.careerPath) result.careerPath = job.careerPath;
+      if (job.benefitsIncome) result.benefitsIncome = job.benefitsIncome;
+      if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
+      if (job.contact) result.contact = job.contact;
+      if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
+
+      return result;
+    });
+  }
+
   // Search jobs
   async searchJobs(data: SearchJobsInput, userId?: string): Promise<{
     jobs: JobWithApplication[];
