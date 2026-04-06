@@ -73,6 +73,7 @@ export const getPostSchema = z.object({
 // Get posts schema (for company posts)
 export const getCompanyPostsSchema = z.object({
   companyId: z.string().cuid('Invalid company ID'),
+  scope: z.enum(['profile', 'manage']),
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).optional(),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   page: z.coerce.number().min(1).default(1),

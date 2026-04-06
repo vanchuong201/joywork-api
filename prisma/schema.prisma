@@ -356,6 +356,7 @@ model Post {
   coverUrl    String?
   type        PostType       @default(STORY)
   visibility  PostVisibility @default(PUBLIC)
+  hiddenFromFeed Boolean     @default(false)
   publishedAt DateTime?
   statementId String?
   statementSnapshot Json?

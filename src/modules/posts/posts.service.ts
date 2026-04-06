@@ -43,6 +43,7 @@ export interface Post {
   coverUrl?: string;
   type: string;
   visibility: string;
+  hiddenFromFeed: boolean;
   publishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -107,6 +108,7 @@ function mapPostEntity(post: any): Post {
     coverUrl: post.coverUrl ?? undefined,
     type: post.type,
     visibility: post.visibility,
+    hiddenFromFeed: post.hiddenFromFeed,
     publishedAt: post.publishedAt ?? undefined,
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
@@ -688,11 +690,36 @@ export class PostsService {
       totalPages: number;
     };
   }> {
-    const { companyId, type, visibility, page, limit } = data;
+    const { companyId, scope, type, visibility, page, limit } = data;
     const skip = (page - 1) * limit;
+
+    if (scope === 'manage') {
+      if (!userId) {
+        throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+      }
+
+      const membership = await prisma.companyMember.findFirst({
+        where: {
+          companyId,
+          userId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!membership) {
+        throw new AppError('Bạn không có quyền truy cập', 403, 'FORBIDDEN');
+      }
+    }
 
     // Build where clause
     const where: any = { companyId };
+
+    if (scope === 'profile') {
+      where.visibility = 'PUBLIC';
+      where.publishedAt = { not: null };
+    }
 
     if (type) {
       where.type = type;
@@ -708,7 +735,7 @@ export class PostsService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: scope === 'profile' ? { publishedAt: 'desc' } : { createdAt: 'desc' },
         include: {
           company: {
             select: {
@@ -829,6 +856,7 @@ export class PostsService {
     // Build where clause - only public posts
     const where: any = { 
       visibility: 'PUBLIC',
+      hiddenFromFeed: false,
       publishedAt: { not: null }, // Only published posts
     };
 

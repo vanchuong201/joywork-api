@@ -354,6 +354,105 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.listJobs.bind(systemController));
 
+  fastify.get('/posts', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Danh sách bài viết cho admin theo thứ tự mới nhất',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          q: { type: 'string' },
+          companyId: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                posts: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      title: { type: 'string' },
+                      type: { type: 'string' },
+                      visibility: { type: 'string' },
+                      hiddenFromFeed: { type: 'boolean' },
+                      companyId: { type: 'string' },
+                      companyName: { type: 'string' },
+                      companySlug: { type: 'string' },
+                      createdAt: { type: 'string' },
+                      publishedAt: { type: ['string', 'null'] },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.listPosts.bind(systemController));
+
+  fastify.patch('/posts/:postId/feed-visibility', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Ẩn hoặc hiện bài viết trên new feed',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['postId'],
+        properties: {
+          postId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['hiddenFromFeed'],
+        properties: {
+          hiddenFromFeed: { type: 'boolean' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                post: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    hiddenFromFeed: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.patchPostFeedVisibility.bind(systemController));
+
   fastify.post('/jobs/:jobId/send-reminder', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {

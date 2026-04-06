@@ -5,6 +5,8 @@ import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import {
   adminCompaniesQuerySchema,
   adminJobsQuerySchema,
+  adminPostFeedVisibilityPatchSchema,
+  adminPostsQuerySchema,
   adminCompanyPremiumPatchSchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
@@ -80,6 +82,25 @@ export class SystemController {
     }
     const result = await this.systemService.listJobsForAdmin(parsed.data);
     return reply.send({ data: result });
+  }
+
+  async listPosts(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = adminPostsQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const result = await this.systemService.listPostsForAdmin(parsed.data);
+    return reply.send({ data: result });
+  }
+
+  async patchPostFeedVisibility(request: FastifyRequest, reply: FastifyReply) {
+    const { postId } = request.params as { postId: string };
+    const parsed = adminPostFeedVisibilityPatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const post = await this.systemService.setPostFeedVisibility(postId, parsed.data.hiddenFromFeed);
+    return reply.send({ data: { post } });
   }
 
   async sendJobReminder(request: FastifyRequest, reply: FastifyReply) {

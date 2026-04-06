@@ -323,7 +323,16 @@ export async function postsRoutes(fastify: FastifyInstance) {
 
   // Get company posts
   fastify.get('/companies/:companyId/posts', {
-    preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
+    preHandler: [
+      async (request, reply) => {
+        const scope = (request.query as { scope?: string } | undefined)?.scope;
+        if (scope === 'manage') {
+          await authMiddleware.verifyToken(request as any, reply);
+          return;
+        }
+        await authMiddleware.optionalAuth(request as any, reply);
+      },
+    ],
     schema: {
       description: 'Get posts for a specific company',
       tags: ['Posts'],
@@ -336,7 +345,13 @@ export async function postsRoutes(fastify: FastifyInstance) {
       },
       querystring: {
         type: 'object',
+        required: ['scope'],
         properties: {
+          scope: {
+            type: 'string',
+            enum: ['profile', 'manage'],
+            description: 'Danh sách bài viết cho profile công khai hoặc trang quản lý doanh nghiệp',
+          },
           type: { 
             type: 'string', 
             enum: ['STORY', 'ANNOUNCEMENT', 'EVENT'],
@@ -371,6 +386,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       coverUrl: { type: 'string', nullable: true },
                       type: { type: 'string' },
                       visibility: { type: 'string' },
+                      hiddenFromFeed: { type: 'boolean' },
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
@@ -525,6 +541,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                       coverUrl: { type: 'string', nullable: true },
                       type: { type: 'string' },
                       visibility: { type: 'string' },
+                      hiddenFromFeed: { type: 'boolean' },
                       publishedAt: { type: 'string', format: 'date-time', nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },

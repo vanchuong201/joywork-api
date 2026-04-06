@@ -49,3 +49,18 @@ export const adminJobsQuerySchema = z.object({
 });
 
 export type AdminJobsQuery = z.infer<typeof adminJobsQuerySchema>;
+
+export const adminPostsQuerySchema = z.object({
+  page: pageSchema,
+  limit: limitSchema,
+  q: z.string().trim().max(200).optional(),
+  companyId: z.string().cuid().optional(),
+});
+
+export type AdminPostsQuery = z.infer<typeof adminPostsQuerySchema>;
+
+export const adminPostFeedVisibilityPatchSchema = z.object({
+  hiddenFromFeed: z.boolean(),
+});
+
+export type AdminPostFeedVisibilityPatch = z.infer<typeof adminPostFeedVisibilityPatchSchema>;

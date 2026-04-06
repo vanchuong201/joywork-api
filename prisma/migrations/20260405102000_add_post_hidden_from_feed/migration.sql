@@ -1,0 +1,2 @@
+ALTER TABLE "posts"
+ADD COLUMN "hiddenFromFeed" BOOLEAN NOT NULL DEFAULT false;

@@ -7,6 +7,7 @@ import { config } from '@/config/env';
 import type {
   AdminCompaniesQuery,
   AdminJobsQuery,
+  AdminPostsQuery,
   AdminReportTimeseriesQuery,
   AdminUsersQuery,
 } from '@/modules/system/system.schema';
@@ -82,6 +83,19 @@ export interface AdminJobListItem {
   createdAt: Date;
   reminderSentAt: Date | null;
   adminEmails: string[];
+}
+
+export interface AdminPostListItem {
+  id: string;
+  title: string;
+  type: string;
+  visibility: string;
+  hiddenFromFeed: boolean;
+  companyId: string;
+  companyName: string;
+  companySlug: string;
+  createdAt: Date;
+  publishedAt: Date | null;
 }
 
 export interface AdminProvinceAliasItem {
@@ -385,6 +399,99 @@ export class SystemService {
         totalPages: Math.ceil(total / limit) || 1,
       },
     };
+  }
+
+  async listPostsForAdmin(query: AdminPostsQuery): Promise<{
+    posts: AdminPostListItem[];
+    pagination: AdminPagination;
+  }> {
+    const { page, limit, q, companyId } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.PostWhereInput = {};
+    if (companyId) {
+      where.companyId = companyId;
+    }
+    if (q) {
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { company: { name: { contains: q, mode: 'insensitive' } } },
+        { company: { slug: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [total, rows] = await Promise.all([
+      prisma.post.count({ where }),
+      prisma.post.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          visibility: true,
+          hiddenFromFeed: true,
+          createdAt: true,
+          publishedAt: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const posts: AdminPostListItem[] = rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      type: row.type,
+      visibility: row.visibility,
+      hiddenFromFeed: row.hiddenFromFeed,
+      companyId: row.company.id,
+      companyName: row.company.name,
+      companySlug: row.company.slug,
+      createdAt: row.createdAt,
+      publishedAt: row.publishedAt,
+    }));
+
+    return {
+      posts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async setPostFeedVisibility(
+    postId: string,
+    hiddenFromFeed: boolean
+  ): Promise<{ id: string; hiddenFromFeed: boolean }> {
+    try {
+      const updated = await prisma.post.update({
+        where: { id: postId },
+        data: {
+          hiddenFromFeed,
+        },
+        select: {
+          id: true,
+          hiddenFromFeed: true,
+        },
+      });
+      return updated;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new AppError('Không tìm thấy bài viết', 404, 'POST_NOT_FOUND');
+      }
+      throw error;
+    }
   }
 
   async sendExpiringReminderForJob(jobId: string): Promise<{ id: string; reminderSentAt: Date }> {
