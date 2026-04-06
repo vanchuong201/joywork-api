@@ -40,3 +40,12 @@ export const adminCompanyPremiumPatchSchema = z.object({
 });
 
 export type AdminCompanyPremiumPatch = z.infer<typeof adminCompanyPremiumPatchSchema>;
+
+export const adminJobsQuerySchema = z.object({
+  page: pageSchema,
+  limit: limitSchema,
+  q: z.string().trim().max(200).optional(),
+  filter: z.enum(['expiring_soon', 'expired', 'all']).default('all'),
+});
+
+export type AdminJobsQuery = z.infer<typeof adminJobsQuerySchema>;

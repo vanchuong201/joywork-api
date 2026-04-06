@@ -298,6 +298,154 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.patchCompanyPremiumStatus.bind(systemController));
 
+  fastify.get('/jobs', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Danh sách job cho admin theo trạng thái sắp hết hạn / quá hạn',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+          q: { type: 'string' },
+          filter: { type: 'string', enum: ['expiring_soon', 'expired', 'all'] },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                jobs: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      title: { type: 'string' },
+                      companyId: { type: 'string' },
+                      companyName: { type: 'string' },
+                      companySlug: { type: 'string' },
+                      updatedAt: { type: 'string' },
+                      createdAt: { type: 'string' },
+                      reminderSentAt: { type: ['string', 'null'] },
+                      adminEmails: { type: 'array', items: { type: 'string' } },
+                    },
+                  },
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'number' },
+                    limit: { type: 'number' },
+                    total: { type: 'number' },
+                    totalPages: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.listJobs.bind(systemController));
+
+  fastify.post('/jobs/:jobId/send-reminder', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Gửi email nhắc nhở cho job sắp hết hạn',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['jobId'],
+        properties: {
+          jobId: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                job: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    reminderSentAt: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.sendJobReminder.bind(systemController));
+
+  fastify.patch('/jobs/:jobId/close', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Đóng một job theo thao tác admin',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['jobId'],
+        properties: {
+          jobId: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                job: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    isActive: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.closeJob.bind(systemController));
+
+  fastify.post('/jobs/close-expired', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Đóng tất cả job quá hạn 20 ngày không tương tác',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                closedCount: { type: 'number' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.closeExpiredJobs.bind(systemController));
+
   fastify.get('/reports/timeseries', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {

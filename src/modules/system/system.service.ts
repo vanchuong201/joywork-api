@@ -6,9 +6,11 @@ import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import type {
   AdminCompaniesQuery,
+  AdminJobsQuery,
   AdminReportTimeseriesQuery,
   AdminUsersQuery,
 } from '@/modules/system/system.schema';
+import { getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 
 export interface SystemOverview {
   users: number;
@@ -70,6 +72,18 @@ export interface CompanyVerificationItem {
   isVerified: boolean;
 }
 
+export interface AdminJobListItem {
+  id: string;
+  title: string;
+  companyId: string;
+  companyName: string;
+  companySlug: string;
+  updatedAt: Date;
+  createdAt: Date;
+  reminderSentAt: Date | null;
+  adminEmails: string[];
+}
+
 export interface AdminProvinceAliasItem {
   id: string;
   aliasText: string;
@@ -117,6 +131,12 @@ function mapCountsToSeries(
     map.set(toDateKeyUTC(new Date(r.day)), Number(r.count));
   }
   return keys.map((date) => ({ date, count: map.get(date) ?? 0 }));
+}
+
+function subtractDays(base: Date, days: number): Date {
+  const value = new Date(base);
+  value.setDate(value.getDate() - days);
+  return value;
 }
 
 export class SystemService {
@@ -270,6 +290,218 @@ export class SystemService {
         totalPages: Math.ceil(total / limit) || 1,
       },
     };
+  }
+
+  async listJobsForAdmin(query: AdminJobsQuery): Promise<{
+    jobs: AdminJobListItem[];
+    pagination: AdminPagination;
+  }> {
+    const { page, limit, q, filter } = query;
+    const skip = (page - 1) * limit;
+    const now = new Date();
+    const fifteenDaysAgo = subtractDays(now, 15);
+    const twentyDaysAgo = subtractDays(now, 20);
+
+    const where: Prisma.JobWhereInput = {
+      isActive: true,
+    };
+
+    if (q) {
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { company: { name: { contains: q, mode: 'insensitive' } } },
+        { company: { slug: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (filter === 'expiring_soon') {
+      where.updatedAt = {
+        lt: fifteenDaysAgo,
+        gte: twentyDaysAgo,
+      };
+    }
+
+    if (filter === 'expired') {
+      where.updatedAt = {
+        lt: twentyDaysAgo,
+      };
+    }
+
+    const [total, rows] = await Promise.all([
+      prisma.job.count({ where }),
+      prisma.job.findMany({
+        where,
+        orderBy: { updatedAt: 'asc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+          updatedAt: true,
+          reminderSentAt: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              members: {
+                where: {
+                  role: { in: ['OWNER', 'ADMIN'] },
+                },
+                select: {
+                  userId: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const adminIds = Array.from(new Set(rows.flatMap((job) => job.company.members.map((member) => member.userId))));
+    const verifiedEmailMap = adminIds.length > 0 ? await getVerifiedEmailsForUsers(adminIds) : new Map<string, string>();
+
+    const jobs = rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      companyId: row.company.id,
+      companyName: row.company.name,
+      companySlug: row.company.slug,
+      updatedAt: row.updatedAt,
+      createdAt: row.createdAt,
+      reminderSentAt: row.reminderSentAt,
+      adminEmails: row.company.members
+        .map((member) => verifiedEmailMap.get(member.userId))
+        .filter((email): email is string => Boolean(email)),
+    }));
+
+    return {
+      jobs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async sendExpiringReminderForJob(jobId: string): Promise<{ id: string; reminderSentAt: Date }> {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        isActive: true,
+        company: {
+          select: {
+            name: true,
+            slug: true,
+            members: {
+              where: {
+                role: { in: ['OWNER', 'ADMIN'] },
+              },
+              select: {
+                userId: true,
+                user: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!job) {
+      throw new AppError('Không tìm thấy tin tuyển dụng', 404, 'JOB_NOT_FOUND');
+    }
+    if (!job.isActive) {
+      throw new AppError('Tin tuyển dụng đã đóng', 400, 'JOB_INACTIVE');
+    }
+
+    const now = new Date();
+    const fifteenDaysAgo = subtractDays(now, 15);
+    const twentyDaysAgo = subtractDays(now, 20);
+    if (job.updatedAt >= fifteenDaysAgo || job.updatedAt < twentyDaysAgo) {
+      throw new AppError('Tin tuyển dụng chưa đến ngưỡng nhắc nhở', 400, 'JOB_NOT_ELIGIBLE_FOR_REMINDER');
+    }
+
+    const elapsedDays = Math.floor((now.getTime() - job.updatedAt.getTime()) / (24 * 60 * 60 * 1000));
+    const daysLeft = Math.max(0, 20 - elapsedDays);
+    const manageUrl = `${config.FRONTEND_ORIGIN}/companies/${job.company.slug}/manage?tab=jobs`;
+    const adminIds = job.company.members.map((member) => member.userId);
+    const verifiedEmailMap = adminIds.length > 0 ? await getVerifiedEmailsForUsers(adminIds) : new Map<string, string>();
+
+    await Promise.all(
+      job.company.members.map(async (member) => {
+        const email = verifiedEmailMap.get(member.userId);
+        if (!email) return;
+        await emailService.sendJobExpiringReminderEmail(email, {
+          recipientName: member.user.name,
+          jobTitle: job.title,
+          companyName: job.company.name,
+          manageUrl,
+          daysLeft,
+        });
+      }),
+    );
+
+    const updated = await prisma.job.update({
+      where: { id: jobId },
+      data: { reminderSentAt: now },
+      select: {
+        id: true,
+        reminderSentAt: true,
+      },
+    });
+
+    return {
+      id: updated.id,
+      reminderSentAt: updated.reminderSentAt as Date,
+    };
+  }
+
+  async closeJobByAdmin(jobId: string): Promise<{ id: string; isActive: boolean }> {
+    try {
+      const updated = await prisma.job.update({
+        where: { id: jobId },
+        data: {
+          isActive: false,
+        },
+        select: {
+          id: true,
+          isActive: true,
+        },
+      });
+      return updated;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new AppError('Không tìm thấy tin tuyển dụng', 404, 'JOB_NOT_FOUND');
+      }
+      throw error;
+    }
+  }
+
+  async closeExpiredJobsByAdmin(): Promise<{ closedCount: number }> {
+    const twentyDaysAgo = subtractDays(new Date(), 20);
+    const result = await prisma.job.updateMany({
+      where: {
+        isActive: true,
+        updatedAt: {
+          lt: twentyDaysAgo,
+        },
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    return { closedCount: result.count };
   }
 
   async getReportTimeseries(query: AdminReportTimeseriesQuery): Promise<{

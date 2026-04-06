@@ -971,6 +971,36 @@ export async function jobsRoutes(fastify: FastifyInstance) {
     },
   }, jobsController.updateJob.bind(jobsController));
 
+  // Refresh job activity timestamp
+  fastify.patch('/:jobId/refresh', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Refresh job update timestamp',
+      tags: ['Jobs'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          jobId: { type: 'string', description: 'Job ID' },
+        },
+        required: ['jobId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, jobsController.refreshJob.bind(jobsController));
+
   // Delete job
   fastify.delete('/:jobId', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],

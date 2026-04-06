@@ -53,6 +53,19 @@ export class JobsController {
     });
   }
 
+  async refreshJob(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { jobId } = getJobSchema.parse(request.params);
+
+    await this.jobsService.refreshJob(jobId, userId);
+
+    return reply.send({
+      data: {
+        message: 'Làm mới tin tuyển dụng thành công',
+      },
+    });
+  }
+
   // Get job by ID
   async getJob(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;

@@ -1,4 +1,4 @@
-import { NotificationType } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
@@ -273,6 +273,7 @@ export class JobsService {
     // Update job
     const updateData: any = {
       updatedAt: new Date(),
+      reminderSentAt: null,
     };
     
     // Basic info
@@ -391,6 +392,40 @@ export class JobsService {
     if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
     
     return result;
+  }
+
+  async refreshJob(jobId: string, userId: string): Promise<void> {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+      include: {
+        company: {
+          include: {
+            members: {
+              where: { userId },
+            },
+          },
+        },
+      },
+    });
+
+    if (!job) {
+      throw new AppError('Job not found', 404, 'JOB_NOT_FOUND');
+    }
+
+    const membership = job.company.members[0];
+    if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
+      throw new AppError('You do not have permission to refresh this job', 403, 'FORBIDDEN');
+    }
+
+    const refreshData: Record<string, unknown> = {
+      updatedAt: new Date(),
+      reminderSentAt: null,
+    };
+
+    await prisma.job.update({
+      where: { id: jobId },
+      data: refreshData as Prisma.JobUncheckedUpdateInput,
+    });
   }
 
   // Get job by ID
@@ -883,7 +918,9 @@ export class JobsService {
       throw new AppError('Job is no longer active', 400, 'JOB_INACTIVE');
     }
 
-    // Cho phép apply kể cả đã hết hạn (không chặn theo applicationDeadline)
+    if (job.applicationDeadline && job.applicationDeadline.getTime() < Date.now()) {
+      throw new AppError('Đã hết hạn ứng tuyển cho việc làm này', 400, 'APPLICATION_DEADLINE_PASSED');
+    }
 
     // Check if user has already applied
     const existingApplication = await prisma.application.findUnique({
@@ -917,6 +954,16 @@ export class JobsService {
         resumeUrl: data.resumeUrl ?? null,
         status: 'PENDING',
       },
+    });
+
+    const interactionData: Record<string, unknown> = {
+      updatedAt: new Date(),
+      reminderSentAt: null,
+    };
+
+    await prisma.job.update({
+      where: { id: job.id },
+      data: interactionData as Prisma.JobUncheckedUpdateInput,
     });
 
     const companyAdmins = await prisma.companyMember.findMany({

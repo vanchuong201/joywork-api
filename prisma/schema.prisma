@@ -521,6 +521,7 @@ model Job {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  reminderSentAt DateTime?
 
   // Relations
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)

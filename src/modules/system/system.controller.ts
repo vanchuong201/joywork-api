@@ -4,6 +4,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import {
   adminCompaniesQuerySchema,
+  adminJobsQuerySchema,
   adminCompanyPremiumPatchSchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
@@ -70,6 +71,32 @@ export class SystemController {
     }
     const company = await this.systemService.setCompanyPremiumStatus(companyId, parsed.data.isPremium);
     return reply.send({ data: { company } });
+  }
+
+  async listJobs(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = adminJobsQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const result = await this.systemService.listJobsForAdmin(parsed.data);
+    return reply.send({ data: result });
+  }
+
+  async sendJobReminder(request: FastifyRequest, reply: FastifyReply) {
+    const { jobId } = request.params as { jobId: string };
+    const job = await this.systemService.sendExpiringReminderForJob(jobId);
+    return reply.send({ data: { job } });
+  }
+
+  async closeJob(request: FastifyRequest, reply: FastifyReply) {
+    const { jobId } = request.params as { jobId: string };
+    const job = await this.systemService.closeJobByAdmin(jobId);
+    return reply.send({ data: { job } });
+  }
+
+  async closeExpiredJobs(_request: FastifyRequest, reply: FastifyReply) {
+    const result = await this.systemService.closeExpiredJobsByAdmin();
+    return reply.send({ data: result });
   }
 
   async getReportTimeseries(request: FastifyRequest, reply: FastifyReply) {

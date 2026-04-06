@@ -1063,6 +1063,78 @@ Trân trọng,
     });
   }
 
+  async sendJobExpiringReminderEmail(
+    to: string,
+    payload: {
+      recipientName?: string | null;
+      jobTitle: string;
+      companyName: string;
+      manageUrl: string;
+      daysLeft: number;
+    },
+  ): Promise<void> {
+    const recipientLabel = payload.recipientName || 'bạn';
+    const subject = `[JOYWORK] Nhắc nhở cập nhật tin tuyển dụng: ${payload.jobTitle}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nhắc nhở cập nhật tin tuyển dụng - JOYWORK</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #295892; margin-bottom: 20px;">Tin tuyển dụng sắp tự động đóng</h2>
+    <p>Chào ${recipientLabel},</p>
+    <p>
+      Tin tuyển dụng <strong>${payload.jobTitle}</strong> tại <strong>${payload.companyName}</strong>
+      sẽ tự động đóng sau <strong>${payload.daysLeft} ngày</strong> nếu không có thao tác cập nhật.
+    </p>
+    <p>
+      Bạn có thể vào trang quản lý để chỉnh sửa nội dung hoặc bấm nút <strong>"Làm mới"</strong>
+      để giữ tin hiển thị.
+    </p>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Cập nhật tin tuyển dụng</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+      Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+      <a href="${payload.manageUrl}" style="color: #295892;">${payload.manageUrl}</a>
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWORK</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Chào ${recipientLabel},
+
+Tin tuyển dụng ${payload.jobTitle} tại ${payload.companyName} sẽ tự động đóng sau ${payload.daysLeft} ngày nếu không có thao tác cập nhật.
+
+Bạn có thể chỉnh sửa nội dung hoặc bấm nút "Làm mới" tại trang quản lý:
+${payload.manageUrl}
+
+Trân trọng,
+Đội ngũ JOYWORK
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
   // ── Talent Pool emails (bilingual Vi–En) ──
 
   private talentPoolWrapper(title: string, bodyVi: string, bodyEn: string, ctaUrl?: string, ctaLabel?: string): string {
