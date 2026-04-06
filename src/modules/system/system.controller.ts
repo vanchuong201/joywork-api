@@ -4,6 +4,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import {
   adminCompaniesQuerySchema,
+  adminPostDeleteSchema,
   adminJobsQuerySchema,
   adminPostFeedVisibilityPatchSchema,
   adminPostsQuerySchema,
@@ -100,6 +101,30 @@ export class SystemController {
       throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
     }
     const post = await this.systemService.setPostFeedVisibility(postId, parsed.data.hiddenFromFeed);
+    return reply.send({ data: { post } });
+  }
+
+  async deletePostByJoywork(request: AuthenticatedRequest, reply: FastifyReply) {
+    const adminId = request.user?.userId;
+    if (!adminId) {
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+    }
+    const { postId } = request.params as { postId: string };
+    const parsed = adminPostDeleteSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const post = await this.systemService.deletePostByJoywork(adminId, postId, parsed.data.reason);
+    return reply.send({ data: { post } });
+  }
+
+  async restorePostByJoywork(request: AuthenticatedRequest, reply: FastifyReply) {
+    const adminId = request.user?.userId;
+    if (!adminId) {
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+    }
+    const { postId } = request.params as { postId: string };
+    const post = await this.systemService.restorePostByJoywork(adminId, postId);
     return reply.send({ data: { post } });
   }
 

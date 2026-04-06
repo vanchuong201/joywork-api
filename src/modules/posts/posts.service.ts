@@ -639,6 +639,9 @@ export class PostsService {
     if (!post) {
       return null;
     }
+    if ((post as any).deletedByJoyworkAt) {
+      return null;
+    }
 
     // Check reactions/likes/saved for this post
     let isLiked = false;
@@ -714,7 +717,7 @@ export class PostsService {
     }
 
     // Build where clause
-    const where: any = { companyId };
+    const where: any = { companyId, deletedByJoyworkAt: null };
 
     if (scope === 'profile') {
       where.visibility = 'PUBLIC';
@@ -857,6 +860,7 @@ export class PostsService {
     const where: any = { 
       visibility: 'PUBLIC',
       hiddenFromFeed: false,
+      deletedByJoyworkAt: null,
       publishedAt: { not: null }, // Only published posts
     };
 
@@ -1030,7 +1034,7 @@ export class PostsService {
   // Save post to favorites
   async addFavorite(postId: string, userId: string): Promise<void> {
     const post = await prisma.post.findUnique({ where: { id: postId } });
-    if (!post) {
+    if (!post || (post as any).deletedByJoyworkAt) {
       throw new AppError('Post not found', 404, 'POST_NOT_FOUND');
     }
     const existing = await prisma.postFavorite.findUnique({
@@ -1103,7 +1107,8 @@ export class PostsService {
     ]);
 
     // Get reactions for all posts in parallel
-    const postIds = favorites.map((fav) => fav.post.id);
+    const activeFavorites = favorites.filter((fav) => !(fav as any).post?.deletedByJoyworkAt);
+    const postIds = activeFavorites.map((fav) => fav.post.id);
     const [reactionsCounts, userReactions] = await Promise.all([
       Promise.all(
         postIds.map(async (postId) => {
@@ -1132,7 +1137,7 @@ export class PostsService {
     );
 
     return {
-      favorites: favorites.map((fav) => {
+      favorites: activeFavorites.map((fav) => {
         const mapped = mapPostEntity(fav.post as any);
         const liked = (fav.post.likes ?? []).some((like: any) => like.userId === userId);
         const reactions = reactionsMap.get(fav.post.id) ?? { JOY: 0, TRUST: 0, SKEPTIC: 0 };

@@ -357,6 +357,8 @@ model Post {
   type        PostType       @default(STORY)
   visibility  PostVisibility @default(PUBLIC)
   hiddenFromFeed Boolean     @default(false)
+  deletedByJoyworkAt DateTime?
+  deletedByJoyworkReason String?
   publishedAt DateTime?
   statementId String?
   statementSnapshot Json?

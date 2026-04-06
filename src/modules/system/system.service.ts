@@ -91,6 +91,8 @@ export interface AdminPostListItem {
   type: string;
   visibility: string;
   hiddenFromFeed: boolean;
+  deletedByJoyworkAt: Date | null;
+  deletedByJoyworkReason: string | null;
   companyId: string;
   companyName: string;
   companySlug: string;
@@ -433,6 +435,8 @@ export class SystemService {
           type: true,
           visibility: true,
           hiddenFromFeed: true,
+          deletedByJoyworkAt: true,
+          deletedByJoyworkReason: true,
           createdAt: true,
           publishedAt: true,
           company: {
@@ -443,15 +447,17 @@ export class SystemService {
             },
           },
         },
-      }),
+      } as any),
     ]);
 
-    const posts: AdminPostListItem[] = rows.map((row) => ({
+    const posts: AdminPostListItem[] = (rows as any[]).map((row) => ({
       id: row.id,
       title: row.title,
       type: row.type,
       visibility: row.visibility,
       hiddenFromFeed: row.hiddenFromFeed,
+      deletedByJoyworkAt: row.deletedByJoyworkAt,
+      deletedByJoyworkReason: row.deletedByJoyworkReason,
       companyId: row.company.id,
       companyName: row.company.name,
       companySlug: row.company.slug,
@@ -485,6 +491,100 @@ export class SystemService {
           hiddenFromFeed: true,
         },
       });
+      return updated;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new AppError('Không tìm thấy bài viết', 404, 'POST_NOT_FOUND');
+      }
+      throw error;
+    }
+  }
+
+  async deletePostByJoywork(
+    _adminId: string,
+    postId: string,
+    reason: string
+  ): Promise<{ id: string; deletedByJoyworkAt: Date | null; deletedByJoyworkReason: string | null }> {
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        title: true,
+        company: {
+          select: {
+            name: true,
+            slug: true,
+            members: {
+              where: { role: { in: ['OWNER', 'ADMIN'] } },
+              select: {
+                userId: true,
+                user: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new AppError('Không tìm thấy bài viết', 404, 'POST_NOT_FOUND');
+    }
+
+    const now = new Date();
+    const updated = await prisma.post.update({
+      where: { id: postId },
+      data: {
+        deletedByJoyworkAt: now,
+        deletedByJoyworkReason: reason,
+      },
+      select: {
+        id: true,
+        deletedByJoyworkAt: true,
+        deletedByJoyworkReason: true,
+      },
+    } as any);
+
+    const adminIds = post.company.members.map((member) => member.userId);
+    const verifiedEmailMap = adminIds.length > 0 ? await getVerifiedEmailsForUsers(adminIds) : new Map<string, string>();
+
+    await Promise.all(
+      post.company.members.map(async (member) => {
+        const email = verifiedEmailMap.get(member.userId);
+        if (!email) return;
+        await emailService.sendCompanyPostDeletedByJoyworkEmail(email, {
+          recipientName: member.user.name,
+          companyName: post.company.name,
+          postTitle: post.title,
+          reason,
+          manageUrl: `${config.FRONTEND_ORIGIN}/companies/${post.company.slug}/manage?tab=activity`,
+        });
+      })
+    );
+
+    return updated;
+  }
+
+  async restorePostByJoywork(
+    _adminId: string,
+    postId: string
+  ): Promise<{ id: string; deletedByJoyworkAt: Date | null; deletedByJoyworkReason: string | null }> {
+    try {
+      const updated = await prisma.post.update({
+        where: { id: postId },
+        data: {
+          deletedByJoyworkAt: null,
+          deletedByJoyworkReason: null,
+        },
+        select: {
+          id: true,
+          deletedByJoyworkAt: true,
+          deletedByJoyworkReason: true,
+        },
+      } as any);
       return updated;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {

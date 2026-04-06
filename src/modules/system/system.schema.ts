@@ -64,3 +64,9 @@ export const adminPostFeedVisibilityPatchSchema = z.object({
 });
 
 export type AdminPostFeedVisibilityPatch = z.infer<typeof adminPostFeedVisibilityPatchSchema>;
+
+export const adminPostDeleteSchema = z.object({
+  reason: z.string().trim().min(5).max(1000),
+});
+
+export type AdminPostDeleteInput = z.infer<typeof adminPostDeleteSchema>;

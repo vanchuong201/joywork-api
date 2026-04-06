@@ -386,6 +386,8 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       type: { type: 'string' },
                       visibility: { type: 'string' },
                       hiddenFromFeed: { type: 'boolean' },
+                      deletedByJoyworkAt: { type: ['string', 'null'] },
+                      deletedByJoyworkReason: { type: ['string', 'null'] },
                       companyId: { type: 'string' },
                       companyName: { type: 'string' },
                       companySlug: { type: 'string' },
@@ -452,6 +454,85 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.patchPostFeedVisibility.bind(systemController));
+
+  fastify.patch('/posts/:postId/delete', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Xóa mềm bài viết bởi JOYWORK và lưu lý do',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['postId'],
+        properties: {
+          postId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['reason'],
+        properties: {
+          reason: { type: 'string', minLength: 5, maxLength: 1000 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                post: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    deletedByJoyworkAt: { type: ['string', 'null'] },
+                    deletedByJoyworkReason: { type: ['string', 'null'] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.deletePostByJoywork.bind(systemController));
+
+  fastify.patch('/posts/:postId/restore', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Khôi phục bài viết đã xóa mềm bởi JOYWORK',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['postId'],
+        properties: {
+          postId: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                post: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    deletedByJoyworkAt: { type: ['string', 'null'] },
+                    deletedByJoyworkReason: { type: ['string', 'null'] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.restorePostByJoywork.bind(systemController));
 
   fastify.post('/jobs/:jobId/send-reminder', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],

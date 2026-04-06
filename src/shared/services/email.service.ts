@@ -1135,6 +1135,84 @@ Trân trọng,
     });
   }
 
+  async sendCompanyPostDeletedByJoyworkEmail(
+    to: string,
+    payload: {
+      recipientName?: string | null;
+      companyName: string;
+      postTitle: string;
+      reason: string;
+      manageUrl: string;
+    }
+  ): Promise<void> {
+    const recipientLabel = payload.recipientName || 'bạn';
+    const subject = `[JOYWORK] Bài viết bị gỡ khỏi hiển thị: ${payload.postTitle}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bài viết bị gỡ hiển thị - JOYWORK</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #b45309; margin-bottom: 20px;">Bài viết đã bị JOYWORK gỡ khỏi hiển thị</h2>
+    <p>Chào ${recipientLabel},</p>
+    <p>
+      Bài viết <strong>${payload.postTitle}</strong> của doanh nghiệp <strong>${payload.companyName}</strong>
+      đã bị đội ngũ JOYWORK ẩn khỏi các kênh hiển thị người dùng.
+    </p>
+
+    <div style="background-color: #fffbeb; border: 1px solid #fcd34d; padding: 14px; border-radius: 6px; margin: 18px 0;">
+      <p style="margin: 0 0 6px 0; font-weight: 700;">Lý do:</p>
+      <p style="margin: 0;">${payload.reason}</p>
+    </div>
+
+    <p>Bạn có thể vào trang quản lý hoạt động để rà soát nội dung và liên hệ JOYWORK nếu cần hỗ trợ thêm.</p>
+
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${payload.manageUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 28px; text-decoration: none; border-radius: 5px; font-weight: bold;">Mở trang quản lý bài viết</a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+      Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn sau vào trình duyệt:<br/>
+      <a href="${payload.manageUrl}" style="color: #295892;">${payload.manageUrl}</a>
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWORK</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Chào ${recipientLabel},
+
+Bài viết "${payload.postTitle}" của doanh nghiệp ${payload.companyName} đã bị đội ngũ JOYWORK ẩn khỏi các kênh hiển thị người dùng.
+
+Lý do:
+${payload.reason}
+
+Bạn có thể kiểm tra tại trang quản lý hoạt động:
+${payload.manageUrl}
+
+Trân trọng,
+Đội ngũ JOYWORK
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
   // ── Talent Pool emails (bilingual Vi–En) ──
 
   private talentPoolWrapper(title: string, bodyVi: string, bodyEn: string, ctaUrl?: string, ctaLabel?: string): string {
