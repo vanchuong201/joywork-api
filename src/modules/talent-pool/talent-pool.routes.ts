@@ -18,7 +18,50 @@ export async function talentPoolRoutes(fastify: FastifyInstance) {
       tags: ['Talent Pool'],
       security: [{ bearerAuth: [] }],
       response: {
-        200: { type: 'object', properties: { data: { type: 'object' } } },
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                member: {
+                  anyOf: [
+                    { type: 'null' },
+                    {
+                      type: 'object',
+                      additionalProperties: true,
+                      properties: {
+                        id: { type: 'string' },
+                        status: { type: 'string' },
+                        source: { type: 'string' },
+                        reason: { type: ['string', 'null'] },
+                        createdAt: { type: 'string', format: 'date-time' },
+                      },
+                    },
+                  ],
+                },
+                latestRequest: {
+                  anyOf: [
+                    { type: 'null' },
+                    {
+                      type: 'object',
+                      additionalProperties: true,
+                      properties: {
+                        id: { type: 'string' },
+                        status: { type: 'string' },
+                        message: { type: ['string', 'null'] },
+                        reason: { type: ['string', 'null'] },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        reviewedAt: { type: ['string', 'null'], format: 'date-time' },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
       },
     },
   }, controller.getMyStatus.bind(controller));

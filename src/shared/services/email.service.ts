@@ -1166,18 +1166,42 @@ Trân trọng,
   ): Promise<void> {
     const name = payload.name || 'bạn';
     const html = this.talentPoolWrapper(
-      'Chào mừng bạn đến với Talent Pool! 🎉',
+      'Thông báo kết quả xét duyệt Talent Pool',
       `<p>Chào ${name},</p>
-      <p>Yêu cầu tham gia <strong>Talent Pool</strong> của bạn đã được <strong>phê duyệt</strong>.</p>
-      <p>Hồ sơ của bạn giờ đây sẽ nằm trong danh sách ứng viên tài năng được tuyển chọn bởi JoyWork, giúp bạn tiếp cận nhiều cơ hội hơn từ các doanh nghiệp hàng đầu.</p>`,
+      <p>JOYWORK thông báo: yêu cầu tham gia <strong>Talent Pool</strong> của bạn đã được <strong>phê duyệt</strong>.</p>
+      <p>Hồ sơ của bạn hiện đã nằm trong danh sách ứng viên nổi bật được tuyển chọn và có thể được tiếp cận bởi các doanh nghiệp phù hợp trên nền tảng.</p>
+      <p>Vui lòng tiếp tục cập nhật hồ sơ để gia tăng cơ hội nghề nghiệp.</p>`,
       `<p>Hi ${name},</p>
       <p>Your request to join the <strong>Talent Pool</strong> has been <strong>approved</strong>.</p>
-      <p>Your profile is now part of JoyWork's curated list of top talent, giving you access to more opportunities from leading companies.</p>`,
+      <p>Your profile is now part of JOYWORK's curated talent list and can be viewed by relevant employers on the platform.</p>
+      <p>Please keep your profile up to date to maximize your opportunities.</p>`,
       payload.profileUrl,
       'Xem hồ sơ / View Profile',
     );
 
-    await this.sendEmail({ to, subject: '[JOYWORK] Talent Pool – Yêu cầu được phê duyệt / Request Approved', html });
+    await this.sendEmail({ to, subject: '[JOYWORK] Talent Pool - Yêu cầu tham gia đã được phê duyệt / Request Approved', html });
+  }
+
+  async sendTalentPoolRequestSubmittedEmail(
+    to: string,
+    payload: { name: string | null; profileUrl: string },
+  ): Promise<void> {
+    const name = payload.name || 'bạn';
+    const html = this.talentPoolWrapper(
+      'Xác nhận đã tiếp nhận yêu cầu tham gia Talent Pool',
+      `<p>Chào ${name},</p>
+      <p>JOYWORK đã <strong>tiếp nhận thành công</strong> yêu cầu tham gia <strong>Talent Pool</strong> của bạn.</p>
+      <p>Yêu cầu đang ở trạng thái <strong>chờ xét duyệt</strong>. Kết quả xử lý sẽ được JOYWORK gửi lại qua email này ngay khi có cập nhật.</p>
+      <p>Bạn có thể tiếp tục hoàn thiện hồ sơ để tăng khả năng được duyệt.</p>`,
+      `<p>Hi ${name},</p>
+      <p>JOYWORK has <strong>successfully received</strong> your request to join the <strong>Talent Pool</strong>.</p>
+      <p>Your request is now <strong>under review</strong>. We will notify you at this email address once there is an update.</p>
+      <p>You may continue improving your profile to increase your approval chances.</p>`,
+      payload.profileUrl,
+      'Xem hồ sơ / View Profile',
+    );
+
+    await this.sendEmail({ to, subject: '[JOYWORK] Talent Pool - Đã tiếp nhận yêu cầu tham gia / Request Received', html });
   }
 
   async sendTalentPoolRejectedEmail(
@@ -1186,20 +1210,22 @@ Trân trọng,
   ): Promise<void> {
     const name = payload.name || 'bạn';
     const html = this.talentPoolWrapper(
-      'Cập nhật yêu cầu Talent Pool',
+      'Thông báo kết quả xét duyệt Talent Pool',
       `<p>Chào ${name},</p>
-      <p>Yêu cầu tham gia <strong>Talent Pool</strong> của bạn chưa được phê duyệt lần này.</p>
+      <p>JOYWORK thông báo: yêu cầu tham gia <strong>Talent Pool</strong> của bạn hiện <strong>chưa được phê duyệt</strong>.</p>
       <p><strong>Lý do:</strong> ${payload.reason}</p>
-      <p>Bạn có thể cập nhật hồ sơ và gửi lại yêu cầu bất kỳ lúc nào.</p>`,
+      <p>Bạn có thể cập nhật hồ sơ và gửi lại yêu cầu bất kỳ lúc nào.</p>
+      <p>JOYWORK sẽ tiếp tục thông báo kết quả các lần xét duyệt tiếp theo qua email.</p>`,
       `<p>Hi ${name},</p>
       <p>Your request to join the <strong>Talent Pool</strong> was not approved this time.</p>
       <p><strong>Reason:</strong> ${payload.reason}</p>
-      <p>You can update your profile and resubmit a request at any time.</p>`,
+      <p>You can update your profile and resubmit at any time.</p>
+      <p>JOYWORK will continue to send future review updates to your email.</p>`,
       payload.profileUrl,
       'Cập nhật hồ sơ / Update Profile',
     );
 
-    await this.sendEmail({ to, subject: '[JOYWORK] Talent Pool – Cập nhật yêu cầu / Request Update', html });
+    await this.sendEmail({ to, subject: '[JOYWORK] Talent Pool - Kết quả yêu cầu tham gia / Request Result', html });
   }
 
   async sendTalentPoolRemovedEmail(
@@ -1230,12 +1256,12 @@ Trân trọng,
   ): Promise<void> {
     const name = payload.name || 'bạn';
     const html = this.talentPoolWrapper(
-      'Chào mừng bạn đến với Talent Pool! 🎉',
+      'Bạn đã được thêm vào Talent Pool',
       `<p>Chào ${name},</p>
-      <p>Đội ngũ JoyWork đã chọn bạn tham gia <strong>Talent Pool</strong> – danh sách ứng viên tài năng được tuyển chọn.</p>
+      <p>Đội ngũ JOYWORK đã chọn và thêm bạn vào <strong>Talent Pool</strong> - danh sách ứng viên nổi bật được tuyển chọn.</p>
       <p>Hồ sơ của bạn giờ đây sẽ được các doanh nghiệp hàng đầu tiếp cận. Hãy đảm bảo hồ sơ của bạn luôn cập nhật!</p>`,
       `<p>Hi ${name},</p>
-      <p>The JoyWork team has selected you to join the <strong>Talent Pool</strong> – a curated list of top talent.</p>
+      <p>The JOYWORK team has selected and added you to the <strong>Talent Pool</strong> - a curated list of standout candidates.</p>
       <p>Your profile will now be accessible to leading companies. Make sure your profile is up to date!</p>`,
       payload.profileUrl,
       'Xem hồ sơ / View Profile',

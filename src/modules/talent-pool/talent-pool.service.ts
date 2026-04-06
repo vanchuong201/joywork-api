@@ -42,6 +42,11 @@ export class TalentPoolService {
   }
 
   async createRequest(userId: string, message?: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true, slug: true },
+    });
+
     const existingMember = await prisma.talentPoolMember.findUnique({
       where: { userId },
     });
@@ -69,6 +74,17 @@ export class TalentPoolService {
         metadata: { requestId: request.id },
       },
     });
+
+    if (user?.email) {
+      try {
+        await emailService.sendTalentPoolRequestSubmittedEmail(
+          user.email,
+          { name: user.name, profileUrl: profileUrl(user.slug) },
+        );
+      } catch (err) {
+        console.error('Failed to send talent pool request-submitted email:', err);
+      }
+    }
 
     return request;
   }
@@ -119,7 +135,7 @@ export class TalentPoolService {
   async approveRequest(requestId: string, adminId: string) {
     const request = await prisma.talentPoolRequest.findUnique({
       where: { id: requestId },
-      include: { user: { select: { id: true, email: true, name: true, slug: true, emailVerified: true } } },
+      include: { user: { select: { id: true, email: true, name: true, slug: true } } },
     });
     if (!request) throw new AppError('Không tìm thấy yêu cầu', 404, 'REQUEST_NOT_FOUND');
     if (request.status !== 'PENDING') {
@@ -148,7 +164,7 @@ export class TalentPoolService {
       });
     });
 
-    if (request.user.emailVerified) {
+    if (request.user.email) {
       try {
         await emailService.sendTalentPoolApprovedEmail(
           request.user.email,
@@ -165,7 +181,7 @@ export class TalentPoolService {
   async rejectRequest(requestId: string, adminId: string, reason: string) {
     const request = await prisma.talentPoolRequest.findUnique({
       where: { id: requestId },
-      include: { user: { select: { id: true, email: true, name: true, slug: true, emailVerified: true } } },
+      include: { user: { select: { id: true, email: true, name: true, slug: true } } },
     });
     if (!request) throw new AppError('Không tìm thấy yêu cầu', 404, 'REQUEST_NOT_FOUND');
     if (request.status !== 'PENDING') {
@@ -188,7 +204,7 @@ export class TalentPoolService {
       });
     });
 
-    if (request.user.emailVerified) {
+    if (request.user.email) {
       try {
         await emailService.sendTalentPoolRejectedEmail(
           request.user.email,
@@ -262,7 +278,7 @@ export class TalentPoolService {
 
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, name: true, slug: true, emailVerified: true },
+      select: { id: true, email: true, name: true, slug: true },
     });
     if (!user) throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
 
@@ -296,7 +312,7 @@ export class TalentPoolService {
       });
     });
 
-    if (user.emailVerified) {
+    if (user.email) {
       try {
         await emailService.sendTalentPoolAdminAddedEmail(
           user.email,
@@ -313,7 +329,7 @@ export class TalentPoolService {
   async removeMember(memberId: string, adminId: string, reason: string) {
     const member = await prisma.talentPoolMember.findUnique({
       where: { id: memberId },
-      include: { user: { select: { id: true, email: true, name: true, slug: true, emailVerified: true } } },
+      include: { user: { select: { id: true, email: true, name: true, slug: true } } },
     });
     if (!member) throw new AppError('Không tìm thấy thành viên', 404, 'MEMBER_NOT_FOUND');
     if (member.status !== 'ACTIVE') {
@@ -336,7 +352,7 @@ export class TalentPoolService {
       });
     });
 
-    if (member.user.emailVerified) {
+    if (member.user.email) {
       try {
         await emailService.sendTalentPoolRemovedEmail(
           member.user.email,
