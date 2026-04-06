@@ -1557,7 +1557,7 @@ export class CompaniesService {
               status: 'ACTIVE',
               // Chỉ set sentAt và expiresAt nếu có verification list
               sentAt: listId ? now : null,
-              expiresAt: listId ? new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000) : null, // +3 ngày
+              expiresAt: listId ? new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000) : null, // +5 ngày
             },
           }),
         ),

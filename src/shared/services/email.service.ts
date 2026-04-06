@@ -519,7 +519,7 @@ Trân trọng,
         <a href="${payload.verifyUrl}" style="color:#295892;">${payload.verifyUrl}</a>
       </p>
       <p style="font-size:12px; color:#9ca3af; margin-top:24px;">
-        Lưu ý: Thời gian xác thực tối đa là 3 ngày kể từ khi nhận được email này. Sau thời gian trên, liên kết có thể hết hiệu lực.
+        Lưu ý: Thời gian xác thực tối đa là 5 ngày kể từ khi nhận được email này. Sau thời gian trên, liên kết có thể hết hiệu lực.
       </p>
       <p style="margin-top:24px;">
         Trân trọng,<br/>
@@ -540,7 +540,7 @@ Vui lòng truy cập liên kết sau để xác thực các cam kết (Đúng / 
 
 ${payload.verifyUrl}
 
-Lưu ý: Thời gian xác thực tối đa là 3 ngày kể từ khi nhận được email này.
+Lưu ý: Thời gian xác thực tối đa là 5 ngày kể từ khi nhận được email này.
 
 Trân trọng,
 Đội ngũ JOYWORK
