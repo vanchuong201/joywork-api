@@ -4,6 +4,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import { createPresignedDownloadUrl } from '@/shared/storage/s3';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
+import { notificationService } from '@/shared/services/notification.service';
 import type {
   AdminCompaniesQuery,
   AdminJobsQuery,
@@ -512,6 +513,7 @@ export class SystemService {
         title: true,
         company: {
           select: {
+            id: true,
             name: true,
             slug: true,
             members: {
@@ -550,6 +552,21 @@ export class SystemService {
 
     const adminIds = post.company.members.map((member) => member.userId);
     const verifiedEmailMap = adminIds.length > 0 ? await getVerifiedEmailsForUsers(adminIds) : new Map<string, string>();
+    const targetUrl = `/companies/${post.company.slug}/manage?tab=activity`;
+
+    await notificationService.createNotificationsForUsers(adminIds, {
+      type: 'SYSTEM',
+      title: 'Bài viết đã bị JOYWORK gỡ',
+      content: `Bài viết "${post.title}" đã bị gỡ khỏi hiển thị. Lý do: ${reason}`,
+      metadata: {
+        companyId: post.company.id,
+        companySlug: post.company.slug,
+        targetUrl,
+        reason,
+      },
+      relatedEntityType: 'POST',
+      relatedEntityId: postId,
+    });
 
     await Promise.all(
       post.company.members.map(async (member) => {
@@ -560,7 +577,7 @@ export class SystemService {
           companyName: post.company.name,
           postTitle: post.title,
           reason,
-          manageUrl: `${config.FRONTEND_ORIGIN}/companies/${post.company.slug}/manage?tab=activity`,
+          manageUrl: `${config.FRONTEND_ORIGIN}${targetUrl}`,
         });
       })
     );

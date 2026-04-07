@@ -1188,31 +1188,59 @@ export class JobsService {
       throw new AppError('You do not have permission to update this application', 403, 'FORBIDDEN');
     }
 
-    // Update application
+    const prevNotes = (application.notes ?? '').trim();
+    const notesProvided = data.notes !== undefined;
+    const nextNotesTrimmed = notesProvided ? (data.notes ?? '').trim() : prevNotes;
+    const statusChanged = data.status !== application.status;
+    const notesChanged = notesProvided && prevNotes !== nextNotesTrimmed;
+
+    if (!statusChanged && !notesChanged) {
+      return;
+    }
+
+    const updateData: Prisma.ApplicationUncheckedUpdateInput = {
+      updatedAt: new Date(),
+    };
+    if (statusChanged) {
+      updateData.status = data.status;
+    }
+    if (notesProvided) {
+      updateData.notes = nextNotesTrimmed === '' ? null : nextNotesTrimmed;
+    }
+
     await prisma.application.update({
       where: { id: data.applicationId },
-      data: {
-        status: data.status,
-        notes: data.notes ?? null,
-        updatedAt: new Date(),
-      },
+      data: updateData,
     });
 
-    const statusLabel = APPLICATION_STATUS_LABEL[data.status] || data.status;
+    const effectiveStatus = statusChanged ? data.status : application.status;
+    const statusLabel = APPLICATION_STATUS_LABEL[effectiveStatus] || effectiveStatus;
     const jobTitle = application.job.title;
     const companyName = application.job.company.name;
-    const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/jobs/${application.jobId}`;
+    const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/applications`;
+
+    let notifTitle = 'Đơn ứng tuyển đã được cập nhật';
+    let notifContent = '';
+    if (statusChanged && notesChanged) {
+      notifContent = `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel} và có cập nhật thông tin kèm theo.`;
+    } else if (statusChanged) {
+      notifContent = `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel}.`;
+    } else {
+      notifContent = `Nhà tuyển dụng đã cập nhật thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí ${jobTitle} tại ${companyName}.`;
+    }
 
     notificationService
       .createNotification({
         userId: application.userId,
         type: NotificationType.APPLICATION_STATUS,
-        title: `Trạng thái ứng tuyển đã được cập nhật`,
-        content: `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel}.`,
+        title: notifTitle,
+        content: notifContent,
         metadata: {
           applicationId: application.id,
           jobId: application.jobId,
-          status: data.status,
+          status: effectiveStatus,
+          statusChanged,
+          notesChanged,
         },
         relatedEntityType: 'APPLICATION',
         relatedEntityId: application.id,
@@ -1228,6 +1256,8 @@ export class JobsService {
           companyName,
           newStatus: statusLabel,
           applicationUrl: myApplicationsUrl,
+          statusChanged,
+          notesChanged,
         })
         .catch(() => {});
     }

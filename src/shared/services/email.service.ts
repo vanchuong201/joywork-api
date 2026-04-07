@@ -1002,10 +1002,30 @@ Trân trọng,
       companyName: string;
       newStatus: string;
       applicationUrl: string;
+      statusChanged: boolean;
+      notesChanged: boolean;
     },
   ): Promise<void> {
     const recipientLabel = payload.applicantName || 'bạn';
-    const subject = `[JOYWORK] Cập nhật trạng thái ứng tuyển: ${payload.jobTitle}`;
+    const subject = `[JOYWORK] Cập nhật đơn ứng tuyển: ${payload.jobTitle}`;
+
+    let leadVi = '';
+    if (payload.statusChanged && payload.notesChanged) {
+      leadVi = `Doanh nghiệp <strong>${payload.companyName}</strong> vừa cập nhật trạng thái và thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí <strong>${payload.jobTitle}</strong>.`;
+    } else if (payload.statusChanged) {
+      leadVi = `Doanh nghiệp <strong>${payload.companyName}</strong> vừa cập nhật <strong>trạng thái</strong> đơn ứng tuyển của bạn cho vị trí <strong>${payload.jobTitle}</strong>.`;
+    } else {
+      leadVi = `Doanh nghiệp <strong>${payload.companyName}</strong> vừa cập nhật thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí <strong>${payload.jobTitle}</strong>.`;
+    }
+
+    let leadText = '';
+    if (payload.statusChanged && payload.notesChanged) {
+      leadText = `Doanh nghiệp ${payload.companyName} vừa cập nhật trạng thái và thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí ${payload.jobTitle}.`;
+    } else if (payload.statusChanged) {
+      leadText = `Doanh nghiệp ${payload.companyName} vừa cập nhật trạng thái đơn ứng tuyển của bạn cho vị trí ${payload.jobTitle}.`;
+    } else {
+      leadText = `Doanh nghiệp ${payload.companyName} vừa cập nhật thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí ${payload.jobTitle}.`;
+    }
 
     const html = `
 <!DOCTYPE html>
@@ -1013,20 +1033,17 @@ Trân trọng,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cập nhật trạng thái ứng tuyển - JOYWORK</title>
+  <title>Cập nhật đơn ứng tuyển - JOYWORK</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
-    <h2 style="color: #295892; margin-bottom: 20px;">Trạng thái ứng tuyển của bạn đã được cập nhật</h2>
+    <h2 style="color: #295892; margin-bottom: 20px;">Đơn ứng tuyển của bạn đã được cập nhật</h2>
     <p>Chào ${recipientLabel},</p>
-    <p>
-      Doanh nghiệp <strong>${payload.companyName}</strong> vừa cập nhật trạng thái ứng tuyển của bạn
-      cho vị trí <strong>${payload.jobTitle}</strong>.
-    </p>
-    <p><strong>Trạng thái mới:</strong> ${payload.newStatus}</p>
+    <p>${leadVi}</p>
+    <p><strong>Trạng thái hiện tại:</strong> ${payload.newStatus}</p>
 
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${payload.applicationUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem chi tiết ứng tuyển</a>
+      <a href="${payload.applicationUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem đơn ứng tuyển</a>
     </div>
 
     <p style="font-size: 14px; color: #666;">
@@ -1046,10 +1063,10 @@ Trân trọng,
     const text = `
 Chào ${recipientLabel},
 
-Doanh nghiệp ${payload.companyName} vừa cập nhật trạng thái ứng tuyển của bạn cho vị trí ${payload.jobTitle}.
-Trạng thái mới: ${payload.newStatus}
+${leadText}
+Trạng thái hiện tại: ${payload.newStatus}
 
-Xem chi tiết tại: ${payload.applicationUrl}
+Xem đơn ứng tuyển tại: ${payload.applicationUrl}
 
 Trân trọng,
 Đội ngũ JOYWORK
