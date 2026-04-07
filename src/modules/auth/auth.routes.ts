@@ -1,8 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { AuthMiddleware } from './auth.middleware';
+import { AuthMiddleware, type AuthenticatedRequest } from './auth.middleware';
 import { registerSchema } from './auth.schema';
+import { AppError } from '@/shared/errors/errorHandler';
+
+/** Giới hạn gửi lại email xác minh: số lần tối đa trong mỗi cửa sổ thời gian (theo userId). */
+const RESEND_VERIFICATION_EMAIL_MAX = 1;
+const RESEND_VERIFICATION_EMAIL_WINDOW_MS = 2 * 60 * 1000;
 
 export async function authRoutes(fastify: FastifyInstance) {
   const authService = new AuthService();
@@ -409,7 +414,26 @@ export async function authRoutes(fastify: FastifyInstance) {
   }, authController.verifyEmail.bind(authController));
 
   fastify.post('/resend-verification-email', {
-    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    preHandler: [
+      authMiddleware.verifyToken.bind(authMiddleware),
+      fastify.rateLimit({
+        max: RESEND_VERIFICATION_EMAIL_MAX,
+        timeWindow: RESEND_VERIFICATION_EMAIL_WINDOW_MS,
+        keyGenerator: (request) => {
+          const userId = (request as AuthenticatedRequest).user?.userId;
+          if (!userId) {
+            return `resend-verification-email:ip:${request.ip}`;
+          }
+          return `resend-verification-email:user:${userId}`;
+        },
+        errorResponseBuilder: (_request, context) =>
+          new AppError(
+            `Bạn đã yêu cầu gửi lại email xác minh quá nhiều lần. Vui lòng thử lại sau ${context.after}.`,
+            429,
+            'RATE_LIMITED',
+          ),
+      }),
+    ],
     schema: {
       description: 'Gửi lại email xác thực',
       tags: ['Auth'],
@@ -421,6 +445,18 @@ export async function authRoutes(fastify: FastifyInstance) {
             data: {
               type: 'object',
               properties: {
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
+        429: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
                 message: { type: 'string' },
               },
             },

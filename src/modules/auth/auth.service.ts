@@ -16,6 +16,8 @@ import {
   ResetPasswordInput,
 } from './auth.schema';
 
+const RESEND_VERIFICATION_COOLDOWN_MS = 2 * 60 * 1000;
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -332,6 +334,18 @@ export class AuthService {
       throw new AppError('Email đã được xác thực', 400, 'ALREADY_VERIFIED');
     }
 
+    const latestVerificationToken = await prisma.emailVerificationToken.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (latestVerificationToken) {
+      const elapsedSinceLastSent = Date.now() - latestVerificationToken.createdAt.getTime();
+      if (elapsedSinceLastSent < RESEND_VERIFICATION_COOLDOWN_MS) {
+        return;
+      }
+    }
+
     // Delete old tokens for this user
     await prisma.emailVerificationToken.deleteMany({
       where: { userId },
@@ -355,7 +369,6 @@ export class AuthService {
     try {
       await emailService.sendVerificationEmail(user.email, user.name, verificationUrl);
     } catch (error) {
-      console.error('Failed to send verification email:', error);
       throw new AppError('Không thể gửi email xác thực', 500, 'EMAIL_SEND_FAILED');
     }
   }
