@@ -2,6 +2,7 @@ import { Prisma, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
+import { assertWardsBelongToProvinces } from '@/shared/wards';
 import {
   CreateCompanyInput,
   UpdateCompanyInput,
@@ -31,6 +32,7 @@ export interface Company {
   coverUrl?: string;
   website?: string;
   location?: string;
+  wardCodes?: string[];
   industry?: string;
   size?: string;
   foundedYear?: number;
@@ -132,6 +134,7 @@ export interface CompanyWithMembers {
   coverUrl?: string;
   website?: string;
   location?: string;
+  wardCodes?: string[];
   industry?: string;
   size?: string;
   foundedYear?: number;
@@ -238,6 +241,15 @@ export class CompaniesService {
       Object.entries(rest).filter(([, v]) => v !== undefined)
     );
 
+    const loc = (baseData as { location?: string | null }).location;
+    const wards = (baseData as { wardCodes?: string[] }).wardCodes;
+    if (wards?.length) {
+      if (!loc) {
+        throw new AppError('Cần chọn tỉnh/thành trước khi chọn phường/xã', 400, 'COMPANY_LOCATION_REQUIRED_FOR_WARD');
+      }
+      assertWardsBelongToProvinces(wards, new Set([loc]));
+    }
+
     const company = await prisma.company.create({
       data: {
         ...(baseData as any),
@@ -272,6 +284,7 @@ export class CompaniesService {
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
+      ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -408,6 +421,33 @@ export class CompaniesService {
       Object.entries(rest).filter(([, v]) => v !== undefined)
     );
 
+    const existingCo = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { location: true, wardCodes: true },
+    });
+    if (existingCo) {
+      let nextLoc = existingCo.location ?? null;
+      if ('location' in updateBase) {
+        nextLoc = (updateBase as { location?: string | null }).location ?? null;
+      }
+
+      let nextWards = existingCo.wardCodes ?? [];
+      if ('wardCodes' in updateBase) {
+        nextWards = ((updateBase as { wardCodes?: string[] }).wardCodes ?? []) as string[];
+      }
+
+      if (!nextLoc && nextWards.length) {
+        throw new AppError('Cần chọn tỉnh/thành trước khi chọn phường/xã', 400, 'COMPANY_LOCATION_REQUIRED_FOR_WARD');
+      }
+      if (nextLoc && nextWards.length) {
+        assertWardsBelongToProvinces(nextWards, new Set([nextLoc]));
+      }
+
+      if ('location' in updateBase && !(updateBase as { location?: string | null }).location) {
+        (updateBase as { wardCodes?: string[] }).wardCodes = [];
+      }
+    }
+
     // If requestReVerification is true, reset verification status to PENDING
     const verificationUpdate: Record<string, any> = {};
     if (requestReVerification === true) {
@@ -490,6 +530,7 @@ export class CompaniesService {
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
+      ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -608,6 +649,7 @@ export class CompaniesService {
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
+      ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -770,6 +812,7 @@ export class CompaniesService {
         ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
         ...(company.website != null ? { website: company.website } : {}),
         ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
+        ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
         ...(company.email != null ? { email: company.email } : {}),
         ...(company.phone != null ? { phone: company.phone } : {}),
         ...(company.industry != null ? { industry: company.industry } : {}),
@@ -812,6 +855,7 @@ export class CompaniesService {
         ...(membership.company.coverUrl != null ? { coverUrl: membership.company.coverUrl } : {}),
         ...(membership.company.website != null ? { website: membership.company.website } : {}),
         ...(membership.company.location != null ? { location: membership.company.location, locationName: getProvinceNameByCode(membership.company.location) ?? membership.company.location } : {}),
+        ...(membership.company.wardCodes?.length ? { wardCodes: membership.company.wardCodes } : {}),
         ...(membership.company.email != null ? { email: membership.company.email } : {}),
         ...(membership.company.phone != null ? { phone: membership.company.phone } : {}),
         ...(membership.company.industry != null ? { industry: membership.company.industry } : {}),
@@ -853,6 +897,7 @@ export class CompaniesService {
         ...(follow.company.coverUrl != null ? { coverUrl: follow.company.coverUrl } : {}),
         ...(follow.company.website != null ? { website: follow.company.website } : {}),
         ...(follow.company.location != null ? { location: follow.company.location, locationName: getProvinceNameByCode(follow.company.location) ?? follow.company.location } : {}),
+        ...(follow.company.wardCodes?.length ? { wardCodes: follow.company.wardCodes } : {}),
         ...(follow.company.email != null ? { email: follow.company.email } : {}),
         ...(follow.company.phone != null ? { phone: follow.company.phone } : {}),
         ...(follow.company.industry != null ? { industry: follow.company.industry } : {}),

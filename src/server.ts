@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { initializeProvinceRegistry } from '@/shared/provinces';
+import { initializeWardRegistry, isWardRegistryTableMissing } from '@/shared/wards';
 
 async function start() {
   try {
@@ -9,6 +10,12 @@ async function start() {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
     await initializeProvinceRegistry();
+    await initializeWardRegistry();
+    if (isWardRegistryTableMissing()) {
+      console.warn(
+        '⚠️  Bảng ward_registry chưa có trên DB. Chạy: npx prisma migrate deploy — sau đó npm run db:seed:wards nếu cần danh sách phường/xã.',
+      );
+    }
 
     // Create Fastify app
     const app = await createApp();

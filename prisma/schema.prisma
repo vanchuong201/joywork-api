@@ -118,6 +118,8 @@ model UserProfile {
   skills   String[]
   cvUrl    String?
   locations String[] @default([])
+  /// Mã phường/xã canonical: `{provinceCode}/{officialWardCode}` — ví dụ `ha-noi/00004`
+  wardCodes String[] @default([])
   website  String?
   linkedin String?
   github   String?
@@ -214,6 +216,7 @@ model Company {
   coverUrl                 String?
   website                  String?
   location                 String?
+  wardCodes                String[]        @default([])
   email                    String?
   phone                    String?
   industry                 String?
@@ -490,6 +493,7 @@ model Job {
   companyId           String
   title               String
   locations           String[]        @default([])
+  wardCodes           String[]        @default([])
   remote              Boolean         @default(false)
   salaryMin           Int?
   salaryMax           Int?
@@ -1021,6 +1025,7 @@ model ProvinceRegistry {
   updatedAt     DateTime @updatedAt
 
   aliases ProvinceAlias[]
+  wards   WardRegistry[]
 
   @@index([region])
   @@index([isActive])
@@ -1043,4 +1048,22 @@ model ProvinceAlias {
   @@index([aliasSlug, isActive])
   @@index([provinceCode])
   @@map("province_aliases")
+}
+
+model WardRegistry {
+  code         String   @id
+  provinceCode String
+  officialCode String
+  name         String
+  fullName     String?
+  unitType     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  province ProvinceRegistry @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+
+  @@unique([provinceCode, officialCode])
+  @@index([provinceCode])
+  @@map("ward_registry")
 }

@@ -106,6 +106,32 @@ Khi migrate dữ liệu cũ:
 - Endpoint admin để xem registry/alias:
   - `GET /api/system/provinces`
 
+## Phường / xã (`ward`)
+
+### Dữ liệu chuẩn
+
+- Bảng DB: `ward_registry` (mã composite + FK về `province_registry`).
+- Seed từ file `documents/full_json_generated_data_vn_units.json` (script: `npm run db:seed:wards` sau khi migrate).
+
+### Định dạng mã
+
+- **`{provinceSlug}/{mã đơn vị trong file nguồn}`** — ví dụ: `ha-noi/00004`, `tp-ho-chi-minh/26791`.
+- Prefix trước dấu `/` luôn trùng `province_registry.code` của tỉnh chứa phường/xã đó.
+
+### Lưu trữ theo mô hình
+
+- **UserProfile**, **Job**: `wardCodes: string[]` (tuỳ chọn, kèm `locations` / tỉnh).
+- **Company**: `wardCodes: string[]` (tuỳ chọn); phải thuộc đúng tỉnh trụ sở (`location`). Khi xóa `location`, backend xóa `wardCodes`.
+
+### API gợi ý
+
+- Danh sách phường/xã theo tỉnh: `GET /api/locations/wards?provinceCode=` hoặc `provinceCodes=a,b`.
+- Tìm job theo phường/xã: query `ward` (một mã canonical) trên `GET /api/jobs`.
+
+### Matching
+
+- Có thể kết hợp: trùng tỉnh (`locations`), trùng phường/xã (giao `wardCodes`), cùng vùng (`region`), remote.
+
 ## Kết luận
 
 Phần `province` không còn chỉ là danh sách select cho form, mà đã được định hướng thành một `canonical location registry` để dùng chung cho:

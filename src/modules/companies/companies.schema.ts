@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROVINCE_BY_CODE } from '@/shared/provinces';
+import { WARD_BY_CODE, WARD_CODE_PATTERN } from '@/shared/wards';
 
 const metricSchema = z.object({
   id: z.string().optional(),
@@ -99,6 +100,11 @@ const optionalLocationCode = () =>
       .optional(),
   );
 
+const wardCodeSchema = z
+  .string()
+  .regex(WARD_CODE_PATTERN, 'Invalid ward code format')
+  .refine((code) => WARD_BY_CODE.has(code), 'Unknown ward code');
+
 const baseCompanySchema = {
   name: z.string().min(2, 'Company name must be at least 2 characters'),
   legalName: optionalString(200),
@@ -109,6 +115,7 @@ const baseCompanySchema = {
   coverUrl: optionalUrl(),
   website: optionalUrl(),
   location: optionalLocationCode(),
+  wardCodes: z.array(wardCodeSchema).max(10, 'Maximum 10 wards allowed').optional(),
   email: optionalEmail(),
   phone: optionalString(50),
   industry: optionalString(200),

@@ -245,7 +245,7 @@ export class TalentPoolService {
           user: {
             select: {
               id: true, email: true, name: true, slug: true,
-              profile: { select: { avatar: true, headline: true, locations: true } },
+              profile: { select: { avatar: true, headline: true, locations: true, wardCodes: true } },
             },
           },
           addedBy: { select: { id: true, name: true, email: true } },
@@ -265,7 +265,7 @@ export class TalentPoolService {
       where: { email },
       select: {
         id: true, email: true, name: true, slug: true, accountStatus: true,
-        profile: { select: { avatar: true, headline: true, locations: true } },
+        profile: { select: { avatar: true, headline: true, locations: true, wardCodes: true } },
         talentPoolMember: { select: { id: true, status: true } },
       },
     });
@@ -498,7 +498,7 @@ export class TalentPoolService {
               profile: {
                 select: {
                   avatar: true, headline: true, bio: true, skills: true,
-                  locations: true, knowledge: true, attitude: true,
+                  locations: true, wardCodes: true, knowledge: true, attitude: true,
                   expectedSalaryMin: true, expectedSalaryMax: true, salaryCurrency: true, workMode: true, expectedCulture: true,
                   isPublic: true, visibility: true,
                 },
@@ -541,6 +541,7 @@ export class TalentPoolService {
           bio: vis['bio'] !== false ? p.bio : null,
           skills: p.skills,
           locations: p.locations,
+          wardCodes: p.wardCodes,
           ...(p.locations.length > 0 ? { location: getProvinceNameByCode(p.locations[0]) ?? p.locations[0] } : {}),
           knowledge: vis['ksa'] !== false ? p.knowledge : [],
           attitude: vis['ksa'] !== false ? p.attitude : [],

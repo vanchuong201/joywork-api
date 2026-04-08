@@ -1,6 +1,7 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
+import { resolveLocationsWithWards } from '@/shared/wards';
 import {
   UpdateProfileInput,
   SearchUsersInput,
@@ -15,6 +16,7 @@ export interface UserProfile {
   skills: string[];
   cvUrl?: string;
   locations: string[];
+  wardCodes: string[];
   website?: string;
   linkedin?: string;
   github?: string;
@@ -69,6 +71,7 @@ export class UsersService {
       if (user.profile.bio) result.profile.bio = user.profile.bio;
       if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
       result.profile.locations = user.profile.locations;
+      result.profile.wardCodes = user.profile.wardCodes;
       if (user.profile.locations.length > 0) {
         result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
       }
@@ -110,9 +113,22 @@ export class UsersService {
     if (profileInput.bio !== undefined) profileData.bio = profileInput.bio ?? null;
     if (profileInput.skills !== undefined) profileData.skills = profileInput.skills;
     if (profileInput.cvUrl !== undefined) profileData.cvUrl = profileInput.cvUrl ?? null;
-    if (profileInput.locations !== undefined) profileData.locations = profileInput.locations;
-    if (profileInput.location !== undefined && profileInput.locations === undefined) {
-      profileData.locations = profileInput.location ? [profileInput.location] : [];
+    if (
+      profileInput.locations !== undefined ||
+      profileInput.location !== undefined ||
+      profileInput.wardCodes !== undefined
+    ) {
+      const existing = await prisma.userProfile.findUnique({
+        where: { userId },
+        select: { locations: true, wardCodes: true },
+      });
+      const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
+      if (profileInput.locations !== undefined) locInput.locations = profileInput.locations;
+      if (profileInput.location !== undefined) locInput.location = profileInput.location;
+      if (profileInput.wardCodes !== undefined) locInput.wardCodes = profileInput.wardCodes;
+      const resolved = resolveLocationsWithWards(existing, locInput);
+      profileData.locations = resolved.locations;
+      profileData.wardCodes = resolved.wardCodes;
     }
     if (profileInput.website !== undefined) profileData.website = profileInput.website ?? null;
     if (profileInput.linkedin !== undefined) profileData.linkedin = profileInput.linkedin ?? null;
@@ -217,6 +233,7 @@ export class UsersService {
           if (user.profile.bio) result.profile.bio = user.profile.bio;
           if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
           result.profile.locations = user.profile.locations;
+          result.profile.wardCodes = user.profile.wardCodes;
           if (user.profile.locations.length > 0) {
             result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
           }
@@ -269,6 +286,7 @@ export class UsersService {
       if (user.profile.bio) result.profile.bio = user.profile.bio;
       if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
       result.profile.locations = user.profile.locations;
+      result.profile.wardCodes = user.profile.wardCodes;
       if (user.profile.locations.length > 0) {
         result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
       }

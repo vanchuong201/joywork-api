@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROVINCE_BY_CODE } from '@/shared/provinces';
+import { WARD_BY_CODE, WARD_CODE_PATTERN } from '@/shared/wards';
 
 // UserStatus enum
 export const userStatusEnum = z.enum(['OPEN_TO_WORK', 'NOT_AVAILABLE', 'LOOKING']);
@@ -29,6 +30,11 @@ const locationCodeSchema = z
   .regex(/^[a-z0-9-]+$/, 'Invalid location code format')
   .refine((code) => PROVINCE_BY_CODE.has(code), 'Unknown location code');
 
+const wardCodeSchema = z
+  .string()
+  .regex(WARD_CODE_PATTERN, 'Invalid ward code format')
+  .refine((code) => WARD_BY_CODE.has(code), 'Unknown ward code');
+
 // Update profile schema
 export const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
@@ -40,6 +46,7 @@ export const updateProfileSchema = z.object({
   cvUrl: optionalUrl,
   location: locationCodeSchema.optional().nullable(),
   locations: z.array(locationCodeSchema).max(20, 'Maximum 20 locations allowed').optional(),
+  wardCodes: z.array(wardCodeSchema).max(30, 'Maximum 30 wards allowed').optional(),
   website: optionalUrl,
   linkedin: optionalUrl,
   github: optionalUrl,

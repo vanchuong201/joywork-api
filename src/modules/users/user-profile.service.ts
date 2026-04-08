@@ -1,6 +1,7 @@
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
+import { resolveLocationsWithWards } from '@/shared/wards';
 import {
   UpdateProfileInput,
 } from './users.schema';
@@ -137,6 +138,7 @@ export class UserProfileService {
         title: user.profile.title,
         headline: user.profile.headline,
         locations: user.profile.locations,
+        wardCodes: user.profile.wardCodes,
         ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
         website: user.profile.website,
         linkedin: user.profile.linkedin,
@@ -253,6 +255,7 @@ export class UserProfileService {
             skills: user.profile.skills,
             cvUrl: user.profile.cvUrl,
             locations: user.profile.locations,
+            wardCodes: user.profile.wardCodes,
             ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
             website: user.profile.website,
             linkedin: user.profile.linkedin,
@@ -349,7 +352,6 @@ export class UserProfileService {
       'bio',
       'skills',
       'cvUrl',
-      'locations',
       'website',
       'linkedin',
       'github',
@@ -377,8 +379,22 @@ export class UserProfileService {
       }
     }
 
-    if (profileInput.location !== undefined && profileInput.locations === undefined) {
-      profileData.locations = profileInput.location ? [profileInput.location] : [];
+    if (
+      profileInput.locations !== undefined ||
+      profileInput.location !== undefined ||
+      profileInput.wardCodes !== undefined
+    ) {
+      const existing = await prisma.userProfile.findUnique({
+        where: { userId },
+        select: { locations: true, wardCodes: true },
+      });
+      const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
+      if (profileInput.locations !== undefined) locInput.locations = profileInput.locations;
+      if (profileInput.location !== undefined) locInput.location = profileInput.location;
+      if (profileInput.wardCodes !== undefined) locInput.wardCodes = profileInput.wardCodes;
+      const resolved = resolveLocationsWithWards(existing, locInput);
+      profileData.locations = resolved.locations;
+      profileData.wardCodes = resolved.wardCodes;
     }
 
     await prisma.userProfile.upsert({

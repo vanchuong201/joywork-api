@@ -3,6 +3,7 @@ import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
+import { resolveLocationsWithWards } from '@/shared/wards';
 import { emailService } from '@/shared/services/email.service';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
@@ -26,6 +27,7 @@ export interface Job {
   responsibilities?: string;
   benefits?: string;
   locations: string[];
+  wardCodes: string[];
   remote: boolean;
   salaryMin?: number;
   salaryMax?: number;
@@ -102,6 +104,7 @@ export interface JobFavorite {
     id: string;
     title: string;
     locations: string[];
+    wardCodes: string[];
     remote: boolean;
     employmentType: string;
     experienceLevel: string;
@@ -140,10 +143,17 @@ export class JobsService {
       deadline.setUTCHours(12, 0, 0, 0);
     }
 
+    const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
+    if (data.locations !== undefined) locInput.locations = data.locations;
+    if (data.location !== undefined) locInput.location = data.location ?? null;
+    if (data.wardCodes !== undefined) locInput.wardCodes = data.wardCodes;
+    const resolved = resolveLocationsWithWards(null, locInput);
+
     const jobData: any = {
       companyId,
       title: data.title,
-      locations: data.locations ?? (data.location ? [data.location] : []),
+      locations: resolved.locations,
+      wardCodes: resolved.wardCodes,
       remote: data.remote,
       currency: data.currency,
       employmentType: data.employmentType,
@@ -199,6 +209,7 @@ export class JobsService {
       companyId: job.companyId,
       title: job.title,
       locations: job.locations,
+      wardCodes: job.wardCodes,
       ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
       remote: job.remote,
       currency: job.currency,
@@ -278,9 +289,17 @@ export class JobsService {
     
     // Basic info
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.locations !== undefined) updateData.locations = data.locations;
-    if (data.location !== undefined && data.locations === undefined) {
-      updateData.locations = data.location ? [data.location] : [];
+    if (data.locations !== undefined || data.location !== undefined || data.wardCodes !== undefined) {
+      const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
+      if (data.locations !== undefined) locInput.locations = data.locations;
+      if (data.location !== undefined) locInput.location = data.location;
+      if (data.wardCodes !== undefined) locInput.wardCodes = data.wardCodes;
+      const resolved = resolveLocationsWithWards(
+        { locations: job.locations, wardCodes: job.wardCodes },
+        locInput,
+      );
+      updateData.locations = resolved.locations;
+      updateData.wardCodes = resolved.wardCodes;
     }
     if (data.remote !== undefined) updateData.remote = data.remote;
     if (data.salaryMin !== undefined) updateData.salaryMin = data.salaryMin;
@@ -349,6 +368,7 @@ export class JobsService {
       companyId: updatedJob.companyId,
       title: updatedJob.title,
       locations: updatedJob.locations,
+      wardCodes: updatedJob.wardCodes,
       ...(updatedJob.locations.length > 0 ? { location: getProvinceNameByCode(updatedJob.locations[0]) ?? updatedJob.locations[0] } : {}),
       remote: updatedJob.remote,
       currency: updatedJob.currency,
@@ -473,6 +493,7 @@ export class JobsService {
       companyId: job.companyId,
       title: job.title,
       locations: job.locations,
+      wardCodes: job.wardCodes,
       ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
       remote: job.remote,
       currency: job.currency,
@@ -663,6 +684,7 @@ export class JobsService {
         companyId: job.companyId,
         title: job.title,
         locations: job.locations,
+        wardCodes: job.wardCodes,
         ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
         remote: job.remote,
         currency: job.currency,
@@ -720,7 +742,7 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { q, location, remote, employmentType, experienceLevel, salaryMin, salaryMax, skills, companyId, isActive, page, limit } = data;
+    const { q, location, ward, remote, employmentType, experienceLevel, salaryMin, salaryMax, skills, companyId, isActive, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -750,6 +772,10 @@ export class JobsService {
     if (location) {
       const normalizedLocation = resolveProvinceCode(location) ?? location;
       where.locations = { has: normalizedLocation };
+    }
+
+    if (ward) {
+      where.wardCodes = { has: ward };
     }
 
     if (remote !== undefined) {
@@ -837,6 +863,7 @@ export class JobsService {
         companyId: job.companyId,
         title: job.title,
         locations: job.locations,
+        wardCodes: job.wardCodes,
         ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
         remote: job.remote,
         currency: job.currency,
@@ -1413,6 +1440,7 @@ export class JobsService {
           title: fav.job.title,
           isActive: fav.job.isActive,
           locations: fav.job.locations,
+          wardCodes: fav.job.wardCodes,
           ...(fav.job.locations.length > 0 ? { location: getProvinceNameByCode(fav.job.locations[0]) ?? fav.job.locations[0] } : {}),
           remote: fav.job.remote,
           employmentType: fav.job.employmentType,
