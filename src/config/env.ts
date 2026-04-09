@@ -28,6 +28,12 @@ const envSchema = z.object({
   // API
   API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
 
+  // Public CDN URL for serving uploaded assets (e.g. CloudFront domain)
+  CDN_BASE_URL: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().url().optional()
+  ),
+
   // AWS S3
   AWS_ACCESS_KEY_ID: z.string().min(1, 'AWS_ACCESS_KEY_ID is required'),
   AWS_SECRET_ACCESS_KEY: z.string().min(1, 'AWS_SECRET_ACCESS_KEY is required'),
