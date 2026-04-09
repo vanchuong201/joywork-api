@@ -4,6 +4,10 @@ import { AppError } from '@/shared/errors/errorHandler';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import {
   adminCompaniesQuerySchema,
+  adminCompanyShowcaseAddSchema,
+  adminCompanyShowcaseCoverUploadSchema,
+  adminCompanyShowcaseReorderSchema,
+  adminCompanyShowcaseTypeSchema,
   adminPostDeleteSchema,
   adminJobsQuerySchema,
   adminPostFeedVisibilityPatchSchema,
@@ -64,6 +68,58 @@ export class SystemController {
     }
     const result = await this.systemService.listCompaniesForAdmin(parsed.data);
     return reply.send({ data: result });
+  }
+
+  async listCompanyShowcase(request: FastifyRequest, reply: FastifyReply) {
+    const type = adminCompanyShowcaseTypeSchema.parse((request.params as { type: string }).type);
+    const data = await this.systemService.listCompanyShowcaseForAdmin(type);
+    return reply.send({ data });
+  }
+
+  async addCompanyToShowcase(request: FastifyRequest, reply: FastifyReply) {
+    const type = adminCompanyShowcaseTypeSchema.parse((request.params as { type: string }).type);
+    const parsed = adminCompanyShowcaseAddSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const data = await this.systemService.addCompanyToShowcaseForAdmin(type, parsed.data.companyId, parsed.data.coverUrl);
+    return reply.send({ data });
+  }
+
+  async removeCompanyFromShowcase(request: FastifyRequest, reply: FastifyReply) {
+    const type = adminCompanyShowcaseTypeSchema.parse((request.params as { type: string }).type);
+    const { companyId } = request.params as { companyId: string };
+    const data = await this.systemService.removeCompanyFromShowcaseForAdmin(type, companyId);
+    return reply.send({ data });
+  }
+
+  async reorderCompanyShowcase(request: FastifyRequest, reply: FastifyReply) {
+    const type = adminCompanyShowcaseTypeSchema.parse((request.params as { type: string }).type);
+    const parsed = adminCompanyShowcaseReorderSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const data = await this.systemService.reorderCompanyShowcaseForAdmin(type, parsed.data.companyIds);
+    return reply.send({ data });
+  }
+
+  async uploadFeaturedShowcaseCover(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = adminCompanyShowcaseCoverUploadSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const data = await this.systemService.uploadFeaturedCompanyShowcaseCover(parsed.data);
+    return reply.send({ data });
+  }
+
+  async patchFeaturedShowcaseCover(request: FastifyRequest, reply: FastifyReply) {
+    const { companyId } = request.params as { companyId: string };
+    const parsed = adminCompanyShowcaseAddSchema.pick({ coverUrl: true }).safeParse(request.body);
+    if (!parsed.success || !parsed.data.coverUrl) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.success ? undefined : parsed.error.flatten());
+    }
+    const data = await this.systemService.setFeaturedCompanyShowcaseCover(companyId, parsed.data.coverUrl);
+    return reply.send({ data });
   }
 
   async patchCompanyPremiumStatus(request: AuthenticatedRequest, reply: FastifyReply) {

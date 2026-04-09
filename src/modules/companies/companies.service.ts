@@ -13,13 +13,14 @@ import {
   UploadVerificationContactsCsvInput,
   SendCompanyStatementsInput,
   CreatePostFromStatementInput,
+  CompanyShowcaseQueryInput,
 } from './companies.schema';
 import { PostsService } from '@/modules/posts/posts.service';
 import crypto from 'crypto';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { buildS3ObjectUrl, getS3BucketName, s3Client } from '@/shared/storage/s3';
+import { buildS3ObjectUrl, getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
 
 export interface Company {
   id: string;
@@ -201,6 +202,16 @@ export interface CompanySummary {
   followersCount: number;
   jobsActive: number;
   postsCount: number;
+}
+
+export interface HomepageCompanyShowcaseItem {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  tagline: string | null;
+  coverUrl: string | null;
+  order: number;
 }
 
 export class CompaniesService {
@@ -638,6 +649,11 @@ export class CompaniesService {
         }
       : null;
 
+    const [resolvedLogoUrl, resolvedCoverUrl] = await Promise.all([
+      resolveReadableS3ObjectUrl(company.logoUrl ?? null),
+      resolveReadableS3ObjectUrl(company.coverUrl ?? null),
+    ]);
+
     return {
       id: company.id,
       name: company.name,
@@ -645,8 +661,8 @@ export class CompaniesService {
       slug: company.slug,
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
-      ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
-      ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
+      ...(resolvedLogoUrl != null ? { logoUrl: resolvedLogoUrl } : {}),
+      ...(resolvedCoverUrl != null ? { coverUrl: resolvedCoverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
@@ -871,6 +887,51 @@ export class CompaniesService {
         updatedAt: membership.company.updatedAt,
       },
     }));
+  }
+
+  async getHomepageCompanyShowcase(query: CompanyShowcaseQueryInput): Promise<{ companies: HomepageCompanyShowcaseItem[] }> {
+    const orderField = query.type === 'FEATURED' ? 'showcaseFeaturedOrder' : 'showcaseTopOrder';
+    const rows = await prisma.company.findMany({
+      where: {
+        [orderField]: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        tagline: true,
+        coverUrl: true,
+        showcaseFeaturedCoverUrl: true,
+        showcaseFeaturedOrder: true,
+        showcaseTopOrder: true,
+      },
+      orderBy: [
+        { [orderField]: 'asc' },
+        { updatedAt: 'desc' },
+      ],
+      take: query.limit,
+    });
+
+    const companies = await Promise.all(
+      rows.map(async (row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
+        tagline: row.tagline ?? null,
+        coverUrl: await resolveReadableS3ObjectUrl(
+          query.type === 'FEATURED'
+            ? (row.showcaseFeaturedCoverUrl ?? row.coverUrl ?? null)
+            : (row.coverUrl ?? null),
+        ),
+        order: query.type === 'FEATURED' ? (row.showcaseFeaturedOrder ?? 0) : (row.showcaseTopOrder ?? 0),
+      })),
+    );
+
+    return { companies };
   }
 
   // Get companies the user follows

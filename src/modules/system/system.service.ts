@@ -1,12 +1,21 @@
 import { prisma } from '@/shared/database/prisma';
 import { Prisma, CompanyVerificationStatus, UserAccountStatus } from '@prisma/client';
 import { AppError } from '@/shared/errors/errorHandler';
-import { createPresignedDownloadUrl } from '@/shared/storage/s3';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { notificationService } from '@/shared/services/notification.service';
+import {
+  buildS3ObjectUrl,
+  createPresignedDownloadUrl,
+  getS3BucketName,
+  resolveReadableS3ObjectUrl,
+  s3Client,
+} from '@/shared/storage/s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import crypto from 'crypto';
 import type {
   AdminCompaniesQuery,
+  AdminCompanyShowcaseType,
   AdminJobsQuery,
   AdminPostsQuery,
   AdminReportTimeseriesQuery,
@@ -121,6 +130,16 @@ export interface AdminProvinceRegistryItem {
   aliases: AdminProvinceAliasItem[];
 }
 
+export interface CompanyShowcaseItem {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  tagline: string | null;
+  coverUrl: string | null;
+  order: number;
+}
+
 function toDateKeyUTC(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -158,6 +177,73 @@ function subtractDays(base: Date, days: number): Date {
 
 export class SystemService {
   private static readonly TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
+  private static readonly SHOWCASE_MAX_FILE_SIZE = 8 * 1024 * 1024;
+
+  private sanitizeFileName(name: string): string {
+    return name.trim().replace(/[^a-zA-Z0-9.\-_]+/g, '-');
+  }
+
+  private getShowcaseOrderField(type: AdminCompanyShowcaseType): 'showcaseFeaturedOrder' | 'showcaseTopOrder' {
+    return type === 'FEATURED' ? 'showcaseFeaturedOrder' : 'showcaseTopOrder';
+  }
+
+  private async buildCompanyShowcaseItem(
+    row: {
+      id: string;
+      name: string;
+      slug: string;
+      logoUrl: string | null;
+      tagline: string | null;
+      coverUrl: string | null;
+      showcaseFeaturedCoverUrl: string | null;
+      showcaseFeaturedOrder: number | null;
+      showcaseTopOrder: number | null;
+    },
+    type: AdminCompanyShowcaseType,
+  ): Promise<CompanyShowcaseItem> {
+    const rawCover =
+      type === 'FEATURED'
+        ? (row.showcaseFeaturedCoverUrl ?? row.coverUrl ?? null)
+        : (row.coverUrl ?? null);
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
+      tagline: row.tagline ?? null,
+      coverUrl: await resolveReadableS3ObjectUrl(rawCover),
+      order: type === 'FEATURED' ? (row.showcaseFeaturedOrder ?? 0) : (row.showcaseTopOrder ?? 0),
+    };
+  }
+
+  private async normalizeShowcaseOrders(type: AdminCompanyShowcaseType) {
+    const orderField = this.getShowcaseOrderField(type);
+    const rows = await prisma.company.findMany({
+      where: {
+        [orderField]: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        showcaseFeaturedOrder: true,
+        showcaseTopOrder: true,
+      },
+      orderBy: [
+        { [orderField]: 'asc' },
+        { updatedAt: 'desc' },
+      ],
+    });
+
+    await prisma.$transaction(
+      rows.map((row, idx) =>
+        prisma.company.update({
+          where: { id: row.id },
+          data: { [orderField]: idx + 1 },
+        }),
+      ),
+    );
+  }
 
   async listUsersForAdmin(query: AdminUsersQuery): Promise<{
     users: AdminUserListItem[];
@@ -401,6 +487,203 @@ export class SystemService {
         total,
         totalPages: Math.ceil(total / limit) || 1,
       },
+    };
+  }
+
+  async listCompanyShowcaseForAdmin(type: AdminCompanyShowcaseType): Promise<{ companies: CompanyShowcaseItem[] }> {
+    const orderField = this.getShowcaseOrderField(type);
+    const rows = await prisma.company.findMany({
+      where: {
+        [orderField]: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        tagline: true,
+        coverUrl: true,
+        showcaseFeaturedCoverUrl: true,
+        showcaseFeaturedOrder: true,
+        showcaseTopOrder: true,
+      },
+      orderBy: [
+        { [orderField]: 'asc' },
+        { updatedAt: 'desc' },
+      ],
+    });
+
+    const companies = await Promise.all(rows.map((row) => this.buildCompanyShowcaseItem(row, type)));
+    return { companies };
+  }
+
+  async addCompanyToShowcaseForAdmin(
+    type: AdminCompanyShowcaseType,
+    companyId: string,
+    coverUrl?: string,
+  ): Promise<{ company: CompanyShowcaseItem }> {
+    const orderField = this.getShowcaseOrderField(type);
+
+    const exists = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const maxOrderRow = await tx.company.aggregate({
+        _max: {
+          showcaseFeaturedOrder: true,
+          showcaseTopOrder: true,
+        },
+        where: {
+          [orderField]: {
+            not: null,
+          },
+        },
+      });
+      const currentMax =
+        type === 'FEATURED'
+          ? (maxOrderRow._max.showcaseFeaturedOrder ?? 0)
+          : (maxOrderRow._max.showcaseTopOrder ?? 0);
+
+      const updated = await tx.company.update({
+        where: { id: companyId },
+        data: {
+          [orderField]: currentMax + 1,
+          ...(type === 'FEATURED' && coverUrl ? { showcaseFeaturedCoverUrl: coverUrl } : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          tagline: true,
+          coverUrl: true,
+          showcaseFeaturedCoverUrl: true,
+          showcaseFeaturedOrder: true,
+          showcaseTopOrder: true,
+        },
+      });
+
+      return updated;
+    });
+
+    return {
+      company: await this.buildCompanyShowcaseItem(result, type),
+    };
+  }
+
+  async removeCompanyFromShowcaseForAdmin(type: AdminCompanyShowcaseType, companyId: string): Promise<{ id: string }> {
+    const orderField = this.getShowcaseOrderField(type);
+    await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        [orderField]: null,
+        ...(type === 'FEATURED' ? { showcaseFeaturedCoverUrl: null } : {}),
+      },
+      select: { id: true },
+    });
+
+    await this.normalizeShowcaseOrders(type);
+    return { id: companyId };
+  }
+
+  async reorderCompanyShowcaseForAdmin(
+    type: AdminCompanyShowcaseType,
+    companyIds: string[],
+  ): Promise<{ companies: CompanyShowcaseItem[] }> {
+    const orderField = this.getShowcaseOrderField(type);
+    const existing = await this.listCompanyShowcaseForAdmin(type);
+    const existingIds = existing.companies.map((company) => company.id);
+    if (existingIds.length !== companyIds.length) {
+      throw new AppError('Danh sách sắp xếp không hợp lệ', 400, 'INVALID_SHOWCASE_ORDER');
+    }
+    const existingSet = new Set(existingIds);
+    if (companyIds.some((id) => !existingSet.has(id))) {
+      throw new AppError('Danh sách sắp xếp không hợp lệ', 400, 'INVALID_SHOWCASE_ORDER');
+    }
+
+    await prisma.$transaction(
+      companyIds.map((companyId, idx) =>
+        prisma.company.update({
+          where: { id: companyId },
+          data: { [orderField]: idx + 1 },
+        }),
+      ),
+    );
+
+    return this.listCompanyShowcaseForAdmin(type);
+  }
+
+  async uploadFeaturedCompanyShowcaseCover(input: {
+    fileName: string;
+    fileType: 'image/jpeg' | 'image/png' | 'image/webp';
+    fileData: string;
+  }): Promise<{ coverUrl: string }> {
+    const buffer = Buffer.from(input.fileData, 'base64');
+    if (!buffer.length) {
+      throw new AppError('Ảnh cover không được rỗng', 400, 'EMPTY_FILE');
+    }
+    if (buffer.length > SystemService.SHOWCASE_MAX_FILE_SIZE) {
+      throw new AppError('Kích thước ảnh cover vượt quá giới hạn 8MB', 400, 'FILE_TOO_LARGE');
+    }
+
+    const ext = input.fileType === 'image/png' ? '.png' : input.fileType === 'image/webp' ? '.webp' : '.jpg';
+    const safeName = this.sanitizeFileName(input.fileName);
+    const base = safeName.replace(/\.[^.]+$/, '');
+    const key = `system/showcase/featured-cover/${base || 'cover'}-${crypto.randomUUID()}${ext}`;
+
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: getS3BucketName(),
+          Key: key,
+          Body: buffer,
+          ContentType: input.fileType,
+          ContentLength: buffer.length,
+        }),
+      );
+    } catch {
+      throw new AppError('Không thể tải ảnh cover, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
+    }
+
+    return {
+      coverUrl: buildS3ObjectUrl(key),
+    };
+  }
+
+  async setFeaturedCompanyShowcaseCover(
+    companyId: string,
+    coverUrl: string,
+  ): Promise<{ company: CompanyShowcaseItem }> {
+    const row = await prisma.company.update({
+      where: { id: companyId },
+      data: { showcaseFeaturedCoverUrl: coverUrl },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        tagline: true,
+        coverUrl: true,
+        showcaseFeaturedCoverUrl: true,
+        showcaseFeaturedOrder: true,
+      },
+    });
+
+    return {
+      company: await this.buildCompanyShowcaseItem(
+        {
+          ...row,
+          showcaseTopOrder: null,
+        },
+        'FEATURED',
+      ),
     };
   }
 

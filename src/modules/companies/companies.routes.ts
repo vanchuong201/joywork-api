@@ -369,6 +369,49 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     },
   }, companiesController.getCompanySummary.bind(companiesController));
 
+  // Homepage showcase companies (public)
+  fastify.get('/showcase/homepage', {
+    schema: {
+      description: 'Lấy danh sách công ty cho khu vực nổi bật/hàng đầu trên trang việc làm',
+      tags: ['Companies'],
+      querystring: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['FEATURED', 'TOP'] },
+          limit: { type: 'number', minimum: 1, maximum: 20, default: 10 },
+        },
+        required: ['type'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                companies: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      name: { type: 'string' },
+                      slug: { type: 'string' },
+                      logoUrl: { type: ['string', 'null'] },
+                      tagline: { type: ['string', 'null'] },
+                      coverUrl: { type: ['string', 'null'] },
+                      order: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, companiesController.getHomepageShowcaseCompanies.bind(companiesController));
+
   // Get company by ID (minimal info for support)
   fastify.get('/by-id/:id', {
     schema: {

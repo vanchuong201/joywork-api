@@ -258,6 +258,130 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.listCompanies.bind(systemController));
 
+  fastify.get('/companies/showcase/:type', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Danh sách công ty trong mục hiển thị trang jobs (FEATURED/TOP)',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['type'],
+        properties: {
+          type: { type: 'string', enum: ['FEATURED', 'TOP'] },
+        },
+      },
+    },
+  }, systemController.listCompanyShowcase.bind(systemController));
+
+  fastify.post('/companies/showcase/:type', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Thêm công ty vào danh sách hiển thị FEATURED/TOP',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['type'],
+        properties: {
+          type: { type: 'string', enum: ['FEATURED', 'TOP'] },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+          coverUrl: { type: 'string' },
+        },
+      },
+    },
+  }, systemController.addCompanyToShowcase.bind(systemController));
+
+  fastify.delete('/companies/showcase/:type/:companyId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Loại bỏ công ty khỏi danh sách hiển thị FEATURED/TOP',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['type', 'companyId'],
+        properties: {
+          type: { type: 'string', enum: ['FEATURED', 'TOP'] },
+          companyId: { type: 'string' },
+        },
+      },
+    },
+  }, systemController.removeCompanyFromShowcase.bind(systemController));
+
+  fastify.patch('/companies/showcase/:type/reorder', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Sắp xếp thứ tự công ty trong danh sách hiển thị FEATURED/TOP',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['type'],
+        properties: {
+          type: { type: 'string', enum: ['FEATURED', 'TOP'] },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['companyIds'],
+        properties: {
+          companyIds: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, systemController.reorderCompanyShowcase.bind(systemController));
+
+  fastify.post('/companies/showcase/featured-cover/upload', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Upload ảnh cover riêng cho mục công ty nổi bật',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['fileName', 'fileType', 'fileData'],
+        properties: {
+          fileName: { type: 'string' },
+          fileType: { type: 'string', enum: ['image/jpeg', 'image/png', 'image/webp'] },
+          fileData: { type: 'string' },
+        },
+      },
+    },
+  }, systemController.uploadFeaturedShowcaseCover.bind(systemController));
+
+  fastify.patch('/companies/showcase/featured/:companyId/cover', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Gán cover riêng cho 1 công ty trong danh sách FEATURED',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['coverUrl'],
+        properties: {
+          coverUrl: { type: 'string' },
+        },
+      },
+    },
+  }, systemController.patchFeaturedShowcaseCover.bind(systemController));
+
   fastify.patch('/companies/:companyId/premium', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {

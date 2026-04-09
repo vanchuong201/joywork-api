@@ -107,6 +107,7 @@ export const searchJobsSchema = z.object({
   remote: z.coerce.boolean().optional(),
   employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
   experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).optional(),
+  jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional(),
   salaryMin: z.coerce.number().int().min(0).optional(),
   salaryMax: z.coerce.number().int().min(0).optional(),
   skills: z.string().optional(), // Comma-separated skills

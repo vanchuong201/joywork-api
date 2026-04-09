@@ -403,6 +403,11 @@ export async function jobsRoutes(fastify: FastifyInstance) {
             enum: ['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10'],
             description: 'Filter by experience level'
           },
+          jobLevel: {
+            type: 'string',
+            enum: ['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE'],
+            description: 'Filter by job level'
+          },
           salaryMin: { type: 'number', minimum: 0, description: 'Minimum salary filter' },
           salaryMax: { type: 'number', minimum: 0, description: 'Maximum salary filter' },
           skills: { type: 'string', description: 'Comma-separated skills' },

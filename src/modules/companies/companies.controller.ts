@@ -8,6 +8,7 @@ import {
   addCompanyMemberSchema,
   updateCompanyMemberSchema,
   getCompanySummarySchema,
+  companyShowcaseQuerySchema,
   updateCompanyProfileSchema,
   sendCompanyStatementsSchema,
   ReorderCompanyStatementsInput,
@@ -120,6 +121,14 @@ export class CompaniesController {
     
     const result = await this.companiesService.searchCompanies(data);
     
+    return reply.send({
+      data: result,
+    });
+  }
+
+  async getHomepageShowcaseCompanies(request: FastifyRequest, reply: FastifyReply) {
+    const query = companyShowcaseQuerySchema.parse(request.query);
+    const result = await this.companiesService.getHomepageCompanyShowcase(query);
     return reply.send({
       data: result,
     });

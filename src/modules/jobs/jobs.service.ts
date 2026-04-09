@@ -742,7 +742,7 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { q, location, ward, remote, employmentType, experienceLevel, salaryMin, salaryMax, skills, companyId, isActive, page, limit } = data;
+    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, salaryMin, salaryMax, skills, companyId, isActive, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -788,6 +788,10 @@ export class JobsService {
 
     if (experienceLevel) {
       where.experienceLevel = experienceLevel;
+    }
+
+    if (jobLevel) {
+      where.jobLevel = jobLevel;
     }
 
     if (salaryMin !== undefined || salaryMax !== undefined) {

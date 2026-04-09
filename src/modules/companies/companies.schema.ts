@@ -173,6 +173,11 @@ export const searchCompaniesSchema = z.object({
   limit: z.coerce.number().min(1).max(50).default(20),
 });
 
+export const companyShowcaseQuerySchema = z.object({
+  type: z.enum(['FEATURED', 'TOP']),
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+});
+
 // Add company member schema
 export const addCompanyMemberSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -255,6 +260,7 @@ export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export type GetCompanyInput = z.infer<typeof getCompanySchema>;
 export type GetCompanySummaryInput = z.infer<typeof getCompanySummarySchema>;
 export type SearchCompaniesInput = z.infer<typeof searchCompaniesSchema>;
+export type CompanyShowcaseQueryInput = z.infer<typeof companyShowcaseQuerySchema>;
 export type AddCompanyMemberInput = z.infer<typeof addCompanyMemberSchema>;
 export type UpdateCompanyMemberInput = z.infer<typeof updateCompanyMemberSchema>;
 export type UpdateCompanyProfileInput = z.infer<typeof updateCompanyProfileSchema>;

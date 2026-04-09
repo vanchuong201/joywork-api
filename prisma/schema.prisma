@@ -227,6 +227,9 @@ model Company {
   metrics                  Json?
   profileStory             Json?
   highlights               Json?
+  showcaseFeaturedOrder    Int?
+  showcaseFeaturedCoverUrl String?
+  showcaseTopOrder         Int?
   isVerified               Boolean                   @default(false)
   verificationStatus       CompanyVerificationStatus @default(UNVERIFIED)
   verificationFileKey      String?

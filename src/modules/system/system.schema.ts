@@ -70,3 +70,37 @@ export const adminPostDeleteSchema = z.object({
 });
 
 export type AdminPostDeleteInput = z.infer<typeof adminPostDeleteSchema>;
+
+export const adminCompanyShowcaseTypeSchema = z.enum(['FEATURED', 'TOP']);
+
+export type AdminCompanyShowcaseType = z.infer<typeof adminCompanyShowcaseTypeSchema>;
+
+export const adminCompanyShowcaseAddSchema = z.object({
+  companyId: z.string().cuid(),
+  coverUrl: z.string().url().optional(),
+});
+
+export type AdminCompanyShowcaseAddInput = z.infer<typeof adminCompanyShowcaseAddSchema>;
+
+export const adminCompanyShowcaseReorderSchema = z.object({
+  companyIds: z.array(z.string().cuid()).min(1),
+});
+
+export type AdminCompanyShowcaseReorderInput = z.infer<typeof adminCompanyShowcaseReorderSchema>;
+
+export const adminCompanyShowcaseCoverUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  fileType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  fileData: z
+    .string()
+    .min(1)
+    .refine((value) => {
+      try {
+        return Buffer.from(value, 'base64').length > 0;
+      } catch {
+        return false;
+      }
+    }, 'Invalid base64 data'),
+});
+
+export type AdminCompanyShowcaseCoverUploadInput = z.infer<typeof adminCompanyShowcaseCoverUploadSchema>;
