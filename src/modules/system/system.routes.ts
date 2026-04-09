@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { SystemService } from './system.service';
 import { SystemController } from './system.controller';
+import { SystemImportController } from './system-import.controller';
 import { SystemTalentPoolController } from './system-talent-pool.controller';
 import { TalentPoolService } from '@/modules/talent-pool/talent-pool.service';
 import { AuthMiddleware } from '@/modules/auth/auth.middleware';
@@ -11,6 +12,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
   const authMiddleware = new AuthMiddleware(authService);
   const systemService = new SystemService();
   const systemController = new SystemController(systemService);
+  const importController = new SystemImportController();
   const talentPoolService = new TalentPoolService();
   const tpController = new SystemTalentPoolController(talentPoolService);
 
@@ -839,6 +841,70 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.getCompanyVerificationDownload.bind(systemController));
+
+  // ── Import: Bulk create companies + jobs ──
+
+  fastify.get('/import/template', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Tải file Excel mẫu để import hàng loạt công ty + tin tuyển dụng',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'string',
+          description: 'Excel file (.xlsx)',
+        },
+      },
+    },
+  }, importController.downloadTemplate.bind(importController));
+
+  fastify.post('/import/companies-jobs', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Import hàng loạt công ty và tin tuyển dụng từ file Excel',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      consumes: ['multipart/form-data'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                report: {
+                  type: 'object',
+                  properties: {
+                    totalCompanies: { type: 'number' },
+                    successCompanies: { type: 'number' },
+                    failedCompanies: { type: 'number' },
+                    totalJobs: { type: 'number' },
+                    successJobs: { type: 'number' },
+                    failedJobs: { type: 'number' },
+                    skippedJobs: { type: 'number' },
+                    errors: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          sheet: { type: 'string' },
+                          row: { type: 'number' },
+                          field: { type: 'string' },
+                          message: { type: 'string' },
+                        },
+                      },
+                    },
+                    duration: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, importController.importCompaniesJobs.bind(importController));
 
   // ── Talent Pool: Requests ──
 

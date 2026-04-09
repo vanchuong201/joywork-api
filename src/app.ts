@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 
 import { config } from '@/config/env';
 import { errorHandler } from '@/shared/errors/errorHandler';
@@ -42,6 +43,7 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Register plugins
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
 
   const allowedOrigins = new Set<string>([config.FRONTEND_ORIGIN]);
   if (config.ADMIN_CP_ORIGIN) {
