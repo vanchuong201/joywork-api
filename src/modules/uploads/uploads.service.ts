@@ -13,12 +13,16 @@ import {
   UploadCompanyCoverInput,
   UploadProfileCVInput,
   UploadCompanyVerificationInput,
+  CreateCourseAssetPresignInput,
 } from './uploads.schema';
 import { config } from '@/config/env';
 import { emailService } from '@/shared/services/email.service';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
+const COURSE_THUMB_MAX = 8 * 1024 * 1024;
+const COURSE_VIDEO_MAX = 200 * 1024 * 1024;
+const COURSE_ATTACH_MAX = 25 * 1024 * 1024;
 const AVATAR_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 const CV_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const DKKD_MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
@@ -37,6 +41,13 @@ const ALLOWED_DKKD_MIME_TYPES = new Set([
   'image/png',
 ]);
 
+const ALLOWED_COURSE_ATTACHMENT_TYPES = new Set<string>([
+  ...Array.from(ALLOWED_CV_MIME_TYPES),
+  ...Array.from(ALLOWED_MIME_TYPES),
+  'application/zip',
+  'application/x-zip-compressed',
+]);
+
 function getExtensionFromMime(mime: string): string | null {
   if (mime === 'image/jpeg') return '.jpg';
   if (mime === 'image/png') return '.png';
@@ -51,6 +62,7 @@ function getDocExtensionFromMime(mime: string): string | null {
   if (mime === 'application/pdf') return '.pdf';
   if (mime === 'application/msword') return '.doc';
   if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return '.docx';
+  if (mime === 'application/zip' || mime === 'application/x-zip-compressed') return '.zip';
   return null;
 }
 
@@ -159,6 +171,183 @@ export class UploadsService {
       expiresIn: 300,
       maxFileSize: AVATAR_MAX_FILE_SIZE,
       allowedTypes: Array.from(ALLOWED_MIME_TYPES),
+    };
+  }
+
+  /** Presign tài sản khóa học (chỉ ADMIN qua route). */
+  async createCourseAssetPresignUrl(_adminUserId: string, input: CreateCourseAssetPresignInput) {
+    const { kind, fileName, fileType, fileSize } = input;
+
+    let prefixFolder: string;
+    let maxSize: number;
+    let allowed: Set<string>;
+
+    if (kind === 'thumbnail') {
+      prefixFolder = 'courses/thumbnails';
+      maxSize = COURSE_THUMB_MAX;
+      allowed = ALLOWED_MIME_TYPES;
+      if (fileSize > maxSize) {
+        throw new AppError('Ảnh đại diện khóa học tối đa 8MB', 400, 'FILE_TOO_LARGE');
+      }
+      if (!allowed.has(fileType)) {
+        throw new AppError('Định dạng ảnh không được hỗ trợ', 400, 'UNSUPPORTED_FILE_TYPE');
+      }
+    } else if (kind === 'video') {
+      prefixFolder = 'courses/videos';
+      maxSize = COURSE_VIDEO_MAX;
+      allowed = ALLOWED_VIDEO_TYPES;
+      if (fileSize > maxSize) {
+        throw new AppError('Video khóa học tối đa 200MB', 400, 'FILE_TOO_LARGE');
+      }
+      if (!allowed.has(fileType)) {
+        throw new AppError('Định dạng video không được hỗ trợ', 400, 'UNSUPPORTED_FILE_TYPE');
+      }
+    } else {
+      prefixFolder = 'courses/attachments';
+      maxSize = COURSE_ATTACH_MAX;
+      allowed = ALLOWED_COURSE_ATTACHMENT_TYPES;
+      if (fileSize > maxSize) {
+        throw new AppError('Tệp đính kèm tối đa 25MB', 400, 'FILE_TOO_LARGE');
+      }
+      if (!allowed.has(fileType)) {
+        throw new AppError('Định dạng tệp đính kèm không được hỗ trợ', 400, 'UNSUPPORTED_FILE_TYPE');
+      }
+    }
+
+    let extFromMime: string | null = null;
+    if (kind === 'thumbnail' || kind === 'video') {
+      extFromMime = getExtensionFromMime(fileType);
+    } else {
+      extFromMime = getDocExtensionFromMime(fileType) ?? getExtensionFromMime(fileType);
+    }
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `${prefixFolder}/${randomUUID()}${extension}`;
+
+    const uploadUrl = await createPresignedUploadUrl({
+      key,
+      contentType: fileType,
+      contentLength: fileSize,
+      expiresIn: 300,
+    });
+
+    return {
+      key,
+      uploadUrl,
+      assetUrl: buildS3ObjectUrl(key),
+      expiresIn: 300,
+      maxFileSize: maxSize,
+      allowedTypes: Array.from(allowed),
+    };
+  }
+
+  /**
+   * Upload khóa học qua máy chủ (multipart) — tránh CORS khi PUT trực tiếp lên S3 từ trình duyệt.
+   * Chỉ ADMIN (đã qua middleware).
+   */
+  async uploadCourseAssetAdmin(
+    adminUserId: string,
+    input: {
+      kind: CreateCourseAssetPresignInput['kind'];
+      fileName: string;
+      fileType: string;
+      buffer: Buffer;
+    },
+  ) {
+    const admin = await prisma.user.findUnique({
+      where: { id: adminUserId },
+      select: { role: true, accountStatus: true },
+    });
+    if (!admin || admin.role !== 'ADMIN') {
+      throw new AppError('Bạn không có quyền thực hiện thao tác này', 403, 'FORBIDDEN');
+    }
+    if (admin.accountStatus !== 'ACTIVE') {
+      throw new AppError('Tài khoản không hoạt động', 403, 'FORBIDDEN');
+    }
+
+    const { kind, fileName, fileType, buffer } = input;
+    const fileSize = buffer.length;
+
+    let prefixFolder: string;
+    let maxSize: number;
+    let allowed: Set<string>;
+
+    if (kind === 'thumbnail') {
+      prefixFolder = 'courses/thumbnails';
+      maxSize = COURSE_THUMB_MAX;
+      allowed = ALLOWED_MIME_TYPES;
+      if (fileSize > maxSize) {
+        throw new AppError('Ảnh đại diện khóa học tối đa 8MB', 400, 'FILE_TOO_LARGE');
+      }
+      if (!allowed.has(fileType)) {
+        throw new AppError('Định dạng ảnh không được hỗ trợ', 400, 'UNSUPPORTED_FILE_TYPE');
+      }
+    } else if (kind === 'video') {
+      prefixFolder = 'courses/videos';
+      maxSize = COURSE_VIDEO_MAX;
+      allowed = ALLOWED_VIDEO_TYPES;
+      if (fileSize > maxSize) {
+        throw new AppError('Video khóa học tối đa 200MB', 400, 'FILE_TOO_LARGE');
+      }
+      if (!allowed.has(fileType)) {
+        throw new AppError('Định dạng video không được hỗ trợ', 400, 'UNSUPPORTED_FILE_TYPE');
+      }
+    } else {
+      prefixFolder = 'courses/attachments';
+      maxSize = COURSE_ATTACH_MAX;
+      allowed = ALLOWED_COURSE_ATTACHMENT_TYPES;
+      if (fileSize > maxSize) {
+        throw new AppError('Tệp đính kèm tối đa 25MB', 400, 'FILE_TOO_LARGE');
+      }
+      if (!allowed.has(fileType)) {
+        throw new AppError('Định dạng tệp đính kèm không được hỗ trợ', 400, 'UNSUPPORTED_FILE_TYPE');
+      }
+    }
+
+    let extFromMime: string | null = null;
+    if (kind === 'thumbnail' || kind === 'video') {
+      extFromMime = getExtensionFromMime(fileType);
+    } else {
+      extFromMime = getDocExtensionFromMime(fileType) ?? getExtensionFromMime(fileType);
+    }
+    const fallbackExt = (() => {
+      const sanitized = sanitizeFileName(fileName);
+      const idx = sanitized.lastIndexOf('.');
+      if (idx === -1) return '';
+      return `.${sanitized.slice(idx + 1).toLowerCase()}`;
+    })();
+    const extension = extFromMime ?? fallbackExt ?? '';
+    const key = `${prefixFolder}/${randomUUID()}${extension}`;
+
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: getS3BucketName(),
+          Key: key,
+          Body: buffer,
+          ContentType: fileType,
+          ContentLength: buffer.length,
+        }),
+      );
+    } catch {
+      throw new AppError('Không thể lưu tệp lên kho lưu trữ', 500, 'UPLOAD_FAILED');
+    }
+
+    const canonical = buildS3ObjectUrl(key);
+    /** Thumbnail: bucket thường private — trả presign GET để preview ngay trong admin (PATCH vẫn chuẩn hóa về canonical). */
+    const assetUrl =
+      kind === 'thumbnail'
+        ? await createPresignedDownloadUrl({ key, expiresIn: 3600 })
+        : canonical;
+
+    return {
+      key,
+      assetUrl,
     };
   }
 

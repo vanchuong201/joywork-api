@@ -1,4 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { AppError } from '@/shared/errors/errorHandler';
+import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import { UploadsService } from './uploads.service';
 import {
   createPresignSchema,
@@ -10,6 +12,7 @@ import {
   uploadCompanyCoverSchema,
   uploadProfileCVSchema,
   uploadCompanyVerificationSchema,
+  createCourseAssetPresignSchema,
 } from './uploads.schema';
 
 export class UploadsController {
@@ -101,6 +104,39 @@ export class UploadsController {
     const { companyId } = request.query as { companyId: string };
     const data = await this.uploadsService.getCompanyVerificationDownloadUrl(userId, companyId);
     return reply.send({ data });
+  }
+
+  async createCourseAssetPresign(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId as string;
+    const payload = createCourseAssetPresignSchema.parse(request.body);
+    const data = await this.uploadsService.createCourseAssetPresignUrl(userId, payload);
+    return reply.status(201).send({ data });
+  }
+
+  /** Multipart: field `file` + query `kind=thumbnail|video|attachment` — upload qua API, không PUT trực tiếp S3. */
+  async uploadCourseAssetMultipart(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as AuthenticatedRequest).user?.userId;
+    if (!userId) {
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+    }
+    const kind = (request.query as { kind?: string }).kind;
+    if (kind !== 'thumbnail' && kind !== 'video' && kind !== 'attachment') {
+      throw new AppError('Tham số kind không hợp lệ', 400, 'VALIDATION_ERROR');
+    }
+    const data = await request.file();
+    if (!data) {
+      throw new AppError('Vui lòng chọn tệp', 400, 'FILE_REQUIRED');
+    }
+    const buffer = await data.toBuffer();
+    const fileType = data.mimetype || 'application/octet-stream';
+    const fileName = data.filename || 'upload';
+    const result = await this.uploadsService.uploadCourseAssetAdmin(userId, {
+      kind,
+      fileName,
+      fileType,
+      buffer,
+    });
+    return reply.status(201).send({ data: result });
   }
 }
 

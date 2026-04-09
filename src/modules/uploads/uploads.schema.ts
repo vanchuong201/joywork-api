@@ -142,6 +142,13 @@ export const uploadCompanyVerificationSchema = z.object({
   previousKey: z.string().optional(),
 });
 
+export const createCourseAssetPresignSchema = z.object({
+  kind: z.enum(['thumbnail', 'video', 'attachment']),
+  fileName: z.string().min(1).max(255),
+  fileType: z.string().min(1),
+  fileSize: z.number().int().min(1),
+});
+
 export type CreatePresignInput = z.infer<typeof createPresignSchema>;
 export type DeleteObjectInput = z.infer<typeof deleteObjectSchema>;
 export type CreateProfileAvatarPresignInput = z.infer<typeof createProfileAvatarPresignSchema>;
@@ -151,4 +158,5 @@ export type UploadCompanyLogoInput = z.infer<typeof uploadCompanyLogoSchema>;
 export type UploadCompanyCoverInput = z.infer<typeof uploadCompanyCoverSchema>;
 export type UploadProfileCVInput = z.infer<typeof uploadProfileCVSchema>;
 export type UploadCompanyVerificationInput = z.infer<typeof uploadCompanyVerificationSchema>;
+export type CreateCourseAssetPresignInput = z.infer<typeof createCourseAssetPresignSchema>;
 

@@ -1,5 +1,10 @@
 import { prisma } from '@/shared/database/prisma';
-import { Prisma, CompanyVerificationStatus, UserAccountStatus } from '@prisma/client';
+import {
+  Prisma,
+  CompanyShowcaseListType,
+  CompanyVerificationStatus,
+  UserAccountStatus,
+} from '@prisma/client';
 import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
@@ -183,63 +188,53 @@ export class SystemService {
     return name.trim().replace(/[^a-zA-Z0-9.\-_]+/g, '-');
   }
 
-  private getShowcaseOrderField(type: AdminCompanyShowcaseType): 'showcaseFeaturedOrder' | 'showcaseTopOrder' {
-    return type === 'FEATURED' ? 'showcaseFeaturedOrder' : 'showcaseTopOrder';
+  private prismaShowcaseListType(type: AdminCompanyShowcaseType): CompanyShowcaseListType {
+    return type === 'FEATURED' ? CompanyShowcaseListType.FEATURED : CompanyShowcaseListType.TOP;
   }
 
-  private async buildCompanyShowcaseItem(
-    row: {
-      id: string;
-      name: string;
-      slug: string;
-      logoUrl: string | null;
-      tagline: string | null;
-      coverUrl: string | null;
-      showcaseFeaturedCoverUrl: string | null;
-      showcaseFeaturedOrder: number | null;
-      showcaseTopOrder: number | null;
+  private async buildCompanyShowcaseItemFromSlot(
+    slot: {
+      sortOrder: number;
+      featuredCoverUrl: string | null;
+      company: {
+        id: string;
+        name: string;
+        slug: string;
+        logoUrl: string | null;
+        tagline: string | null;
+        coverUrl: string | null;
+      };
     },
-    type: AdminCompanyShowcaseType,
+    listType: AdminCompanyShowcaseType,
   ): Promise<CompanyShowcaseItem> {
     const rawCover =
-      type === 'FEATURED'
-        ? (row.showcaseFeaturedCoverUrl ?? row.coverUrl ?? null)
-        : (row.coverUrl ?? null);
+      listType === 'FEATURED'
+        ? (slot.featuredCoverUrl ?? slot.company.coverUrl ?? null)
+        : (slot.company.coverUrl ?? null);
     return {
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
-      tagline: row.tagline ?? null,
+      id: slot.company.id,
+      name: slot.company.name,
+      slug: slot.company.slug,
+      logoUrl: await resolveReadableS3ObjectUrl(slot.company.logoUrl ?? null),
+      tagline: slot.company.tagline ?? null,
       coverUrl: await resolveReadableS3ObjectUrl(rawCover),
-      order: type === 'FEATURED' ? (row.showcaseFeaturedOrder ?? 0) : (row.showcaseTopOrder ?? 0),
+      order: slot.sortOrder,
     };
   }
 
   private async normalizeShowcaseOrders(type: AdminCompanyShowcaseType) {
-    const orderField = this.getShowcaseOrderField(type);
-    const rows = await prisma.company.findMany({
-      where: {
-        [orderField]: {
-          not: null,
-        },
-      },
-      select: {
-        id: true,
-        showcaseFeaturedOrder: true,
-        showcaseTopOrder: true,
-      },
-      orderBy: [
-        { [orderField]: 'asc' },
-        { updatedAt: 'desc' },
-      ],
+    const listType = this.prismaShowcaseListType(type);
+    const rows = await prisma.companyShowcaseSlot.findMany({
+      where: { listType },
+      orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+      select: { id: true },
     });
 
     await prisma.$transaction(
       rows.map((row, idx) =>
-        prisma.company.update({
+        prisma.companyShowcaseSlot.update({
           where: { id: row.id },
-          data: { [orderField]: idx + 1 },
+          data: { sortOrder: idx + 1 },
         }),
       ),
     );
@@ -491,31 +486,27 @@ export class SystemService {
   }
 
   async listCompanyShowcaseForAdmin(type: AdminCompanyShowcaseType): Promise<{ companies: CompanyShowcaseItem[] }> {
-    const orderField = this.getShowcaseOrderField(type);
-    const rows = await prisma.company.findMany({
-      where: {
-        [orderField]: {
-          not: null,
+    const listType = this.prismaShowcaseListType(type);
+    const slots = await prisma.companyShowcaseSlot.findMany({
+      where: { listType },
+      orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            tagline: true,
+            coverUrl: true,
+          },
         },
       },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoUrl: true,
-        tagline: true,
-        coverUrl: true,
-        showcaseFeaturedCoverUrl: true,
-        showcaseFeaturedOrder: true,
-        showcaseTopOrder: true,
-      },
-      orderBy: [
-        { [orderField]: 'asc' },
-        { updatedAt: 'desc' },
-      ],
     });
 
-    const companies = await Promise.all(rows.map((row) => this.buildCompanyShowcaseItem(row, type)));
+    const companies = await Promise.all(
+      slots.map((slot) => this.buildCompanyShowcaseItemFromSlot(slot, type)),
+    );
     return { companies };
   }
 
@@ -524,7 +515,7 @@ export class SystemService {
     companyId: string,
     coverUrl?: string,
   ): Promise<{ company: CompanyShowcaseItem }> {
-    const orderField = this.getShowcaseOrderField(type);
+    const listType = this.prismaShowcaseListType(type);
 
     const exists = await prisma.company.findUnique({
       where: { id: companyId },
@@ -534,60 +525,61 @@ export class SystemService {
       throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const maxOrderRow = await tx.company.aggregate({
-        _max: {
-          showcaseFeaturedOrder: true,
-          showcaseTopOrder: true,
+    const dup = await prisma.companyShowcaseSlot.findUnique({
+      where: {
+        companyId_listType: {
+          companyId,
+          listType,
         },
-        where: {
-          [orderField]: {
-            not: null,
+      },
+      select: { id: true },
+    });
+    if (dup) {
+      throw new AppError('Công ty đã có trong danh sách này', 400, 'ALREADY_IN_SHOWCASE');
+    }
+
+    const slot = await prisma.$transaction(async (tx) => {
+      const maxOrderRow = await tx.companyShowcaseSlot.aggregate({
+        _max: { sortOrder: true },
+        where: { listType },
+      });
+      const nextOrder = (maxOrderRow._max.sortOrder ?? 0) + 1;
+
+      return tx.companyShowcaseSlot.create({
+        data: {
+          companyId,
+          listType,
+          sortOrder: nextOrder,
+          ...(type === 'FEATURED' && coverUrl ? { featuredCoverUrl: coverUrl } : {}),
+        },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+              tagline: true,
+              coverUrl: true,
+            },
           },
         },
       });
-      const currentMax =
-        type === 'FEATURED'
-          ? (maxOrderRow._max.showcaseFeaturedOrder ?? 0)
-          : (maxOrderRow._max.showcaseTopOrder ?? 0);
-
-      const updated = await tx.company.update({
-        where: { id: companyId },
-        data: {
-          [orderField]: currentMax + 1,
-          ...(type === 'FEATURED' && coverUrl ? { showcaseFeaturedCoverUrl: coverUrl } : {}),
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logoUrl: true,
-          tagline: true,
-          coverUrl: true,
-          showcaseFeaturedCoverUrl: true,
-          showcaseFeaturedOrder: true,
-          showcaseTopOrder: true,
-        },
-      });
-
-      return updated;
     });
 
     return {
-      company: await this.buildCompanyShowcaseItem(result, type),
+      company: await this.buildCompanyShowcaseItemFromSlot(slot, type),
     };
   }
 
   async removeCompanyFromShowcaseForAdmin(type: AdminCompanyShowcaseType, companyId: string): Promise<{ id: string }> {
-    const orderField = this.getShowcaseOrderField(type);
-    await prisma.company.update({
-      where: { id: companyId },
-      data: {
-        [orderField]: null,
-        ...(type === 'FEATURED' ? { showcaseFeaturedCoverUrl: null } : {}),
-      },
-      select: { id: true },
+    const listType = this.prismaShowcaseListType(type);
+    const removed = await prisma.companyShowcaseSlot.deleteMany({
+      where: { companyId, listType },
     });
+    if (removed.count === 0) {
+      throw new AppError('Công ty không có trong danh sách này', 404, 'NOT_IN_SHOWCASE');
+    }
 
     await this.normalizeShowcaseOrders(type);
     return { id: companyId };
@@ -597,7 +589,7 @@ export class SystemService {
     type: AdminCompanyShowcaseType,
     companyIds: string[],
   ): Promise<{ companies: CompanyShowcaseItem[] }> {
-    const orderField = this.getShowcaseOrderField(type);
+    const listType = this.prismaShowcaseListType(type);
     const existing = await this.listCompanyShowcaseForAdmin(type);
     const existingIds = existing.companies.map((company) => company.id);
     if (existingIds.length !== companyIds.length) {
@@ -610,9 +602,14 @@ export class SystemService {
 
     await prisma.$transaction(
       companyIds.map((companyId, idx) =>
-        prisma.company.update({
-          where: { id: companyId },
-          data: { [orderField]: idx + 1 },
+        prisma.companyShowcaseSlot.update({
+          where: {
+            companyId_listType: {
+              companyId,
+              listType,
+            },
+          },
+          data: { sortOrder: idx + 1 },
         }),
       ),
     );
@@ -661,30 +658,42 @@ export class SystemService {
     companyId: string,
     coverUrl: string,
   ): Promise<{ company: CompanyShowcaseItem }> {
-    const row = await prisma.company.update({
-      where: { id: companyId },
-      data: { showcaseFeaturedCoverUrl: coverUrl },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoUrl: true,
-        tagline: true,
-        coverUrl: true,
-        showcaseFeaturedCoverUrl: true,
-        showcaseFeaturedOrder: true,
-      },
-    });
-
-    return {
-      company: await this.buildCompanyShowcaseItem(
-        {
-          ...row,
-          showcaseTopOrder: null,
+    try {
+      const slot = await prisma.companyShowcaseSlot.update({
+        where: {
+          companyId_listType: {
+            companyId,
+            listType: CompanyShowcaseListType.FEATURED,
+          },
         },
-        'FEATURED',
-      ),
-    };
+        data: { featuredCoverUrl: coverUrl },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+              tagline: true,
+              coverUrl: true,
+            },
+          },
+        },
+      });
+
+      return {
+        company: await this.buildCompanyShowcaseItemFromSlot(slot, 'FEATURED'),
+      };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+        throw new AppError(
+          'Công ty chưa nằm trong danh sách nổi bật',
+          400,
+          'NOT_IN_FEATURED_SHOWCASE',
+        );
+      }
+      throw e;
+    }
   }
 
   async listPostsForAdmin(query: AdminPostsQuery): Promise<{

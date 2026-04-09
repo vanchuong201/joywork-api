@@ -9,6 +9,7 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
   const authMiddleware = new AuthMiddleware(authService);
   const uploadsService = new UploadsService();
   const uploadsController = new UploadsController(uploadsService);
+  const adminPre = [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)];
 
   fastify.post(
     '/presign',
@@ -95,6 +96,47 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
       },
     },
     uploadsController.createProfileAvatarPresign.bind(uploadsController),
+  );
+
+  fastify.post(
+    '/system/course-asset/presign',
+    {
+      preHandler: adminPre,
+      schema: {
+        description: 'ADMIN: presigned upload cho thumbnail / video / đính kèm khóa học',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['kind', 'fileName', 'fileType', 'fileSize'],
+          properties: {
+            kind: { type: 'string', enum: ['thumbnail', 'video', 'attachment'] },
+            fileName: { type: 'string' },
+            fileType: { type: 'string' },
+            fileSize: { type: 'number' },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  uploadUrl: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                  expiresIn: { type: 'number' },
+                  maxFileSize: { type: 'number' },
+                  allowedTypes: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.createCourseAssetPresign.bind(uploadsController),
   );
 
   fastify.post(
@@ -389,5 +431,42 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
       },
     },
   }, uploadsController.deleteObject.bind(uploadsController));
+
+  /** Multipart dùng plugin đã đăng ký ở app (giới hạn ~210MB) — không đăng ký lại @fastify/multipart. */
+  fastify.post(
+    '/system/course-asset/upload',
+    {
+      preHandler: adminPre,
+      schema: {
+        description:
+          'ADMIN: upload khóa học qua API (multipart). Dùng thay cho PUT presigned trực tiếp lên S3 khi bucket chưa cấu hình CORS.',
+        tags: ['Uploads'],
+        security: [{ bearerAuth: [] }],
+        consumes: ['multipart/form-data'],
+        querystring: {
+          type: 'object',
+          required: ['kind'],
+          properties: {
+            kind: { type: 'string', enum: ['thumbnail', 'video', 'attachment'] },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  assetUrl: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    uploadsController.uploadCourseAssetMultipart.bind(uploadsController),
+  );
 }
 

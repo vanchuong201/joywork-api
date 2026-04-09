@@ -6,6 +6,8 @@ import { SystemTalentPoolController } from './system-talent-pool.controller';
 import { TalentPoolService } from '@/modules/talent-pool/talent-pool.service';
 import { AuthMiddleware } from '@/modules/auth/auth.middleware';
 import { AuthService } from '@/modules/auth/auth.service';
+import { CourseAdminController } from '@/modules/courses/course-admin.controller';
+import { CourseAdminService } from '@/modules/courses/course-admin.service';
 
 export async function systemRoutes(fastify: FastifyInstance) {
   const authService = new AuthService();
@@ -15,6 +17,9 @@ export async function systemRoutes(fastify: FastifyInstance) {
   const importController = new SystemImportController();
   const talentPoolService = new TalentPoolService();
   const tpController = new SystemTalentPoolController(talentPoolService);
+  const courseAdminService = new CourseAdminService();
+  const courseAdminController = new CourseAdminController(courseAdminService);
+  const adminPre = [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)];
 
   fastify.get('/overview', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
@@ -1030,9 +1035,320 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, importController.importCompaniesJobs.bind(importController));
 
-  // ── Talent Pool: Requests ──
+  // ── Courses (admin) ──
 
-  const adminPre = [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)];
+  fastify.get('/courses', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: danh sách khóa học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 200 },
+          q: { type: 'string' },
+          status: { type: 'string', enum: ['DRAFT', 'PUBLISHED', 'HIDDEN'] },
+          visibility: { type: 'string', enum: ['PUBLIC', 'PRIVATE'] },
+        },
+      },
+    },
+  }, courseAdminController.list.bind(courseAdminController));
+
+  fastify.post('/courses', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: tạo khóa học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['title', 'shortDescription'],
+        properties: {
+          title: { type: 'string' },
+          shortDescription: { type: 'string' },
+          description: { type: 'string' },
+          thumbnailUrl: { type: ['string', 'null'] },
+          visibility: { type: 'string', enum: ['PUBLIC', 'PRIVATE'] },
+          status: { type: 'string', enum: ['DRAFT', 'PUBLISHED', 'HIDDEN'] },
+        },
+      },
+    },
+  }, courseAdminController.create.bind(courseAdminController));
+
+  fastify.get('/courses/:courseId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: chi tiết khóa học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+    },
+  }, courseAdminController.getOne.bind(courseAdminController));
+
+  fastify.patch('/courses/:courseId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: cập nhật khóa học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          shortDescription: { type: 'string' },
+          description: { type: 'string' },
+          thumbnailUrl: { type: ['string', 'null'] },
+          visibility: { type: 'string', enum: ['PUBLIC', 'PRIVATE'] },
+          status: { type: 'string', enum: ['DRAFT', 'PUBLISHED', 'HIDDEN'] },
+        },
+      },
+    },
+  }, courseAdminController.patch.bind(courseAdminController));
+
+  fastify.delete('/courses/:courseId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: xóa khóa học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+    },
+  }, courseAdminController.remove.bind(courseAdminController));
+
+  fastify.patch('/courses/:courseId/lessons/reorder', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: sắp xếp bài học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['lessonIds'],
+        properties: { lessonIds: { type: 'array', items: { type: 'string' } } },
+      },
+    },
+  }, courseAdminController.reorderLessons.bind(courseAdminController));
+
+  fastify.post('/courses/:courseId/lessons', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: thêm bài học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['title'],
+        properties: { title: { type: 'string' }, sortOrder: { type: 'integer' } },
+      },
+    },
+  }, courseAdminController.createLesson.bind(courseAdminController));
+
+  fastify.patch('/courses/:courseId/lessons/:lessonId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: sửa bài học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId'],
+        properties: { courseId: { type: 'string' }, lessonId: { type: 'string' } },
+      },
+      body: { type: 'object', properties: { title: { type: 'string' }, sortOrder: { type: 'integer' } } },
+    },
+  }, courseAdminController.patchLesson.bind(courseAdminController));
+
+  fastify.delete('/courses/:courseId/lessons/:lessonId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: xóa bài học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId'],
+        properties: { courseId: { type: 'string' }, lessonId: { type: 'string' } },
+      },
+    },
+  }, courseAdminController.deleteLesson.bind(courseAdminController));
+
+  fastify.post('/courses/:courseId/lessons/:lessonId/videos', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: thêm video bài học',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId'],
+        properties: { courseId: { type: 'string' }, lessonId: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        required: ['source', 'value'],
+        properties: {
+          source: { type: 'string', enum: ['URL', 'S3_KEY'] },
+          value: { type: 'string' },
+          sortOrder: { type: 'integer' },
+        },
+      },
+    },
+  }, courseAdminController.createVideo.bind(courseAdminController));
+
+  fastify.patch('/courses/:courseId/lessons/:lessonId/videos/:videoId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: sửa video',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId', 'videoId'],
+        properties: {
+          courseId: { type: 'string' },
+          lessonId: { type: 'string' },
+          videoId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          source: { type: 'string', enum: ['URL', 'S3_KEY'] },
+          value: { type: 'string' },
+          sortOrder: { type: 'integer' },
+        },
+      },
+    },
+  }, courseAdminController.patchVideo.bind(courseAdminController));
+
+  fastify.delete('/courses/:courseId/lessons/:lessonId/videos/:videoId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: xóa video',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId', 'videoId'],
+        properties: {
+          courseId: { type: 'string' },
+          lessonId: { type: 'string' },
+          videoId: { type: 'string' },
+        },
+      },
+    },
+  }, courseAdminController.deleteVideo.bind(courseAdminController));
+
+  fastify.post('/courses/:courseId/lessons/:lessonId/attachments', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: thêm tệp đính kèm',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId'],
+        properties: { courseId: { type: 'string' }, lessonId: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        required: ['name', 'source', 'value'],
+        properties: {
+          name: { type: 'string' },
+          source: { type: 'string', enum: ['URL', 'S3_KEY'] },
+          value: { type: 'string' },
+          sortOrder: { type: 'integer' },
+        },
+      },
+    },
+  }, courseAdminController.createAttachment.bind(courseAdminController));
+
+  fastify.patch('/courses/:courseId/lessons/:lessonId/attachments/:attachmentId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: sửa tệp đính kèm',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId', 'attachmentId'],
+        properties: {
+          courseId: { type: 'string' },
+          lessonId: { type: 'string' },
+          attachmentId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          source: { type: 'string', enum: ['URL', 'S3_KEY'] },
+          value: { type: 'string' },
+          sortOrder: { type: 'integer' },
+        },
+      },
+    },
+  }, courseAdminController.patchAttachment.bind(courseAdminController));
+
+  fastify.delete('/courses/:courseId/lessons/:lessonId/attachments/:attachmentId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: xóa tệp đính kèm',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'lessonId', 'attachmentId'],
+        properties: {
+          courseId: { type: 'string' },
+          lessonId: { type: 'string' },
+          attachmentId: { type: 'string' },
+        },
+      },
+    },
+  }, courseAdminController.deleteAttachment.bind(courseAdminController));
+
+  fastify.get('/courses/:courseId/enrollments', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: danh sách học viên (private)',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+    },
+  }, courseAdminController.listEnrollments.bind(courseAdminController));
+
+  fastify.post('/courses/:courseId/enrollments', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: thêm học viên',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['courseId'], properties: { courseId: { type: 'string' } } },
+      body: { type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } },
+    },
+  }, courseAdminController.addEnrollment.bind(courseAdminController));
+
+  fastify.delete('/courses/:courseId/enrollments/:enrollmentId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin: gỡ học viên',
+      tags: ['System - Courses'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['courseId', 'enrollmentId'],
+        properties: { courseId: { type: 'string' }, enrollmentId: { type: 'string' } },
+      },
+    },
+  }, courseAdminController.removeEnrollment.bind(courseAdminController));
+
+  // ── Talent Pool: Requests ──
 
   fastify.get('/talent-pool/requests', {
     preHandler: adminPre,

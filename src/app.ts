@@ -22,6 +22,7 @@ import notificationsRoutes from '@/modules/notifications/notifications.routes';
 import { hashtagsRoutes } from '@/modules/hashtags/hashtags.routes';
 import { talentPoolRoutes } from '@/modules/talent-pool/talent-pool.routes';
 import { locationsRoutes } from '@/modules/locations/locations.routes';
+import { coursesRoutes } from '@/modules/courses/courses.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -43,7 +44,8 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Register plugins
   await app.register(cookie);
-  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
+  /** Một lần duy nhất — video khóa học admin tới ~200MB; không đăng ký thêm @fastify/multipart ở module con (trùng parser). */
+  await app.register(multipart, { limits: { fileSize: 210 * 1024 * 1024 } });
 
   const allowedOrigins = new Set<string>([config.FRONTEND_ORIGIN]);
   if (config.ADMIN_CP_ORIGIN) {
@@ -177,6 +179,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(hashtagsRoutes, { prefix: '/api/hashtags' });
   await app.register(talentPoolRoutes, { prefix: '/api/talent-pool' });
   await app.register(locationsRoutes, { prefix: '/api/locations' });
+  await app.register(coursesRoutes, { prefix: '/api/courses' });
 
   return app;
 }

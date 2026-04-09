@@ -1,4 +1,4 @@
-import { Prisma, CompanyStatementAnswer } from '@prisma/client';
+import { Prisma, CompanyShowcaseListType, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
@@ -890,45 +890,43 @@ export class CompaniesService {
   }
 
   async getHomepageCompanyShowcase(query: CompanyShowcaseQueryInput): Promise<{ companies: HomepageCompanyShowcaseItem[] }> {
-    const orderField = query.type === 'FEATURED' ? 'showcaseFeaturedOrder' : 'showcaseTopOrder';
-    const rows = await prisma.company.findMany({
-      where: {
-        [orderField]: {
-          not: null,
+    const listType =
+      query.type === 'FEATURED' ? CompanyShowcaseListType.FEATURED : CompanyShowcaseListType.TOP;
+    const slots = await prisma.companyShowcaseSlot.findMany({
+      where: { listType },
+      orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+      take: query.limit,
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            tagline: true,
+            coverUrl: true,
+          },
         },
       },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoUrl: true,
-        tagline: true,
-        coverUrl: true,
-        showcaseFeaturedCoverUrl: true,
-        showcaseFeaturedOrder: true,
-        showcaseTopOrder: true,
-      },
-      orderBy: [
-        { [orderField]: 'asc' },
-        { updatedAt: 'desc' },
-      ],
-      take: query.limit,
     });
 
     const companies = await Promise.all(
-      rows.map(async (row) => ({
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
-        tagline: row.tagline ?? null,
-        coverUrl: await resolveReadableS3ObjectUrl(
+      slots.map(async (slot) => {
+        const row = slot.company;
+        const rawCover =
           query.type === 'FEATURED'
-            ? (row.showcaseFeaturedCoverUrl ?? row.coverUrl ?? null)
-            : (row.coverUrl ?? null),
-        ),
-        order: query.type === 'FEATURED' ? (row.showcaseFeaturedOrder ?? 0) : (row.showcaseTopOrder ?? 0),
-      })),
+            ? (slot.featuredCoverUrl ?? row.coverUrl ?? null)
+            : (row.coverUrl ?? null);
+        return {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
+          tagline: row.tagline ?? null,
+          coverUrl: await resolveReadableS3ObjectUrl(rawCover),
+          order: slot.sortOrder,
+        };
+      }),
     );
 
     return { companies };

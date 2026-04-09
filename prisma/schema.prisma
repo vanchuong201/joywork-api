@@ -55,6 +55,7 @@ model User {
   talentPoolRequestsReviewed TalentPoolRequest[]     @relation("TalentPoolReviewedBy")
   talentPoolLogs            TalentPoolLog[]          @relation("TalentPoolLogUser")
   talentPoolLogsActed       TalentPoolLog[]          @relation("TalentPoolLogActor")
+  courseEnrollments         CourseEnrollment[]
 
   @@index([slug])
   @@map("users")
@@ -227,9 +228,6 @@ model Company {
   metrics                  Json?
   profileStory             Json?
   highlights               Json?
-  showcaseFeaturedOrder    Int?
-  showcaseFeaturedCoverUrl String?
-  showcaseTopOrder         Int?
   isVerified               Boolean                   @default(false)
   verificationStatus       CompanyVerificationStatus @default(UNVERIFIED)
   verificationFileKey      String?
@@ -258,7 +256,26 @@ model Company {
   // Feature entitlements (premium features)
   featureEntitlements CompanyFeatureEntitlement[]
 
+  showcaseSlots CompanyShowcaseSlot[]
+
   @@map("companies")
+}
+
+/// Vị trí công ty trong danh sách nổi bật / hàng đầu (CMS homepage).
+model CompanyShowcaseSlot {
+  id               String                  @id @default(cuid())
+  companyId        String
+  company          Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  listType         CompanyShowcaseListType
+  sortOrder        Int
+  /// Chỉ dùng khi listType = FEATURED; cover riêng khác cover trang profile.
+  featuredCoverUrl String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@unique([companyId, listType])
+  @@index([listType, sortOrder])
+  @@map("company_showcase_slots")
 }
 
 // New model for detailed Company Profile (Showcase)
@@ -320,6 +337,11 @@ model CompanyProfile {
   updatedAt DateTime @updatedAt
 
   @@map("company_profiles")
+}
+
+enum CompanyShowcaseListType {
+  FEATURED
+  TOP
 }
 
 enum CompanyVerificationStatus {
@@ -1069,4 +1091,113 @@ model WardRegistry {
   @@unique([provinceCode, officialCode])
   @@index([provinceCode])
   @@map("ward_registry")
+}
+
+// =========================
+// Online courses
+// =========================
+
+enum CourseVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+
+enum CourseVideoSource {
+  URL
+  S3_KEY
+}
+
+enum CourseAttachmentSource {
+  URL
+  S3_KEY
+}
+
+model Course {
+  id                String           @id @default(cuid())
+  title             String
+  slug              String           @unique
+  shortDescription  String
+  description       String?
+  thumbnailUrl      String?
+  visibility        CourseVisibility @default(PUBLIC)
+  status            CourseStatus     @default(DRAFT)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  lessons      Lesson[]
+  enrollments  CourseEnrollment[]
+
+  @@index([status, visibility])
+  @@index([slug])
+  @@map("courses")
+}
+
+model Lesson {
+  id        String   @id @default(cuid())
+  courseId  String
+  title     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course       Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  videos       LessonVideo[]
+  attachments  LessonAttachment[]
+
+  @@index([courseId])
+  @@index([courseId, sortOrder])
+  @@map("course_lessons")
+}
+
+model LessonVideo {
+  id        String            @id @default(cuid())
+  lessonId  String
+  source    CourseVideoSource
+  value     String
+  sortOrder Int               @default(0)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@index([lessonId, sortOrder])
+  @@map("course_lesson_videos")
+}
+
+model LessonAttachment {
+  id        String                 @id @default(cuid())
+  lessonId  String
+  name      String
+  source    CourseAttachmentSource
+  value     String
+  sortOrder Int                    @default(0)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@index([lessonId, sortOrder])
+  @@map("course_lesson_attachments")
+}
+
+model CourseEnrollment {
+  id        String   @id @default(cuid())
+  courseId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+  @@index([userId])
+  @@map("course_enrollments")
 }
