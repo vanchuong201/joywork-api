@@ -28,6 +28,9 @@ const envSchema = z.object({
   // API
   API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
 
+  // Public CDN URL for serving uploaded assets (e.g. CloudFront domain)
+  CDN_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+
   // Sentry
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.string().url().optional()),
   SENTRY_ENVIRONMENT: z.string().default('development'),

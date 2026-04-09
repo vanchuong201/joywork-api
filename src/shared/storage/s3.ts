@@ -11,12 +11,16 @@ const s3Client = new S3Client({
 });
 
 const bucketName = config.AWS_S3_BUCKET;
+const normalizedCdnBaseUrl = config.CDN_BASE_URL?.replace(/\/+$/, '');
 
 export function getS3BucketName(): string {
   return bucketName;
 }
 
 export function buildS3ObjectUrl(key: string): string {
+  if (normalizedCdnBaseUrl) {
+    return `${normalizedCdnBaseUrl}/${key}`;
+  }
   return `https://${bucketName}.s3.${config.AWS_REGION}.amazonaws.com/${key}`;
 }
 
@@ -101,4 +105,3 @@ export async function deleteS3Objects(keys: string[]): Promise<void> {
 }
 
 export { s3Client };
-
