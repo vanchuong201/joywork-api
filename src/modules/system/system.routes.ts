@@ -1518,6 +1518,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
           page: { type: 'integer', minimum: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100 },
           q: { type: 'string' },
+          enabled: { type: 'boolean' },
         },
       },
     },

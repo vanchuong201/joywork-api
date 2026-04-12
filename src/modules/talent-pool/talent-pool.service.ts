@@ -426,11 +426,51 @@ export class TalentPoolService {
   // ── Admin: entitlements ──
 
   async listEntitlements(query: AdminEntitlementsQuery) {
-    const { page, limit, q } = query;
+    const { page, limit, q, enabled } = query;
 
-    const companyWhere: Prisma.CompanyWhereInput = q
-      ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { slug: { contains: q, mode: 'insensitive' } }] }
-      : {};
+    const andConditions: Prisma.CompanyWhereInput[] = [];
+
+    if (q) {
+      andConditions.push({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { slug: { contains: q, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (enabled === true) {
+      andConditions.push({
+        featureEntitlements: {
+          some: {
+            featureKey: TALENT_POOL_FEATURE_KEY,
+            enabled: true,
+          },
+        },
+      });
+    } else if (enabled === false) {
+      andConditions.push({
+        OR: [
+          {
+            featureEntitlements: {
+              none: {
+                featureKey: TALENT_POOL_FEATURE_KEY,
+              },
+            },
+          },
+          {
+            featureEntitlements: {
+              some: {
+                featureKey: TALENT_POOL_FEATURE_KEY,
+                enabled: false,
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    const companyWhere: Prisma.CompanyWhereInput = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const [companies, total] = await Promise.all([
       prisma.company.findMany({
@@ -464,7 +504,12 @@ export class TalentPoolService {
 
     return {
       companies: items,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

@@ -65,6 +65,7 @@ export const adminEntitlementsQuerySchema = z.object({
   page: pageSchema,
   limit: limitSchema,
   q: z.string().trim().max(200).optional(),
+  enabled: z.coerce.boolean().optional(),
 });
 
 export type AdminEntitlementsQuery = z.infer<typeof adminEntitlementsQuerySchema>;
