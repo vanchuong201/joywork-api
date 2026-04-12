@@ -64,6 +64,9 @@ export interface AdminCompanyListItem {
   verificationStatus: string;
   isVerified: boolean;
   isPremium: boolean;
+  cvFlipEnabled: boolean;
+  cvFlipMonthlyTotalLimit: number;
+  cvFlipMonthlyRequestLimit: number;
   createdAt: Date;
   memberCount: number;
   jobCount: number;
@@ -182,7 +185,35 @@ function subtractDays(base: Date, days: number): Date {
 
 export class SystemService {
   private static readonly TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
+  private static readonly CV_FLIP_FEATURE_KEY = 'CV_FLIP';
+  private static readonly CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT = 500;
+  private static readonly CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT = 100;
   private static readonly SHOWCASE_MAX_FILE_SIZE = 8 * 1024 * 1024;
+
+  private parseCvFlipLimits(metadata: Prisma.JsonValue | null | undefined): {
+    monthlyTotalLimit: number;
+    monthlyRequestLimit: number;
+  } {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return {
+        monthlyTotalLimit: SystemService.CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT,
+        monthlyRequestLimit: SystemService.CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT,
+      };
+    }
+
+    const data = metadata as Record<string, unknown>;
+    const total = typeof data['monthlyTotalLimit'] === 'number' && data['monthlyTotalLimit'] > 0
+      ? Math.floor(data['monthlyTotalLimit'])
+      : SystemService.CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT;
+    const request = typeof data['monthlyRequestLimit'] === 'number' && data['monthlyRequestLimit'] > 0
+      ? Math.floor(data['monthlyRequestLimit'])
+      : SystemService.CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT;
+
+    return {
+      monthlyTotalLimit: total,
+      monthlyRequestLimit: Math.min(request, total),
+    };
+  }
 
   private sanitizeFileName(name: string): string {
     return name.trim().replace(/[^a-zA-Z0-9.\-_]+/g, '-');
@@ -324,10 +355,11 @@ export class SystemService {
     companies: AdminCompanyListItem[];
     pagination: AdminPagination;
   }> {
-    const { page, limit, q, verificationStatus } = query;
+    const { page, limit, q, verificationStatus, premiumStatus, cvFlipStatus } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.CompanyWhereInput = {};
+    const andConditions: Prisma.CompanyWhereInput[] = [];
     if (verificationStatus) {
       where.verificationStatus = verificationStatus;
     }
@@ -337,6 +369,53 @@ export class SystemService {
         { slug: { contains: q, mode: 'insensitive' } },
         { legalName: { contains: q, mode: 'insensitive' } },
       ];
+    }
+    if (premiumStatus === 'premium') {
+      andConditions.push({
+        featureEntitlements: {
+          some: {
+            featureKey: SystemService.TALENT_POOL_FEATURE_KEY,
+            enabled: true,
+          },
+        },
+      });
+    }
+    if (premiumStatus === 'free') {
+      andConditions.push({
+        NOT: {
+          featureEntitlements: {
+            some: {
+              featureKey: SystemService.TALENT_POOL_FEATURE_KEY,
+              enabled: true,
+            },
+          },
+        },
+      });
+    }
+    if (cvFlipStatus === 'enabled') {
+      andConditions.push({
+        featureEntitlements: {
+          some: {
+            featureKey: SystemService.CV_FLIP_FEATURE_KEY,
+            enabled: true,
+          },
+        },
+      });
+    }
+    if (cvFlipStatus === 'disabled') {
+      andConditions.push({
+        NOT: {
+          featureEntitlements: {
+            some: {
+              featureKey: SystemService.CV_FLIP_FEATURE_KEY,
+              enabled: true,
+            },
+          },
+        },
+      });
+    }
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [total, rows] = await Promise.all([
@@ -358,26 +437,38 @@ export class SystemService {
             select: { members: true, jobs: true },
           },
           featureEntitlements: {
-            where: { featureKey: SystemService.TALENT_POOL_FEATURE_KEY },
-            select: { enabled: true },
-            take: 1,
+            where: {
+              featureKey: {
+                in: [SystemService.TALENT_POOL_FEATURE_KEY, SystemService.CV_FLIP_FEATURE_KEY],
+              },
+            },
+            select: { enabled: true, featureKey: true, metadata: true },
           },
         },
       }),
     ]);
 
-    const companies: AdminCompanyListItem[] = rows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      legalName: c.legalName ?? null,
-      verificationStatus: c.verificationStatus,
-      isVerified: c.isVerified,
-      isPremium: c.featureEntitlements[0]?.enabled ?? false,
-      createdAt: c.createdAt,
-      memberCount: c._count.members,
-      jobCount: c._count.jobs,
-    }));
+    const companies: AdminCompanyListItem[] = rows.map((c) => {
+      const premiumEntitlement = c.featureEntitlements.find((ent) => ent.featureKey === SystemService.TALENT_POOL_FEATURE_KEY);
+      const cvFlipEntitlement = c.featureEntitlements.find((ent) => ent.featureKey === SystemService.CV_FLIP_FEATURE_KEY);
+      const cvFlipLimits = this.parseCvFlipLimits(cvFlipEntitlement?.metadata);
+
+      return {
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        legalName: c.legalName ?? null,
+        verificationStatus: c.verificationStatus,
+        isVerified: c.isVerified,
+        isPremium: premiumEntitlement?.enabled ?? false,
+        cvFlipEnabled: cvFlipEntitlement?.enabled ?? false,
+        cvFlipMonthlyTotalLimit: cvFlipLimits.monthlyTotalLimit,
+        cvFlipMonthlyRequestLimit: cvFlipLimits.monthlyRequestLimit,
+        createdAt: c.createdAt,
+        memberCount: c._count.members,
+        jobCount: c._count.jobs,
+      };
+    });
 
     return {
       companies,
@@ -1085,6 +1176,62 @@ export class SystemService {
     return {
       id: company.id,
       isPremium,
+    };
+  }
+
+  async setCompanyCvFlipStatus(
+    companyId: string,
+    enabled: boolean,
+    monthlyTotalLimit?: number,
+    monthlyRequestLimit?: number
+  ): Promise<{ id: string; enabled: boolean; monthlyTotalLimit: number; monthlyRequestLimit: number }> {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const safeTotalLimit = monthlyTotalLimit && monthlyTotalLimit > 0
+      ? Math.floor(monthlyTotalLimit)
+      : SystemService.CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT;
+
+    const safeRequestLimitRaw = monthlyRequestLimit && monthlyRequestLimit > 0
+      ? Math.floor(monthlyRequestLimit)
+      : SystemService.CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT;
+    const safeRequestLimit = Math.min(safeRequestLimitRaw, safeTotalLimit);
+
+    const metadata = {
+      monthlyTotalLimit: safeTotalLimit,
+      monthlyRequestLimit: safeRequestLimit,
+    };
+
+    await prisma.companyFeatureEntitlement.upsert({
+      where: {
+        companyId_featureKey: {
+          companyId,
+          featureKey: SystemService.CV_FLIP_FEATURE_KEY,
+        },
+      },
+      create: {
+        companyId,
+        featureKey: SystemService.CV_FLIP_FEATURE_KEY,
+        enabled,
+        metadata,
+      },
+      update: {
+        enabled,
+        metadata,
+      },
+    });
+
+    return {
+      id: company.id,
+      enabled,
+      monthlyTotalLimit: safeTotalLimit,
+      monthlyRequestLimit: safeRequestLimit,
     };
   }
 

@@ -19,6 +19,8 @@ export const adminCompaniesQuerySchema = z.object({
   limit: limitSchema,
   q: z.string().trim().max(200).optional(),
   verificationStatus: z.enum(['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED']).optional(),
+  premiumStatus: z.enum(['premium', 'free']).optional(),
+  cvFlipStatus: z.enum(['enabled', 'disabled']).optional(),
 });
 
 export type AdminCompaniesQuery = z.infer<typeof adminCompaniesQuerySchema>;
@@ -40,6 +42,14 @@ export const adminCompanyPremiumPatchSchema = z.object({
 });
 
 export type AdminCompanyPremiumPatch = z.infer<typeof adminCompanyPremiumPatchSchema>;
+
+export const adminCompanyCvFlipPatchSchema = z.object({
+  enabled: z.boolean(),
+  monthlyTotalLimit: z.coerce.number().int().min(1).max(100000).optional(),
+  monthlyRequestLimit: z.coerce.number().int().min(1).max(100000).optional(),
+});
+
+export type AdminCompanyCvFlipPatch = z.infer<typeof adminCompanyCvFlipPatchSchema>;
 
 export const adminJobsQuerySchema = z.object({
   page: pageSchema,

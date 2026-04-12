@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { UserProfileService } from './user-profile.service';
-import { getUserProfileBySlugSchema, updateProfileSchema } from './users.schema';
+import { getUserProfileBySlugSchema, publicProfileQuerySchema, updateProfileSchema } from './users.schema';
+import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 
 export class UserProfileController {
   constructor(private userProfileService: UserProfileService) {}
@@ -8,8 +9,12 @@ export class UserProfileController {
   // Get public profile by slug
   async getPublicProfileBySlug(request: FastifyRequest, reply: FastifyReply) {
     const { slug } = getUserProfileBySlugSchema.parse(request.params);
-    
-    const profile = await this.userProfileService.getPublicProfileBySlug(slug);
+    const viewerUserId = (request as AuthenticatedRequest).user?.userId ?? null;
+    const query = publicProfileQuerySchema.parse(request.query ?? {});
+
+    const profile = await this.userProfileService.getPublicProfileBySlug(slug, viewerUserId, {
+      companyId: query.companyId ?? null,
+    });
     
     if (!profile) {
       return reply.status(404).send({

@@ -6,6 +6,8 @@ import {
   UpdateProfileInput,
 } from './users.schema';
 
+const TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
+
 // Helper: Generate slug from name
 export function generateSlug(name: string): string {
   return name
@@ -39,8 +41,124 @@ export async function ensureUniqueSlug(baseSlug: string, excludeUserId?: string)
 }
 
 export class UserProfileService {
-  // Get public profile by slug (or ID as fallback)
-  async getPublicProfileBySlug(slug: string): Promise<any | null> {
+  /**
+   * Ẩn contactEmail / contactPhone / cvUrl / website / linkedin / github trên API public trừ khi:
+   * - viewer là chủ hồ sơ, hoặc
+   * - có companyId + viewer là OWNER/ADMIN công ty + đã có CvFlipConnection,
+   * - hoặc ứng viên đã chủ động apply vào job của công ty đó (không cần lật CV).
+   */
+  private async shouldRedactPublicContactFields(params: {
+    profileUserId: string;
+    viewerUserId: string | null | undefined;
+    companyId: string | null | undefined;
+  }): Promise<boolean> {
+    const { profileUserId, viewerUserId, companyId } = params;
+    if (!viewerUserId) {
+      return true;
+    }
+    if (viewerUserId === profileUserId) {
+      return false;
+    }
+    const cid = typeof companyId === 'string' ? companyId.trim() : '';
+    if (!cid) {
+      return true;
+    }
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId: viewerUserId,
+        companyId: cid,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: { id: true },
+    });
+    if (!membership) {
+      return true;
+    }
+
+    const hasAppliedToCompany = await prisma.application.findFirst({
+      where: {
+        userId: profileUserId,
+        status: { not: 'REJECTED' },
+        job: { companyId: cid },
+      },
+      select: { id: true },
+    });
+    if (hasAppliedToCompany) {
+      return false;
+    }
+
+    const connection = await prisma.cvFlipConnection.findUnique({
+      where: {
+        companyId_userId: {
+          companyId: cid,
+          userId: profileUserId,
+        },
+      },
+      select: { id: true },
+    });
+
+    return !connection;
+  }
+
+  /**
+   * Cho phép DN (OWNER/ADMIN, công ty bật Talent Pool) xem shell hồ sơ ứng viên
+   * đang ACTIVE trong Talent Pool dù `isPublic === false`, để khớp với list `/talent-pool/candidates`.
+   * Contact vẫn qua `shouldRedactPublicContactFields`.
+   */
+  private async canViewerSeePrivateProfileViaTalentPool(params: {
+    viewerUserId: string | null | undefined;
+    profileUserId: string;
+    companyId: string | null | undefined;
+  }): Promise<boolean> {
+    const { viewerUserId, profileUserId, companyId } = params;
+    if (!viewerUserId || viewerUserId === profileUserId) {
+      return false;
+    }
+    const cid = typeof companyId === 'string' ? companyId.trim() : '';
+    if (!cid) {
+      return false;
+    }
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId: viewerUserId,
+        companyId: cid,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: { id: true },
+    });
+    if (!membership) {
+      return false;
+    }
+
+    const entitlement = await prisma.companyFeatureEntitlement.findUnique({
+      where: {
+        companyId_featureKey: {
+          companyId: cid,
+          featureKey: TALENT_POOL_FEATURE_KEY,
+        },
+      },
+      select: { enabled: true },
+    });
+    if (!entitlement?.enabled) {
+      return false;
+    }
+
+    const member = await prisma.talentPoolMember.findUnique({
+      where: { userId: profileUserId },
+      select: { status: true },
+    });
+    return member?.status === 'ACTIVE';
+  }
+
+  // Get public profile by slug (or ID as fallback).
+  // Khi viewerUserId trùng chủ hồ sơ, vẫn trả về dù isPublic = false (xem trước khi đăng nhập).
+  async getPublicProfileBySlug(
+    slug: string,
+    viewerUserId?: string | null,
+    options?: { companyId?: string | null }
+  ): Promise<any | null> {
     // Try to find by slug first
     let user = await prisma.user.findUnique({
       where: { slug },
@@ -104,9 +222,18 @@ export class UserProfileService {
       return null;
     }
 
-    // Check if profile is public
+    // Check if profile is public (chủ hồ sơ xem được khi đã đăng nhập)
     if (user.profile && !user.profile.isPublic) {
-      return null; // Profile is private
+      if (!viewerUserId || viewerUserId !== user.id) {
+        const allowTalentPoolEmployer = await this.canViewerSeePrivateProfileViaTalentPool({
+          viewerUserId,
+          profileUserId: user.id,
+          companyId: options?.companyId ?? null,
+        });
+        if (!allowTalentPoolEmployer) {
+          return null;
+        }
+      }
     }
 
     const visibility = (user.profile?.visibility as any) || {
@@ -147,6 +274,8 @@ export class UserProfileService {
         contactEmail: user.profile.contactEmail,
         contactPhone: user.profile.contactPhone,
         status: user.profile.status,
+        isSearchingJob: user.profile.isSearchingJob,
+        allowCvFlip: user.profile.allowCvFlip,
         createdAt: user.profile.createdAt,
         updatedAt: user.profile.updatedAt,
       };
@@ -207,6 +336,20 @@ export class UserProfileService {
       }));
     }
 
+    const redactContacts = await this.shouldRedactPublicContactFields({
+      profileUserId: user.id,
+      viewerUserId: viewerUserId ?? null,
+      companyId: options?.companyId ?? null,
+    });
+    if (redactContacts && result.profile) {
+      result.profile.contactEmail = null;
+      result.profile.contactPhone = null;
+      result.profile.cvUrl = null;
+      result.profile.website = null;
+      result.profile.linkedin = null;
+      result.profile.github = null;
+    }
+
     return result;
   }
 
@@ -265,6 +408,8 @@ export class UserProfileService {
             contactPhone: (user.profile as any).contactPhone,
             status: user.profile.status,
             isPublic: user.profile.isPublic,
+            isSearchingJob: user.profile.isSearchingJob,
+            allowCvFlip: user.profile.allowCvFlip,
             visibility: user.profile.visibility,
             knowledge: user.profile.knowledge,
             attitude: user.profile.attitude,
@@ -361,6 +506,8 @@ export class UserProfileService {
       'title',
       'status',
       'isPublic',
+      'isSearchingJob',
+      'allowCvFlip',
       'visibility',
       'knowledge',
       'attitude',

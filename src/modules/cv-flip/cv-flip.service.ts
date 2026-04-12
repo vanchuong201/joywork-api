@@ -1,0 +1,909 @@
+import { config } from '@/config/env';
+import { prisma } from '@/shared/database/prisma';
+import { AppError } from '@/shared/errors/errorHandler';
+import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
+import { emailService } from '@/shared/services/email.service';
+import { notificationService } from '@/shared/services/notification.service';
+import { Prisma } from '@prisma/client';
+import type { CandidateDetailQuery, CandidatesQuery, RequestsQuery } from './cv-flip.schema';
+
+const CV_FLIP_FEATURE_KEY = 'CV_FLIP';
+const DEFAULT_MONTHLY_TOTAL_LIMIT = 500;
+const DEFAULT_MONTHLY_REQUEST_LIMIT = 100;
+const REQUEST_EXPIRE_DAYS = 7;
+
+type CompanyLimits = {
+  enabled: boolean;
+  monthlyTotalLimit: number;
+  monthlyRequestLimit: number;
+};
+
+const parsePositiveNumber = (value: unknown): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value <= 0) return null;
+  return Math.floor(value);
+};
+
+const parseCompanyLimits = (metadata: Prisma.JsonValue | null | undefined): Pick<CompanyLimits, 'monthlyTotalLimit' | 'monthlyRequestLimit'> => {
+  const fallback = {
+    monthlyTotalLimit: DEFAULT_MONTHLY_TOTAL_LIMIT,
+    monthlyRequestLimit: DEFAULT_MONTHLY_REQUEST_LIMIT,
+  };
+
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return fallback;
+  }
+
+  const record = metadata as Record<string, unknown>;
+  const monthlyTotalLimit = parsePositiveNumber(record['monthlyTotalLimit']) ?? DEFAULT_MONTHLY_TOTAL_LIMIT;
+  const monthlyRequestLimit = parsePositiveNumber(record['monthlyRequestLimit']) ?? DEFAULT_MONTHLY_REQUEST_LIMIT;
+
+  return {
+    monthlyTotalLimit,
+    monthlyRequestLimit: Math.min(monthlyRequestLimit, monthlyTotalLimit),
+  };
+};
+
+const getMonthYear = (date = new Date()): { month: number; year: number } => ({
+  month: date.getUTCMonth() + 1,
+  year: date.getUTCFullYear(),
+});
+
+const addDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+};
+
+const profileUrl = (slug: string | null): string => {
+  const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
+  return slug ? `${base}/profile/${slug}` : `${base}/account?tab=profile`;
+};
+
+const cvFlipRequestsUrl = (): string => {
+  const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
+  return `${base}/account?tab=profile`;
+};
+
+export class CvFlipService {
+  private async assertCanManageCompany(userId: string, companyId: string): Promise<void> {
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: { id: true },
+    });
+
+    if (!membership) {
+      throw new AppError('Bạn không có quyền thao tác với doanh nghiệp này', 403, 'COMPANY_PERMISSION_DENIED');
+    }
+  }
+
+  private async getCompanyLimits(companyId: string): Promise<CompanyLimits> {
+    const entitlement = await prisma.companyFeatureEntitlement.findUnique({
+      where: {
+        companyId_featureKey: {
+          companyId,
+          featureKey: CV_FLIP_FEATURE_KEY,
+        },
+      },
+      select: {
+        enabled: true,
+        metadata: true,
+      },
+    });
+
+    const parsed = parseCompanyLimits(entitlement?.metadata);
+
+    return {
+      enabled: entitlement?.enabled ?? false,
+      monthlyTotalLimit: parsed.monthlyTotalLimit,
+      monthlyRequestLimit: parsed.monthlyRequestLimit,
+    };
+  }
+
+  async checkAccess(userId: string) {
+    const companies = await prisma.companyMember.findMany({
+      where: {
+        userId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: {
+        companyId: true,
+        role: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            featureEntitlements: {
+              where: { featureKey: CV_FLIP_FEATURE_KEY },
+              take: 1,
+              select: { enabled: true, metadata: true },
+            },
+          },
+        },
+      },
+      orderBy: { joinedAt: 'desc' },
+    });
+
+    return {
+      companies: companies.map((item) => {
+        const entitlement = item.company.featureEntitlements[0];
+        const limits = parseCompanyLimits(entitlement?.metadata);
+        return {
+          id: item.company.id,
+          name: item.company.name,
+          slug: item.company.slug,
+          logoUrl: item.company.logoUrl,
+          role: item.role,
+          isPremium: entitlement?.enabled ?? false,
+          cvFlipEnabled: entitlement?.enabled ?? false,
+          monthlyTotalLimit: limits.monthlyTotalLimit,
+          monthlyRequestLimit: limits.monthlyRequestLimit,
+        };
+      }),
+    };
+  }
+
+  async listCandidates(query: CandidatesQuery) {
+    const {
+      page,
+      limit,
+      keyword,
+      skills,
+      location,
+      education,
+      salaryMin,
+      salaryMax,
+      workMode,
+    } = query;
+
+    const where: Prisma.UserWhereInput = {
+      accountStatus: 'ACTIVE',
+      profile: {
+        is: {
+          isPublic: true,
+          isSearchingJob: true,
+        },
+      },
+    };
+
+    const andConditions: Prisma.UserWhereInput[] = [];
+
+    if (keyword) {
+      andConditions.push({
+        OR: [
+          { name: { contains: keyword, mode: 'insensitive' } },
+          { profile: { is: { fullName: { contains: keyword, mode: 'insensitive' } } } },
+          { profile: { is: { headline: { contains: keyword, mode: 'insensitive' } } } },
+          { profile: { is: { bio: { contains: keyword, mode: 'insensitive' } } } },
+        ],
+      });
+    }
+
+    if (skills && skills.length > 0) {
+      andConditions.push({
+        profile: { is: { skills: { hasSome: skills } } },
+      });
+    }
+
+    if (location) {
+      andConditions.push({
+        profile: { is: { locations: { has: location } } },
+      });
+    }
+
+    if (education) {
+      andConditions.push({
+        educations: {
+          some: {
+            OR: [
+              { degree: { contains: education, mode: 'insensitive' } },
+              { school: { contains: education, mode: 'insensitive' } },
+            ],
+          },
+        },
+      });
+    }
+
+    if (workMode) {
+      andConditions.push({
+        profile: { is: { workMode: { equals: workMode, mode: 'insensitive' } } },
+      });
+    }
+
+    if (salaryMin !== undefined) {
+      andConditions.push({
+        profile: { is: { expectedSalaryMax: { gte: salaryMin } } },
+      });
+    }
+
+    if (salaryMax !== undefined) {
+      andConditions.push({
+        profile: { is: { expectedSalaryMin: { lte: salaryMax } } },
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          profile: {
+            select: {
+              avatar: true,
+              fullName: true,
+              headline: true,
+              skills: true,
+              locations: true,
+            },
+          },
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return {
+      candidates: users.map((user) => ({
+        userId: user.id,
+        slug: user.slug,
+        name: user.profile?.fullName || user.name,
+        avatar: user.profile?.avatar ?? null,
+        headline: user.profile?.headline ?? null,
+        skills: user.profile?.skills ?? [],
+        locations: user.profile?.locations ?? [],
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async getCandidateDetail(slugOrId: string, viewerUserId: string, query: CandidateDetailQuery) {
+    const companyId = query.companyId;
+
+    const candidate = await prisma.user.findFirst({
+      where: {
+        OR: [{ slug: slugOrId }, { id: slugOrId }],
+        accountStatus: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        profile: true,
+        experiences: {
+          orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
+        },
+        educations: {
+          orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
+        },
+      },
+    });
+
+    if (!candidate || !candidate.profile) {
+      throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
+    }
+
+    const isOwner = viewerUserId === candidate.id;
+    const normalizedCompanyId = companyId?.trim() || null;
+    let hasAppliedToCompany = false;
+
+    if (!isOwner) {
+      if (normalizedCompanyId) {
+        await this.assertCanManageCompany(viewerUserId, normalizedCompanyId);
+        const application = await prisma.application.findFirst({
+          where: {
+            userId: candidate.id,
+            status: { not: 'REJECTED' },
+            job: { companyId: normalizedCompanyId },
+          },
+          select: { id: true },
+        });
+        hasAppliedToCompany = Boolean(application);
+      }
+
+      if (!candidate.profile.isPublic) {
+        throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
+      }
+      if (normalizedCompanyId && !candidate.profile.isSearchingJob && !hasAppliedToCompany) {
+        throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
+      }
+    }
+
+    const buildCandidatePayload = (opts: {
+      contactEmail: string | null;
+      contactPhone: string | null;
+      cvUrl: string | null;
+      website: string | null;
+      linkedin: string | null;
+      github: string | null;
+    }) => ({
+      candidate: {
+        userId: candidate.id,
+        slug: candidate.slug,
+        name: candidate.profile!.fullName || candidate.name,
+        profile: {
+          avatar: candidate.profile!.avatar,
+          fullName: candidate.profile!.fullName,
+          title: candidate.profile!.title,
+          headline: candidate.profile!.headline,
+          bio: candidate.profile!.bio,
+          skills: candidate.profile!.skills,
+          locations: candidate.profile!.locations,
+          wardCodes: candidate.profile!.wardCodes,
+          website: opts.website,
+          linkedin: opts.linkedin,
+          github: opts.github,
+          status: candidate.profile!.status,
+          knowledge: candidate.profile!.knowledge,
+          attitude: candidate.profile!.attitude,
+          expectedSalaryMin: candidate.profile!.expectedSalaryMin,
+          expectedSalaryMax: candidate.profile!.expectedSalaryMax,
+          salaryCurrency: candidate.profile!.salaryCurrency,
+          workMode: candidate.profile!.workMode,
+          expectedCulture: candidate.profile!.expectedCulture,
+          careerGoals: candidate.profile!.careerGoals,
+          contactEmail: opts.contactEmail,
+          contactPhone: opts.contactPhone,
+          cvUrl: opts.cvUrl,
+          isSearchingJob: candidate.profile!.isSearchingJob,
+          allowCvFlip: candidate.profile!.allowCvFlip,
+        },
+        experiences: candidate.experiences,
+        educations: candidate.educations,
+      },
+    });
+
+    // Không có companyId: chỉ chủ hồ sơ mới xem đủ thông tin liên hệ.
+    if (!normalizedCompanyId) {
+      const shouldMaskPublic = !isOwner;
+      return {
+        ...buildCandidatePayload({
+          contactEmail: shouldMaskPublic ? null : candidate.profile.contactEmail,
+          contactPhone: shouldMaskPublic ? null : candidate.profile.contactPhone,
+          cvUrl: shouldMaskPublic ? null : candidate.profile.cvUrl,
+          website: shouldMaskPublic ? null : candidate.profile.website,
+          linkedin: shouldMaskPublic ? null : candidate.profile.linkedin,
+          github: shouldMaskPublic ? null : candidate.profile.github,
+        }),
+        access: {
+          isFlipped: isOwner,
+          hasPendingRequest: false,
+          connectionId: null,
+          flippedAt: null,
+          isOwnerView: isOwner,
+          companyContext: false,
+        },
+      };
+    }
+
+    const connection = await prisma.cvFlipConnection.findUnique({
+      where: {
+        companyId_userId: {
+          companyId: normalizedCompanyId,
+          userId: candidate.id,
+        },
+      },
+      select: {
+        id: true,
+        flippedAt: true,
+      },
+    });
+
+    const pendingRequest = await prisma.cvFlipRequest.findUnique({
+      where: {
+        companyId_userId: {
+          companyId: normalizedCompanyId,
+          userId: candidate.id,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+
+    const now = new Date();
+    const isPendingRequest =
+      pendingRequest?.status === 'PENDING' &&
+      pendingRequest.expiresAt.getTime() > now.getTime();
+
+    const isFlipped = Boolean(connection) || hasAppliedToCompany;
+    const shouldMaskContact = !isOwner && !isFlipped;
+
+    return {
+      ...buildCandidatePayload({
+        contactEmail: shouldMaskContact ? null : candidate.profile.contactEmail,
+        contactPhone: shouldMaskContact ? null : candidate.profile.contactPhone,
+        cvUrl: shouldMaskContact ? null : candidate.profile.cvUrl,
+        website: shouldMaskContact ? null : candidate.profile.website,
+        linkedin: shouldMaskContact ? null : candidate.profile.linkedin,
+        github: shouldMaskContact ? null : candidate.profile.github,
+      }),
+      access: {
+        isFlipped: isOwner || isFlipped,
+        hasPendingRequest: isPendingRequest,
+        connectionId: connection?.id ?? null,
+        flippedAt: connection?.flippedAt ?? null,
+        isOwnerView: isOwner,
+        companyContext: true,
+      },
+    };
+  }
+
+  async getUsage(userId: string, companyId: string) {
+    await this.assertCanManageCompany(userId, companyId);
+
+    const limits = await this.getCompanyLimits(companyId);
+    const { month, year } = getMonthYear();
+    const usage = await prisma.cvFlipUsage.findUnique({
+      where: {
+        companyId_month_year: { companyId, month, year },
+      },
+      select: {
+        totalCount: true,
+        requestCount: true,
+      },
+    });
+
+    const totalUsed = usage?.totalCount ?? 0;
+    const requestUsed = usage?.requestCount ?? 0;
+
+    return {
+      total: {
+        used: totalUsed,
+        limit: limits.monthlyTotalLimit,
+        remaining: Math.max(0, limits.monthlyTotalLimit - totalUsed),
+      },
+      request: {
+        used: requestUsed,
+        limit: limits.monthlyRequestLimit,
+        remaining: Math.max(0, limits.monthlyRequestLimit - requestUsed),
+      },
+      month,
+      year,
+    };
+  }
+
+  async flipCandidate(userId: string, companyId: string, candidateUserId: string) {
+    await this.assertCanManageCompany(userId, companyId);
+
+    const candidate = await prisma.user.findUnique({
+      where: { id: candidateUserId },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        profile: {
+          select: {
+            id: true,
+            isPublic: true,
+            isSearchingJob: true,
+            allowCvFlip: true,
+          },
+        },
+      },
+    });
+
+    if (!candidate || !candidate.profile || !candidate.profile.isPublic || !candidate.profile.isSearchingJob) {
+      throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
+    }
+
+    const existingConnection = await prisma.cvFlipConnection.findUnique({
+      where: {
+        companyId_userId: {
+          companyId,
+          userId: candidateUserId,
+        },
+      },
+      select: { id: true, flippedAt: true },
+    });
+
+    if (existingConnection) {
+      return {
+        status: 'ALREADY_FLIPPED' as const,
+        connectionId: existingConnection.id,
+        flippedAt: existingConnection.flippedAt,
+      };
+    }
+
+    const limits = await this.getCompanyLimits(companyId);
+    if (!limits.enabled) {
+      throw new AppError(
+        'Đây là tính năng trả phí của JOYWORK.VN. Vui lòng liên hệ contact@joywork.vn | 033 868 5855',
+        403,
+        'CV_FLIP_PREMIUM_REQUIRED'
+      );
+    }
+
+    const { month, year } = getMonthYear();
+    const usage = await prisma.cvFlipUsage.findUnique({
+      where: { companyId_month_year: { companyId, month, year } },
+      select: { totalCount: true, requestCount: true },
+    });
+
+    const totalCount = usage?.totalCount ?? 0;
+    const requestCount = usage?.requestCount ?? 0;
+
+    if (totalCount >= limits.monthlyTotalLimit) {
+      throw new AppError('Doanh nghiệp đã hết tổng lượt lật CV trong tháng', 429, 'CV_FLIP_TOTAL_LIMIT_REACHED');
+    }
+
+    if (candidate.profile.allowCvFlip) {
+      const flipped = await prisma.$transaction(async (tx) => {
+        const connection = await tx.cvFlipConnection.create({
+          data: {
+            companyId,
+            userId: candidateUserId,
+            flippedById: userId,
+          },
+          select: {
+            id: true,
+            flippedAt: true,
+          },
+        });
+
+        await tx.cvFlipUsage.upsert({
+          where: { companyId_month_year: { companyId, month, year } },
+          create: { companyId, month, year, totalCount: 1, requestCount: requestCount },
+          update: { totalCount: { increment: 1 } },
+        });
+
+        return connection;
+      });
+
+      return {
+        status: 'FLIPPED' as const,
+        connectionId: flipped.id,
+        flippedAt: flipped.flippedAt,
+      };
+    }
+
+    if (requestCount >= limits.monthlyRequestLimit) {
+      throw new AppError('Doanh nghiệp đã hết lượt lật CV qua yêu cầu trong tháng', 429, 'CV_FLIP_REQUEST_LIMIT_REACHED');
+    }
+
+    const existingRequest = await prisma.cvFlipRequest.findUnique({
+      where: {
+        companyId_userId: {
+          companyId,
+          userId: candidateUserId,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+
+    const now = new Date();
+    const expiresAt = addDays(now, REQUEST_EXPIRE_DAYS);
+
+    const request = existingRequest
+      ? await prisma.cvFlipRequest.update({
+          where: {
+            companyId_userId: {
+              companyId,
+              userId: candidateUserId,
+            },
+          },
+          data: {
+            status: 'PENDING',
+            requestedBy: userId,
+            expiresAt,
+            respondedAt: null,
+          },
+          select: { id: true, status: true, expiresAt: true },
+        })
+      : await prisma.cvFlipRequest.create({
+          data: {
+            companyId,
+            userId: candidateUserId,
+            requestedBy: userId,
+            status: 'PENDING',
+            expiresAt,
+          },
+          select: { id: true, status: true, expiresAt: true },
+        });
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true, slug: true },
+    });
+    const companyName = company?.name ?? 'Doanh nghiệp';
+    const companyProfilePath = company?.slug ? `/companies/${company.slug}` : '/companies';
+    const companyProfileUrl = `${config.FRONTEND_ORIGIN || 'https://joywork.vn'}${companyProfilePath}`;
+
+    await notificationService.createNotification({
+      userId: candidateUserId,
+      type: 'CV_FLIP_REQUEST',
+      title: 'Yêu cầu mở thông tin hồ sơ',
+      content: `${companyName} muốn xem thông tin liên hệ trong hồ sơ của bạn. Mở Cài đặt hồ sơ để Đồng ý / Từ chối.`,
+      metadata: {
+        requestId: request.id,
+        companyId,
+        candidateUserId,
+        targetUrl: '/account?tab=profile',
+      },
+      relatedEntityType: 'CV_FLIP_REQUEST',
+      relatedEntityId: request.id,
+    });
+
+    const candidateEmail = await getVerifiedEmailForUser(candidateUserId);
+    if (candidateEmail) {
+      try {
+        await emailService.sendCvFlipRequestEmail(candidateEmail, {
+          companyName,
+          companyProfileUrl,
+          candidateName: candidate.name,
+          requestsUrl: cvFlipRequestsUrl(),
+          profileUrl: profileUrl(candidate.slug),
+        });
+      } catch {
+        // Ignore email failure to avoid blocking request flow.
+      }
+    }
+
+    return {
+      status: 'REQUESTED' as const,
+      requestId: request.id,
+      expiresAt: request.expiresAt,
+    };
+  }
+
+  private async expireOutdatedRequests(userId: string): Promise<void> {
+    await prisma.cvFlipRequest.updateMany({
+      where: {
+        userId,
+        status: 'PENDING',
+        expiresAt: { lt: new Date() },
+      },
+      data: {
+        status: 'EXPIRED',
+      },
+    });
+  }
+
+  async listMyRequests(userId: string, query: RequestsQuery) {
+    await this.expireOutdatedRequests(userId);
+    const { page, limit, status } = query;
+
+    const where: Prisma.CvFlipRequestWhereInput = {
+      userId,
+    };
+    if (status) {
+      where.status = status;
+    }
+
+    const [requests, total] = await Promise.all([
+      prisma.cvFlipRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          createdAt: true,
+          respondedAt: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+              website: true,
+            },
+          },
+        },
+      }),
+      prisma.cvFlipRequest.count({ where }),
+    ]);
+
+    return {
+      requests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async respondRequest(userId: string, requestId: string, action: 'approve' | 'reject') {
+    const request = await prisma.cvFlipRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        id: true,
+        companyId: true,
+        userId: true,
+        requestedBy: true,
+        status: true,
+        expiresAt: true,
+        company: { select: { name: true } },
+        user: { select: { name: true, slug: true } },
+      },
+    });
+
+    if (!request || request.userId !== userId) {
+      throw new AppError('Không tìm thấy yêu cầu', 404, 'CV_FLIP_REQUEST_NOT_FOUND');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new AppError('Yêu cầu đã được xử lý trước đó', 400, 'CV_FLIP_REQUEST_ALREADY_PROCESSED');
+    }
+
+    const now = new Date();
+    if (request.expiresAt.getTime() <= now.getTime()) {
+      await prisma.cvFlipRequest.update({
+        where: { id: request.id },
+        data: { status: 'EXPIRED', respondedAt: now },
+      });
+      throw new AppError('Yêu cầu đã hết hạn', 409, 'CV_FLIP_REQUEST_EXPIRED');
+    }
+
+    if (action === 'reject') {
+      await prisma.cvFlipRequest.update({
+        where: { id: request.id },
+        data: { status: 'REJECTED', respondedAt: now },
+      });
+
+      await notificationService.createNotification({
+        userId: request.requestedBy,
+        type: 'CV_FLIP_REJECTED',
+        title: 'Ứng viên đã từ chối yêu cầu',
+        content: 'Yêu cầu xem thông tin liên hệ đã bị từ chối.',
+        metadata: { requestId: request.id, companyId: request.companyId },
+        relatedEntityType: 'CV_FLIP_REQUEST',
+        relatedEntityId: request.id,
+      });
+
+      const requesterEmail = await getVerifiedEmailForUser(request.requestedBy);
+      if (requesterEmail) {
+        try {
+          await emailService.sendCvFlipResponseEmail(requesterEmail, {
+            candidateName: request.user.name,
+            approved: false,
+            profileUrl: profileUrl(request.user.slug),
+          });
+        } catch {
+          // Ignore email failure.
+        }
+      }
+
+      return { status: 'REJECTED' as const };
+    }
+
+    const approved = await prisma.$transaction(async (tx) => {
+      const limits = await this.getCompanyLimits(request.companyId);
+      if (!limits.enabled) {
+        await tx.cvFlipRequest.update({
+          where: { id: request.id },
+          data: { status: 'EXPIRED', respondedAt: now },
+        });
+        throw new AppError('Yêu cầu đã hết hạn', 409, 'CV_FLIP_REQUEST_EXPIRED');
+      }
+
+      const { month, year } = getMonthYear(now);
+      const usage = await tx.cvFlipUsage.findUnique({
+        where: { companyId_month_year: { companyId: request.companyId, month, year } },
+        select: { totalCount: true, requestCount: true },
+      });
+
+      const totalCount = usage?.totalCount ?? 0;
+      const requestCount = usage?.requestCount ?? 0;
+      if (totalCount >= limits.monthlyTotalLimit || requestCount >= limits.monthlyRequestLimit) {
+        await tx.cvFlipRequest.update({
+          where: { id: request.id },
+          data: { status: 'EXPIRED', respondedAt: now },
+        });
+        throw new AppError('Yêu cầu đã hết hạn', 409, 'CV_FLIP_REQUEST_EXPIRED');
+      }
+
+      const existingConnection = await tx.cvFlipConnection.findUnique({
+        where: {
+          companyId_userId: {
+            companyId: request.companyId,
+            userId: request.userId,
+          },
+        },
+        select: { id: true, flippedAt: true },
+      });
+
+      const connection = existingConnection
+        ? existingConnection
+        : await tx.cvFlipConnection.create({
+            data: {
+              companyId: request.companyId,
+              userId: request.userId,
+              flippedById: request.requestedBy,
+            },
+            select: {
+              id: true,
+              flippedAt: true,
+            },
+          });
+
+      await tx.cvFlipRequest.update({
+        where: { id: request.id },
+        data: {
+          status: 'APPROVED',
+          respondedAt: now,
+        },
+      });
+
+      if (!existingConnection) {
+        await tx.cvFlipUsage.upsert({
+          where: { companyId_month_year: { companyId: request.companyId, month, year } },
+          create: {
+            companyId: request.companyId,
+            month,
+            year,
+            totalCount: 1,
+            requestCount: 1,
+          },
+          update: {
+            totalCount: { increment: 1 },
+            requestCount: { increment: 1 },
+          },
+        });
+      }
+
+      return connection;
+    });
+
+    await notificationService.createNotification({
+      userId: request.requestedBy,
+      type: 'CV_FLIP_APPROVED',
+      title: 'Ứng viên đã đồng ý yêu cầu',
+      content: 'Bạn đã có thể xem đầy đủ thông tin liên hệ của ứng viên.',
+      metadata: {
+        requestId: request.id,
+        companyId: request.companyId,
+        candidateUserId: request.userId,
+      },
+      relatedEntityType: 'CV_FLIP_REQUEST',
+      relatedEntityId: request.id,
+    });
+
+    const requesterEmail = await getVerifiedEmailForUser(request.requestedBy);
+    if (requesterEmail) {
+      try {
+        await emailService.sendCvFlipResponseEmail(requesterEmail, {
+          candidateName: request.user.name,
+          approved: true,
+          profileUrl: profileUrl(request.user.slug),
+        });
+      } catch {
+        // Ignore email failure.
+      }
+    }
+
+    return {
+      status: 'APPROVED' as const,
+      connectionId: approved.id,
+      flippedAt: approved.flippedAt,
+    };
+  }
+}

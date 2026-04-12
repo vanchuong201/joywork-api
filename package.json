@@ -18,6 +18,7 @@
     "check:ses": "tsx scripts/check-ses-status.ts",
     "verify:email": "tsx scripts/verify-email.ts",
     "seed:jobs": "tsx scripts/seed-jobs.ts",
+    "seed:candidates": "tsx scripts/seed-candidate-users.ts",
     "migrate:location-codes": "tsx scripts/migrate-location-codes.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",

@@ -47,6 +47,10 @@ model User {
   ticketMessages          CompanyTicketMessage[]
   sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
   notifications           Notification[]
+  cvFlipConnections       CvFlipConnection[]
+  cvFlipFlippedBy         CvFlipConnection[]       @relation("CvFlipFlippedBy")
+  cvFlipRequestsReceived  CvFlipRequest[]          @relation("CvFlipRequestTarget")
+  cvFlipRequestsSent      CvFlipRequest[]          @relation("CvFlipRequester")
 
   // Talent Pool
   talentPoolMember          TalentPoolMember?        @relation("TalentPoolMemberUser")
@@ -134,6 +138,8 @@ model UserProfile {
   title      String?
   status     UserStatus?
   isPublic   Boolean     @default(true)
+  isSearchingJob Boolean @default(true)
+  allowCvFlip    Boolean @default(true)
   visibility Json? // { bio: boolean, experience: boolean, education: boolean, ksa: boolean, expectations: boolean }
 
   // KSA (Knowledge, Skills, Attitude)
@@ -255,6 +261,9 @@ model Company {
 
   // Feature entitlements (premium features)
   featureEntitlements CompanyFeatureEntitlement[]
+  cvFlipConnections   CvFlipConnection[]
+  cvFlipRequests      CvFlipRequest[]
+  cvFlipUsages        CvFlipUsage[]
 
   showcaseSlots CompanyShowcaseSlot[]
 
@@ -937,6 +946,16 @@ enum NotificationType {
   POST_LIKE // Post liked
   POST_COMMENT // Post commented
   SYSTEM // System notification
+  CV_FLIP_REQUEST // Company requested CV flip approval
+  CV_FLIP_APPROVED // Candidate approved CV flip request
+  CV_FLIP_REJECTED // Candidate rejected CV flip request
+}
+
+enum CvFlipRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
 }
 
 // =========================
@@ -1026,6 +1045,7 @@ model CompanyFeatureEntitlement {
   companyId  String
   featureKey String
   enabled    Boolean   @default(true)
+  metadata   Json?
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -1035,6 +1055,57 @@ model CompanyFeatureEntitlement {
   @@unique([companyId, featureKey])
   @@index([companyId])
   @@map("company_feature_entitlements")
+}
+
+model CvFlipConnection {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  flippedById String
+  flippedAt   DateTime @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flippedBy User    @relation("CvFlipFlippedBy", fields: [flippedById], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+  @@map("cv_flip_connections")
+}
+
+model CvFlipRequest {
+  id          String              @id @default(cuid())
+  companyId   String
+  userId      String
+  requestedBy String
+  status      CvFlipRequestStatus @default(PENDING)
+  expiresAt   DateTime
+  createdAt   DateTime            @default(now())
+  respondedAt DateTime?
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User    @relation("CvFlipRequestTarget", fields: [userId], references: [id], onDelete: Cascade)
+  requester User    @relation("CvFlipRequester", fields: [requestedBy], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([companyId, status])
+  @@index([userId, status])
+  @@map("cv_flip_requests")
+}
+
+model CvFlipUsage {
+  id           String @id @default(cuid())
+  companyId    String
+  month        Int
+  year         Int
+  totalCount   Int    @default(0)
+  requestCount Int    @default(0)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month, year])
+  @@map("cv_flip_usages")
 }
 
 model ProvinceRegistry {

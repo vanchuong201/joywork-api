@@ -13,6 +13,7 @@ import {
   adminPostFeedVisibilityPatchSchema,
   adminPostsQuerySchema,
   adminCompanyPremiumPatchSchema,
+  adminCompanyCvFlipPatchSchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
   adminUsersQuerySchema,
@@ -129,6 +130,21 @@ export class SystemController {
       throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
     }
     const company = await this.systemService.setCompanyPremiumStatus(companyId, parsed.data.isPremium);
+    return reply.send({ data: { company } });
+  }
+
+  async patchCompanyCvFlipStatus(request: AuthenticatedRequest, reply: FastifyReply) {
+    const { companyId } = request.params as { companyId: string };
+    const parsed = adminCompanyCvFlipPatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const company = await this.systemService.setCompanyCvFlipStatus(
+      companyId,
+      parsed.data.enabled,
+      parsed.data.monthlyTotalLimit,
+      parsed.data.monthlyRequestLimit
+    );
     return reply.send({ data: { company } });
   }
 

@@ -214,10 +214,9 @@ export class UsersService {
     return {
       users: users.map(user => {
         const result: any = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
+          id: user.id,
+          role: user.role,
+          createdAt: user.createdAt,
         };
         if (user.name) result.name = user.name;
         if (user.profile) {
@@ -231,7 +230,6 @@ export class UsersService {
           if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
           if (user.profile.headline) result.profile.headline = user.profile.headline;
           if (user.profile.bio) result.profile.bio = user.profile.bio;
-          if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
           result.profile.locations = user.profile.locations;
           result.profile.wardCodes = user.profile.wardCodes;
           if (user.profile.locations.length > 0) {
@@ -267,7 +265,6 @@ export class UsersService {
 
     const result: any = {
       id: user.id,
-      email: user.email,
       role: user.role,
       createdAt: user.createdAt,
     };
@@ -284,7 +281,6 @@ export class UsersService {
       if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
       if (user.profile.headline) result.profile.headline = user.profile.headline;
       if (user.profile.bio) result.profile.bio = user.profile.bio;
-      if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
       result.profile.locations = user.profile.locations;
       result.profile.wardCodes = user.profile.wardCodes;
       if (user.profile.locations.length > 0) {

@@ -219,6 +219,14 @@ export async function systemRoutes(fastify: FastifyInstance) {
             type: 'string',
             enum: ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'],
           },
+          premiumStatus: {
+            type: 'string',
+            enum: ['premium', 'free'],
+          },
+          cvFlipStatus: {
+            type: 'string',
+            enum: ['enabled', 'disabled'],
+          },
         },
       },
       response: {
@@ -240,6 +248,9 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       verificationStatus: { type: 'string' },
                       isVerified: { type: 'boolean' },
                       isPremium: { type: 'boolean' },
+                      cvFlipEnabled: { type: 'boolean' },
+                      cvFlipMonthlyTotalLimit: { type: 'number' },
+                      cvFlipMonthlyRequestLimit: { type: 'number' },
                       createdAt: { type: 'string' },
                       memberCount: { type: 'number' },
                       jobCount: { type: 'number' },
@@ -428,6 +439,52 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.patchCompanyPremiumStatus.bind(systemController));
+
+  fastify.patch('/companies/:companyId/cv-flip', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Cập nhật entitlement CV Flip của doanh nghiệp',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['enabled'],
+        properties: {
+          enabled: { type: 'boolean' },
+          monthlyTotalLimit: { type: 'integer', minimum: 1 },
+          monthlyRequestLimit: { type: 'integer', minimum: 1 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    enabled: { type: 'boolean' },
+                    monthlyTotalLimit: { type: 'number' },
+                    monthlyRequestLimit: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.patchCompanyCvFlipStatus.bind(systemController));
 
   fastify.get('/jobs', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],

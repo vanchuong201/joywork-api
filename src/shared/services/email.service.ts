@@ -1364,6 +1364,66 @@ Trân trọng,
 
     await this.sendEmail({ to, subject: '[JOYWORK] Talent Pool – Bạn đã được chọn / You\'ve Been Selected', html });
   }
+
+  async sendCvFlipRequestEmail(
+    to: string,
+    payload: {
+      companyName: string;
+      companyProfileUrl: string;
+      candidateName: string | null;
+      requestsUrl: string;
+      profileUrl: string;
+    }
+  ): Promise<void> {
+    const candidateName = payload.candidateName || 'bạn';
+    const companyLink = payload.companyProfileUrl;
+    const html = this.talentPoolWrapper(
+      'Yêu cầu cho phép xem thông tin liên hệ',
+      `<p>Chào ${candidateName},</p>
+      <p>Doanh nghiệp <strong>${payload.companyName}</strong> vừa gửi yêu cầu xem thông tin liên hệ trong hồ sơ của bạn.</p>
+      <p><strong>Trang doanh nghiệp:</strong> <a href="${companyLink}" style="color:#295892;word-break:break-all;">${companyLink}</a></p>
+      <p>Bạn có thể vào mục quản lý hồ sơ để <strong>đồng ý hoặc từ chối</strong> yêu cầu này.</p>`,
+      `<p>Hi ${candidateName},</p>
+      <p><strong>${payload.companyName}</strong> has requested access to your profile contact details.</p>
+      <p><strong>Company page:</strong> <a href="${companyLink}" style="color:#295892;word-break:break-all;">${companyLink}</a></p>
+      <p>Please review the request in your profile settings to approve or reject it.</p>`,
+      payload.requestsUrl,
+      'Xử lý yêu cầu / Review Request',
+    );
+
+    await this.sendEmail({
+      to,
+      subject: '[JOYWORK] Yêu cầu mở thông tin hồ sơ / CV Flip Request',
+      html,
+    });
+  }
+
+  async sendCvFlipResponseEmail(
+    to: string,
+    payload: {
+      candidateName: string | null;
+      approved: boolean;
+      profileUrl: string;
+    }
+  ): Promise<void> {
+    const candidateName = payload.candidateName || 'ứng viên';
+    const approvedTextVi = payload.approved ? 'đồng ý' : 'từ chối';
+    const approvedTextEn = payload.approved ? 'approved' : 'rejected';
+
+    const html = this.talentPoolWrapper(
+      'Cập nhật yêu cầu mở thông tin hồ sơ',
+      `<p>Ứng viên <strong>${candidateName}</strong> đã <strong>${approvedTextVi}</strong> yêu cầu lật CV của doanh nghiệp bạn.</p>`,
+      `<p>The candidate <strong>${candidateName}</strong> has <strong>${approvedTextEn}</strong> your CV flip request.</p>`,
+      payload.profileUrl,
+      'Xem hồ sơ ứng viên / View Candidate',
+    );
+
+    await this.sendEmail({
+      to,
+      subject: '[JOYWORK] Kết quả yêu cầu lật CV / CV Flip Response',
+      html,
+    });
+  }
 }
 
 export const emailService = new EmailService();

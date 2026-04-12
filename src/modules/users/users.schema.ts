@@ -63,6 +63,8 @@ export const updateProfileSchema = z.object({
   title: z.string().max(150, 'Title must be less than 150 characters').optional().nullable().transform((val) => val === '' ? null : val),
   status: userStatusEnum.optional().nullable(),
   isPublic: z.boolean().optional(),
+  isSearchingJob: z.boolean().optional(),
+  allowCvFlip: z.boolean().optional(),
   visibility: z.object({
     bio: z.boolean().optional(),
     experience: z.boolean().optional(),
@@ -114,6 +116,15 @@ export const getUserProfileBySlugSchema = z.object({
   slug: z.string().min(1, 'Slug is required'),
 });
 
+/** Query GET /profile/:slug — companyId dùng để hiển thị contact khi DN đã lật CV với ứng viên */
+export const publicProfileQuerySchema = z
+  .object({
+    companyId: z.string().optional(),
+  })
+  .transform((d) => ({
+    companyId: d.companyId?.trim() ? d.companyId.trim() : undefined,
+  }));
+
 // Search users schema
 export const searchUsersSchema = z.object({
   q: z.string().min(1, 'Search query is required').optional(),
@@ -127,6 +138,7 @@ export const searchUsersSchema = z.object({
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type GetUserProfileInput = z.infer<typeof getUserProfileSchema>;
 export type GetUserProfileBySlugInput = z.infer<typeof getUserProfileBySlugSchema>;
+export type PublicProfileQuery = z.infer<typeof publicProfileQuerySchema>;
 export type SearchUsersInput = z.infer<typeof searchUsersSchema>;
 export type ExperienceInput = z.infer<typeof experienceSchema>;
 export type EducationInput = z.infer<typeof educationSchema>;

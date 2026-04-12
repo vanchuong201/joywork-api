@@ -24,8 +24,9 @@ export async function usersRoutes(fastify: FastifyInstance) {
   
   const authMiddleware = new AuthMiddleware(authService);
 
-  // Get public profile by slug (no auth required)
+  // Get public profile by slug (optional auth: chủ hồ sơ xem được cả khi tạm tắt công khai)
   fastify.get('/profile/:slug', {
+    preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
     schema: {
       description: 'Get public user profile by slug',
       tags: ['Users'],
@@ -35,6 +36,16 @@ export async function usersRoutes(fastify: FastifyInstance) {
           slug: { type: 'string' },
         },
         required: ['slug'],
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          companyId: {
+            type: 'string',
+            description:
+              'Khi truy cập với tư cách DN: truyền ID công ty. contactEmail/contactPhone/cvUrl chỉ có khi đã lật CV (CvFlipConnection).',
+          },
+        },
       },
       response: {
         200: {
@@ -236,6 +247,8 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         contactPhone: { type: 'string', nullable: true },
                         status: { type: 'string', nullable: true },
                         isPublic: { type: 'boolean' },
+                        isSearchingJob: { type: 'boolean' },
+                        allowCvFlip: { type: 'boolean' },
                         visibility: { type: 'object', nullable: true },
                         knowledge: { type: 'array', items: { type: 'string' } },
                         attitude: { type: 'array', items: { type: 'string' } },
@@ -319,6 +332,8 @@ export async function usersRoutes(fastify: FastifyInstance) {
           title: { type: 'string', maxLength: 150, nullable: true },
           status: { type: 'string', enum: ['OPEN_TO_WORK', 'NOT_AVAILABLE', 'LOOKING'], nullable: true },
           isPublic: { type: 'boolean' },
+          isSearchingJob: { type: 'boolean' },
+          allowCvFlip: { type: 'boolean' },
           visibility: {
             type: 'object',
             properties: {
@@ -376,6 +391,8 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         github: { type: 'string', nullable: true },
                         status: { type: 'string', nullable: true },
                         isPublic: { type: 'boolean' },
+                        isSearchingJob: { type: 'boolean' },
+                        allowCvFlip: { type: 'boolean' },
                         visibility: { type: 'object', nullable: true },
                         knowledge: { type: 'array', items: { type: 'string' } },
                         attitude: { type: 'array', items: { type: 'string' } },
@@ -709,11 +726,13 @@ export async function usersRoutes(fastify: FastifyInstance) {
     },
   }, educationController.deleteEducation.bind(educationController));
 
-  // Get user profile by ID (public)
+  // Get user profile by ID (authenticated)
   fastify.get('/:userId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
     schema: {
       description: 'Get user profile by ID',
       tags: ['Users'],
+      security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
         properties: {
@@ -732,7 +751,6 @@ export async function usersRoutes(fastify: FastifyInstance) {
                   type: 'object',
                   properties: {
                     id: { type: 'string' },
-                    email: { type: 'string' },
                     name: { type: 'string', nullable: true },
                     role: { type: 'string' },
                     profile: {
@@ -745,7 +763,6 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         headline: { type: 'string', nullable: true },
                         bio: { type: 'string', nullable: true },
                         skills: { type: 'array', items: { type: 'string' } },
-                        cvUrl: { type: 'string', nullable: true },
                         locations: { type: 'array', items: { type: 'string' } },
                         website: { type: 'string', nullable: true },
                         linkedin: { type: 'string', nullable: true },
@@ -767,9 +784,11 @@ export async function usersRoutes(fastify: FastifyInstance) {
 
   // Search users
   fastify.get('/', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
     schema: {
       description: 'Search users',
       tags: ['Users'],
+      security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
         properties: {
@@ -793,7 +812,6 @@ export async function usersRoutes(fastify: FastifyInstance) {
                     type: 'object',
                     properties: {
                       id: { type: 'string' },
-                      email: { type: 'string' },
                       name: { type: 'string', nullable: true },
                       role: { type: 'string' },
                       createdAt: { type: 'string', format: 'date-time' },
@@ -807,7 +825,6 @@ export async function usersRoutes(fastify: FastifyInstance) {
                           headline: { type: 'string', nullable: true },
                           bio: { type: 'string', nullable: true },
                           skills: { type: 'array', items: { type: 'string' } },
-                          cvUrl: { type: 'string', nullable: true },
                           locations: { type: 'array', items: { type: 'string' } },
                           website: { type: 'string', nullable: true },
                           linkedin: { type: 'string', nullable: true },
