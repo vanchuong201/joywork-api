@@ -123,6 +123,7 @@ export async function talentPoolRoutes(fastify: FastifyInstance) {
           limit: { type: 'integer', minimum: 1, maximum: 100 },
           q: { type: 'string' },
           location: { type: 'string' },
+          ward: { type: 'string' },
         },
       },
       response: {

@@ -82,6 +82,7 @@ export const candidatesQuerySchema = z.object({
   limit: limitSchema,
   q: z.string().trim().max(200).optional(),
   location: z.string().trim().max(200).optional(),
+  ward: z.string().trim().max(200).optional(),
 });
 
 export type CandidatesQuery = z.infer<typeof candidatesQuerySchema>;

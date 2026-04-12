@@ -2,6 +2,7 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { emailService } from '@/shared/services/email.service';
+import { notificationService } from '@/shared/services/notification.service';
 import { config } from '@/config/env';
 import { Prisma } from '@prisma/client';
 import type {
@@ -175,6 +176,24 @@ export class TalentPoolService {
       }
     }
 
+    try {
+      await notificationService.createNotification({
+        userId: request.userId,
+        type: 'SYSTEM',
+        title: 'Yêu cầu Talent Pool đã được phê duyệt',
+        content: 'Chúc mừng bạn! Hồ sơ của bạn đã được thêm vào Talent Pool của JOYWORK.',
+        metadata: {
+          requestId,
+          status: 'APPROVED',
+          targetUrl: '/account?tab=profile',
+        },
+        relatedEntityType: 'TALENT_POOL_REQUEST',
+        relatedEntityId: requestId,
+      });
+    } catch (err) {
+      console.error('Failed to create talent pool approved notification:', err);
+    }
+
     return { success: true };
   }
 
@@ -213,6 +232,25 @@ export class TalentPoolService {
       } catch (err) {
         console.error('Failed to send talent pool rejected email:', err);
       }
+    }
+
+    try {
+      await notificationService.createNotification({
+        userId: request.userId,
+        type: 'SYSTEM',
+        title: 'Yêu cầu Talent Pool chưa được phê duyệt',
+        content: 'JOYWORK đã cập nhật kết quả xét duyệt Talent Pool. Vui lòng xem chi tiết và cập nhật hồ sơ nếu cần.',
+        metadata: {
+          requestId,
+          status: 'REJECTED',
+          reason,
+          targetUrl: '/account?tab=profile',
+        },
+        relatedEntityType: 'TALENT_POOL_REQUEST',
+        relatedEntityId: requestId,
+      });
+    } catch (err) {
+      console.error('Failed to create talent pool rejected notification:', err);
     }
 
     return { success: true };
@@ -363,6 +401,25 @@ export class TalentPoolService {
       }
     }
 
+    try {
+      await notificationService.createNotification({
+        userId: member.userId,
+        type: 'SYSTEM',
+        title: 'Bạn đã bị gỡ khỏi Talent Pool',
+        content: `JOYWORK đã cập nhật trạng thái Talent Pool của bạn. Lý do: ${reason}`,
+        metadata: {
+          memberId,
+          status: 'REMOVED',
+          reason,
+          targetUrl: '/account?tab=profile',
+        },
+        relatedEntityType: 'TALENT_POOL_MEMBER',
+        relatedEntityId: memberId,
+      });
+    } catch (err) {
+      console.error('Failed to create talent pool removed notification:', err);
+    }
+
     return { success: true };
   }
 
@@ -454,7 +511,7 @@ export class TalentPoolService {
   }
 
   async listCandidates(query: CandidatesQuery) {
-    const { page, limit, q, location } = query;
+    const { page, limit, q, location, ward } = query;
 
     const where: Prisma.TalentPoolMemberWhereInput = {
       status: 'ACTIVE',
@@ -465,9 +522,8 @@ export class TalentPoolService {
     if (q) {
       conditions.push({
         OR: [
-          { name: { contains: q, mode: 'insensitive' } },
           { profile: { headline: { contains: q, mode: 'insensitive' } } },
-          { profile: { skills: { hasSome: [q] } } },
+          { profile: { bio: { contains: q, mode: 'insensitive' } } },
         ],
       });
     }
@@ -476,6 +532,12 @@ export class TalentPoolService {
       const normalizedLocation = resolveProvinceCode(location) ?? location;
       conditions.push({
         profile: { locations: { has: normalizedLocation } },
+      });
+    }
+
+    if (ward) {
+      conditions.push({
+        profile: { wardCodes: { has: ward } },
       });
     }
 
