@@ -18,11 +18,12 @@ export const candidatesQuerySchema = z.object({
   limit: limitSchema,
   keyword: z.string().trim().max(200).optional(),
   skills: z.preprocess(csvToArray, z.array(z.string().trim().min(1)).max(20).optional()),
-  location: z.string().trim().max(200).optional(),
-  experience: z.string().trim().max(50).optional(),
+  locations: z.preprocess(csvToArray, z.array(z.string().trim().min(1)).max(20).optional()),
+  ward: z.string().trim().max(200).optional(),
   education: z.string().trim().max(200).optional(),
   salaryMin: z.coerce.number().int().min(0).optional(),
   salaryMax: z.coerce.number().int().min(0).optional(),
+  salaryCurrency: z.enum(['VND', 'USD']).optional().default('VND'),
   workMode: z.string().trim().max(100).optional(),
 });
 

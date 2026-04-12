@@ -1,6 +1,7 @@
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { resolveProvinceCode } from '@/shared/provinces';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
 import { emailService } from '@/shared/services/email.service';
 import { notificationService } from '@/shared/services/notification.service';
@@ -11,6 +12,7 @@ const CV_FLIP_FEATURE_KEY = 'CV_FLIP';
 const DEFAULT_MONTHLY_TOTAL_LIMIT = 500;
 const DEFAULT_MONTHLY_REQUEST_LIMIT = 100;
 const REQUEST_EXPIRE_DAYS = 7;
+const USD_TO_VND_RATE = 26_000;
 
 type CompanyLimits = {
   enabled: boolean;
@@ -66,6 +68,111 @@ const cvFlipRequestsUrl = (): string => {
 };
 
 export class CvFlipService {
+  private convertSalary(value: number, from: 'VND' | 'USD', to: 'VND' | 'USD'): number {
+    if (from === to) return value;
+    if (from === 'USD') return value * USD_TO_VND_RATE;
+    return value / USD_TO_VND_RATE;
+  }
+
+  private normalizeSalaryRange(
+    salaryMin: number | undefined,
+    salaryMax: number | undefined
+  ): { min: number | undefined; max: number | undefined } {
+    const min = salaryMin !== undefined ? Math.floor(salaryMin * 0.8) : undefined;
+    const max = salaryMax !== undefined ? Math.ceil(salaryMax * 1.2) : undefined;
+    return { min, max };
+  }
+
+  private buildSalaryFilter(params: {
+    salaryMin: number | undefined;
+    salaryMax: number | undefined;
+    salaryCurrency: 'VND' | 'USD';
+  }): Prisma.UserWhereInput | null {
+    const { salaryMin, salaryMax } = params;
+    if (salaryMin === undefined && salaryMax === undefined) {
+      return null;
+    }
+
+    const inputCurrency = params.salaryCurrency;
+    const expanded = this.normalizeSalaryRange(salaryMin, salaryMax);
+    const vndRange = {
+      min: expanded.min !== undefined ? this.convertSalary(expanded.min, inputCurrency, 'VND') : undefined,
+      max: expanded.max !== undefined ? this.convertSalary(expanded.max, inputCurrency, 'VND') : undefined,
+    };
+    const usdRange = {
+      min: expanded.min !== undefined ? this.convertSalary(expanded.min, inputCurrency, 'USD') : undefined,
+      max: expanded.max !== undefined ? this.convertSalary(expanded.max, inputCurrency, 'USD') : undefined,
+    };
+
+    const buildRangeConditions = (range: { min: number | undefined; max: number | undefined }): Prisma.UserProfileWhereInput[] => {
+      const conditions: Prisma.UserProfileWhereInput[] = [];
+      if (range.min !== undefined) {
+        conditions.push({ expectedSalaryMax: { gte: Math.floor(range.min) } });
+      }
+      if (range.max !== undefined) {
+        conditions.push({ expectedSalaryMin: { lte: Math.ceil(range.max) } });
+      }
+      return conditions;
+    };
+
+    const vndConditions = buildRangeConditions(vndRange);
+    const usdConditions = buildRangeConditions(usdRange);
+
+    return {
+      OR: [
+        {
+          profile: {
+            is: {
+              salaryCurrency: 'VND',
+              AND: vndConditions,
+            },
+          },
+        },
+        {
+          profile: {
+            is: {
+              salaryCurrency: null,
+              AND: vndConditions,
+            },
+          },
+        },
+        {
+          profile: {
+            is: {
+              salaryCurrency: 'USD',
+              AND: usdConditions,
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  private async searchCandidateIdsBySkills(skills: string[]): Promise<string[]> {
+    const normalizedSkills = skills
+      .map((skill) => skill.trim().toLowerCase())
+      .filter((skill) => skill.length > 0);
+    if (normalizedSkills.length === 0) {
+      return [];
+    }
+
+    const likeClauses = normalizedSkills.map((skill) =>
+      Prisma.sql`EXISTS (
+        SELECT 1
+        FROM unnest(up."skills") AS skill_item
+        WHERE skill_item ILIKE ${`%${skill}%`}
+      )`
+    );
+
+    const rows = await prisma.$queryRaw<Array<{ userId: string }>>(Prisma.sql`
+      SELECT DISTINCT up."userId"
+      FROM "user_profiles" up
+      WHERE ${Prisma.join(likeClauses, ' OR ')}
+    `);
+
+    return rows.map((row) => row.userId);
+  }
+
   private async assertCanManageCompany(userId: string, companyId: string): Promise<void> {
     const membership = await prisma.companyMember.findFirst({
       where: {
@@ -155,10 +262,12 @@ export class CvFlipService {
       limit,
       keyword,
       skills,
-      location,
+      locations,
+      ward,
       education,
       salaryMin,
       salaryMax,
+      salaryCurrency,
       workMode,
     } = query;
 
@@ -177,23 +286,50 @@ export class CvFlipService {
     if (keyword) {
       andConditions.push({
         OR: [
-          { name: { contains: keyword, mode: 'insensitive' } },
-          { profile: { is: { fullName: { contains: keyword, mode: 'insensitive' } } } },
+          // Ưu tiên match trên tiêu đề nghề nghiệp để bám sát ngữ cảnh CV.
           { profile: { is: { headline: { contains: keyword, mode: 'insensitive' } } } },
+          { profile: { is: { title: { contains: keyword, mode: 'insensitive' } } } },
+          { profile: { is: { fullName: { contains: keyword, mode: 'insensitive' } } } },
+          { name: { contains: keyword, mode: 'insensitive' } },
           { profile: { is: { bio: { contains: keyword, mode: 'insensitive' } } } },
+          { profile: { is: { skills: { hasSome: [keyword] } } } },
+          { profile: { is: { knowledge: { hasSome: [keyword] } } } },
         ],
       });
     }
 
     if (skills && skills.length > 0) {
+      const fuzzySkillMatchedUserIds = await this.searchCandidateIdsBySkills(skills);
+      if (fuzzySkillMatchedUserIds.length === 0) {
+        return {
+          candidates: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 1,
+          },
+        };
+      }
       andConditions.push({
-        profile: { is: { skills: { hasSome: skills } } },
+        id: { in: fuzzySkillMatchedUserIds },
       });
     }
 
-    if (location) {
+    if (locations && locations.length > 0) {
+      const normalizedLocations = Array.from(
+        new Set(locations.map((loc) => resolveProvinceCode(loc) ?? loc).filter((loc) => loc.length > 0))
+      );
+      if (normalizedLocations.length > 0) {
+        andConditions.push({
+          profile: { is: { locations: { hasSome: normalizedLocations } } },
+        });
+      }
+    }
+
+    if (ward) {
       andConditions.push({
-        profile: { is: { locations: { has: location } } },
+        profile: { is: { wardCodes: { has: ward } } },
       });
     }
 
@@ -216,16 +352,13 @@ export class CvFlipService {
       });
     }
 
-    if (salaryMin !== undefined) {
-      andConditions.push({
-        profile: { is: { expectedSalaryMax: { gte: salaryMin } } },
-      });
-    }
-
-    if (salaryMax !== undefined) {
-      andConditions.push({
-        profile: { is: { expectedSalaryMin: { lte: salaryMax } } },
-      });
+    const salaryFilter = this.buildSalaryFilter({
+      salaryMin,
+      salaryMax,
+      salaryCurrency,
+    });
+    if (salaryFilter) {
+      andConditions.push(salaryFilter);
     }
 
     if (andConditions.length > 0) {
