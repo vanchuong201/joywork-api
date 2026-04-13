@@ -45,7 +45,7 @@ export class UserProfileService {
    * Ẩn contactEmail / contactPhone / cvUrl / website / linkedin / github trên API public trừ khi:
    * - viewer là chủ hồ sơ, hoặc
    * - có companyId + viewer là OWNER/ADMIN công ty + đã có CvFlipConnection,
-   * - hoặc ứng viên đã chủ động apply vào job của công ty đó (không cần lật CV).
+   * - hoặc ứng viên đã chủ động apply vào job của công ty đó (không cần mở CV).
    */
   private async shouldRedactPublicContactFields(params: {
     profileUserId: string;

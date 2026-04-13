@@ -116,7 +116,7 @@ export const getUserProfileBySlugSchema = z.object({
   slug: z.string().min(1, 'Slug is required'),
 });
 
-/** Query GET /profile/:slug — companyId dùng để hiển thị contact khi DN đã lật CV với ứng viên */
+/** Query GET /profile/:slug — companyId dùng để hiển thị contact khi DN đã mở CV với ứng viên */
 export const publicProfileQuerySchema = z
   .object({
     companyId: z.string().optional(),

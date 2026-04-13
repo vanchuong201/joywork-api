@@ -15,8 +15,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
   fastify.get('/check-access', {
     preHandler: secured,
     schema: {
-      description: 'Lấy danh sách doanh nghiệp có thể dùng để lật CV',
-      tags: ['CV Flip'],
+      description: 'Lấy danh sách doanh nghiệp có thể dùng để mở CV',
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
     },
   }, controller.checkAccess.bind(controller));
@@ -24,8 +24,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
   fastify.get('/candidates', {
     preHandler: secured,
     schema: {
-      description: 'Danh sách ứng viên public cho trang lật CV',
-      tags: ['CV Flip'],
+      description: 'Danh sách ứng viên public cho trang mở CV',
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -50,7 +50,7 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
     preHandler: secured,
     schema: {
       description: 'Chi tiết ứng viên với logic che/mở thông tin liên hệ',
-      tags: ['CV Flip'],
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -71,8 +71,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
   fastify.post('/flip', {
     preHandler: secured,
     schema: {
-      description: 'Thực hiện lật CV hoặc gửi yêu cầu lật CV',
-      tags: ['CV Flip'],
+      description: 'Thực hiện mở CV hoặc gửi yêu cầu mở CV',
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
@@ -88,8 +88,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
   fastify.get('/usage', {
     preHandler: secured,
     schema: {
-      description: 'Lấy quota lật CV theo doanh nghiệp đã chọn',
-      tags: ['CV Flip'],
+      description: 'Lấy quota mở CV theo doanh nghiệp đã chọn',
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -104,8 +104,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
   fastify.get('/requests', {
     preHandler: secured,
     schema: {
-      description: 'Danh sách yêu cầu lật CV cho ứng viên hiện tại',
-      tags: ['CV Flip'],
+      description: 'Danh sách yêu cầu mở CV cho ứng viên hiện tại',
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -121,8 +121,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
   fastify.post('/requests/:requestId/respond', {
     preHandler: secured,
     schema: {
-      description: 'Ứng viên đồng ý/từ chối yêu cầu lật CV',
-      tags: ['CV Flip'],
+      description: 'Ứng viên đồng ý/từ chối yêu cầu mở CV',
+      tags: ['Mở CV'],
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',

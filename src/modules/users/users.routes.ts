@@ -43,7 +43,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
           companyId: {
             type: 'string',
             description:
-              'Khi truy cập với tư cách DN: truyền ID công ty. contactEmail/contactPhone/cvUrl chỉ có khi đã lật CV (CvFlipConnection).',
+              'Khi truy cập với tư cách DN: truyền ID công ty. contactEmail/contactPhone/cvUrl chỉ có khi đã mở CV (CvFlipConnection).',
           },
         },
       },

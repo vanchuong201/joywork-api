@@ -677,7 +677,7 @@ export class CvFlipService {
     const requestCount = usage?.requestCount ?? 0;
 
     if (totalCount >= limits.monthlyTotalLimit) {
-      throw new AppError('Doanh nghiệp đã hết tổng lượt lật CV trong tháng', 429, 'CV_FLIP_TOTAL_LIMIT_REACHED');
+      throw new AppError('Doanh nghiệp đã hết tổng lượt mở CV trong tháng', 429, 'CV_FLIP_TOTAL_LIMIT_REACHED');
     }
 
     if (candidate.profile.allowCvFlip) {
@@ -711,7 +711,7 @@ export class CvFlipService {
     }
 
     if (requestCount >= limits.monthlyRequestLimit) {
-      throw new AppError('Doanh nghiệp đã hết lượt lật CV qua yêu cầu trong tháng', 429, 'CV_FLIP_REQUEST_LIMIT_REACHED');
+      throw new AppError('Doanh nghiệp đã hết lượt mở CV qua yêu cầu trong tháng', 429, 'CV_FLIP_REQUEST_LIMIT_REACHED');
     }
 
     const existingRequest = await prisma.cvFlipRequest.findUnique({

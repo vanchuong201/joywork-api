@@ -443,7 +443,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.patch('/companies/:companyId/cv-flip', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {
-      description: 'Cập nhật entitlement CV Flip của doanh nghiệp',
+      description: 'Cập nhật entitlement Mở CV của doanh nghiệp',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
       params: {

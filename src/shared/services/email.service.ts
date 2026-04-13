@@ -1393,7 +1393,7 @@ Trân trọng,
 
     await this.sendEmail({
       to,
-      subject: '[JOYWORK] Yêu cầu mở thông tin hồ sơ / CV Flip Request',
+      subject: '[JOYWORK] Yêu cầu mở thông tin hồ sơ / Yêu cầu mở CV',
       html,
     });
   }
@@ -1408,19 +1408,18 @@ Trân trọng,
   ): Promise<void> {
     const candidateName = payload.candidateName || 'ứng viên';
     const approvedTextVi = payload.approved ? 'đồng ý' : 'từ chối';
-    const approvedTextEn = payload.approved ? 'approved' : 'rejected';
 
     const html = this.talentPoolWrapper(
       'Cập nhật yêu cầu mở thông tin hồ sơ',
-      `<p>Ứng viên <strong>${candidateName}</strong> đã <strong>${approvedTextVi}</strong> yêu cầu lật CV của doanh nghiệp bạn.</p>`,
-      `<p>The candidate <strong>${candidateName}</strong> has <strong>${approvedTextEn}</strong> your CV flip request.</p>`,
+      `<p>Ứng viên <strong>${candidateName}</strong> đã <strong>${approvedTextVi}</strong> yêu cầu mở CV của doanh nghiệp bạn.</p>`,
+      `<p>Ứng viên <strong>${candidateName}</strong> đã <strong>${approvedTextVi}</strong> yêu cầu mở CV của doanh nghiệp bạn.</p>`,
       payload.profileUrl,
       'Xem hồ sơ ứng viên / View Candidate',
     );
 
     await this.sendEmail({
       to,
-      subject: '[JOYWORK] Kết quả yêu cầu lật CV / CV Flip Response',
+      subject: '[JOYWORK] Kết quả yêu cầu mở CV / Phản hồi mở CV',
       html,
     });
   }
