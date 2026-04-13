@@ -647,7 +647,7 @@ export class SystemService {
         throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
       }
 
-      (dataWithoutFlag as Record<string, unknown>).slug = normalizedSlug;
+      (dataWithoutFlag as Record<string, unknown>)['slug'] = normalizedSlug;
     }
 
     const { metrics, profileStory, highlights, ...rest } = dataWithoutFlag as Record<string, unknown>;
@@ -771,14 +771,17 @@ export class SystemService {
       cleanData['sectionVisibility'] = normalizedVisibility;
     }
 
+    const createData = cleanData as Omit<Prisma.CompanyProfileUncheckedCreateInput, 'companyId'>;
+    const updateData = cleanData as Prisma.CompanyProfileUncheckedUpdateInput;
+
     return prisma.companyProfile.upsert({
       where: { companyId },
       create: {
+        ...createData,
         companyId,
-        ...(cleanData as Prisma.CompanyProfileUncheckedCreateInput),
       },
       update: {
-        ...(cleanData as Prisma.CompanyProfileUncheckedUpdateInput),
+        ...updateData,
         updatedAt: new Date(),
       },
     });
