@@ -1,7 +1,12 @@
 import { Prisma, CompanyShowcaseListType, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
+import {
+  getProvinceNameByCode,
+  normalizeCompanyLocationForStorage,
+  resolveProvinceCode,
+  resolveProvinceCodeForWardCheck,
+} from '@/shared/provinces';
 import { assertWardsBelongToProvinces } from '@/shared/wards';
 import {
   CreateCompanyInput,
@@ -252,13 +257,24 @@ export class CompaniesService {
       Object.entries(rest).filter(([, v]) => v !== undefined)
     );
 
+    const locRaw = (baseData as { location?: string | null }).location;
+    if (locRaw !== undefined) {
+      const stored: string | null =
+        locRaw === null ? null : normalizeCompanyLocationForStorage(locRaw);
+      (baseData as { location?: string | null }).location = stored;
+    }
+
     const loc = (baseData as { location?: string | null }).location;
     const wards = (baseData as { wardCodes?: string[] }).wardCodes;
     if (wards?.length) {
       if (!loc) {
         throw new AppError('Cần chọn tỉnh/thành trước khi chọn phường/xã', 400, 'COMPANY_LOCATION_REQUIRED_FOR_WARD');
       }
-      assertWardsBelongToProvinces(wards, new Set([loc]));
+      const provinceCode = resolveProvinceCodeForWardCheck(loc);
+      if (!provinceCode) {
+        throw new AppError('Tỉnh/thành không hợp lệ', 400, 'INVALID_COMPANY_LOCATION');
+      }
+      assertWardsBelongToProvinces(wards, new Set([provinceCode]));
     }
 
     const company = await prisma.company.create({
@@ -432,6 +448,12 @@ export class CompaniesService {
       Object.entries(rest).filter(([, v]) => v !== undefined)
     );
 
+    if ('location' in updateBase) {
+      const rawLoc = (updateBase as { location: string | null }).location;
+      (updateBase as { location: string | null }).location =
+        rawLoc === null ? null : normalizeCompanyLocationForStorage(rawLoc);
+    }
+
     const existingCo = await prisma.company.findUnique({
       where: { id: companyId },
       select: { location: true, wardCodes: true },
@@ -451,7 +473,11 @@ export class CompaniesService {
         throw new AppError('Cần chọn tỉnh/thành trước khi chọn phường/xã', 400, 'COMPANY_LOCATION_REQUIRED_FOR_WARD');
       }
       if (nextLoc && nextWards.length) {
-        assertWardsBelongToProvinces(nextWards, new Set([nextLoc]));
+        const provinceCode = resolveProvinceCodeForWardCheck(nextLoc);
+        if (!provinceCode) {
+          throw new AppError('Tỉnh/thành không hợp lệ', 400, 'INVALID_COMPANY_LOCATION');
+        }
+        assertWardsBelongToProvinces(nextWards, new Set([provinceCode]));
       }
 
       if ('location' in updateBase && !(updateBase as { location?: string | null }).location) {
@@ -795,8 +821,10 @@ export class CompaniesService {
     }
 
     if (location) {
-      const normalizedLocation = resolveProvinceCode(location) ?? location;
-      where.location = normalizedLocation;
+      const code = resolveProvinceCode(location) ?? location;
+      const displayName = getProvinceNameByCode(code);
+      const variants = displayName && displayName !== code ? [code, displayName] : [code];
+      where.location = { in: variants };
     }
 
     if (size) {

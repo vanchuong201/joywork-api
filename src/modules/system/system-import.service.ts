@@ -4,6 +4,7 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import {
   PROVINCES,
+  getProvinceNameByCode,
   resolveProvinceCode,
 } from '@/shared/provinces';
 
@@ -588,6 +589,8 @@ export async function importCompaniesAndJobs(
         for (const company of batch) {
           const slug = slugMap.get(company.row)!;
           const locationCode = companyLocationMap.get(company.row) ?? null;
+          const locationDisplayName =
+            locationCode != null ? (getProvinceNameByCode(locationCode) ?? null) : null;
 
           const created = await tx.company.create({
             data: {
@@ -598,7 +601,7 @@ export async function importCompaniesAndJobs(
               description: company.description ?? null,
               website: company.website ?? null,
               logoUrl: company.logoUrl ?? null,
-              location: locationCode,
+              location: locationDisplayName,
               email: company.email ?? null,
               phone: company.phone ?? null,
               industry: company.industry ?? null,

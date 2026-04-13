@@ -201,6 +201,24 @@ export function getProvinceNameByCode(code: string | null | undefined): string |
   return PROVINCE_BY_CODE.get(code)?.name ?? null;
 }
 
+/** Lưu Company.location dưới dạng tên hiển thị chuẩn khi map được từ mã/tên/alias. */
+export function normalizeCompanyLocationForStorage(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const code = resolveProvinceCode(trimmed);
+  if (code) {
+    return getProvinceNameByCode(code) ?? trimmed;
+  }
+  return trimmed;
+}
+
+/** Mã tỉnh để kiểm tra ward — location có thể đang lưu tên thay vì slug. */
+export function resolveProvinceCodeForWardCheck(location: string | null | undefined): string | null {
+  if (location == null || location === '') return null;
+  return resolveProvinceCode(String(location).trim());
+}
+
 export function getProvinceRegionByCode(code: string | null | undefined): ProvinceRegion | null {
   if (!code) return null;
   return PROVINCE_BY_CODE.get(code)?.region ?? null;
