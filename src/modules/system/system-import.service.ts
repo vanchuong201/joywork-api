@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import {
@@ -58,6 +59,8 @@ interface ParsedCompany {
   industry?: string | undefined;
   size?: string | undefined;
   foundedYear?: number | undefined;
+  /** Ảnh section Giới thiệu chung (profile.training.image) */
+  introductionImageUrl?: string | undefined;
 }
 
 interface ParsedJob {
@@ -162,6 +165,7 @@ export async function generateTemplate(): Promise<Buffer> {
     { header: 'Ngành nghề', key: 'industry', width: 20 },
     { header: 'Quy mô', key: 'size', width: 15 },
     { header: 'Năm thành lập', key: 'foundedYear', width: 15 },
+    { header: 'URL ảnh giới thiệu (tuỳ chọn)', key: 'introductionImageUrl', width: 40 },
   ];
   companySheet.getRow(1).font = { bold: true };
   companySheet.getRow(1).fill = {
@@ -277,6 +281,7 @@ function parseCompanySheet(
       industry: cellToString(row.getCell(10)) || undefined,
       size: cellToString(row.getCell(11)) || undefined,
       foundedYear: cellToNumber(row.getCell(12)),
+      introductionImageUrl: cellToString(row.getCell(13)) || undefined,
     });
   });
   return results;
@@ -610,9 +615,29 @@ export async function importCompaniesAndJobs(
             },
           });
 
-          await tx.companyProfile.create({
-            data: { companyId: created.id },
-          });
+          const hasIntroTraining =
+            company.description ||
+            company.size ||
+            company.introductionImageUrl;
+          const trainingJson: Prisma.InputJsonValue = {
+            programs: [],
+            ...(company.description ? { description: company.description } : {}),
+            ...(company.size ? { workforceSize: company.size } : {}),
+            ...(company.introductionImageUrl ? { image: company.introductionImageUrl } : {}),
+          };
+
+          if (hasIntroTraining) {
+            await tx.companyProfile.create({
+              data: {
+                companyId: created.id,
+                training: trainingJson,
+              },
+            });
+          } else {
+            await tx.companyProfile.create({
+              data: { companyId: created.id },
+            });
+          }
 
           createdCompanyIdByName.set(company.name.toLowerCase().trim(), created.id);
           successCompanies++;
