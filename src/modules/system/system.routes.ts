@@ -274,6 +274,103 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.listCompanies.bind(systemController));
 
+  fastify.get('/companies/:companyId/detail', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Lấy chi tiết company + company profile để admin chỉnh sửa',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+    },
+  }, systemController.getCompanyDetail.bind(systemController));
+
+  fastify.patch('/companies/:companyId/info', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Admin cập nhật thông tin chung của công ty',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          legalName: { type: ['string', 'null'] },
+          slug: { type: 'string' },
+          tagline: { type: ['string', 'null'] },
+          description: { type: ['string', 'null'] },
+          logoUrl: { type: ['string', 'null'] },
+          coverUrl: { type: ['string', 'null'] },
+          website: { type: ['string', 'null'] },
+          location: { type: ['string', 'null'] },
+          wardCodes: { type: 'array', items: { type: 'string' } },
+          email: { type: ['string', 'null'] },
+          phone: { type: ['string', 'null'] },
+          industry: { type: ['string', 'null'] },
+          size: { type: 'string' },
+          foundedYear: { type: 'number' },
+          headcount: { type: 'number' },
+          headcountNote: { type: 'string' },
+          metrics: { type: 'array' },
+          profileStory: { type: 'array' },
+          highlights: { type: 'array' },
+          requestReVerification: { type: 'boolean' },
+        },
+      },
+    },
+  }, systemController.patchCompanyInfoByAdmin.bind(systemController));
+
+  fastify.patch('/companies/:companyId/profile', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Admin cập nhật hồ sơ showcase của công ty',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          stats: { type: 'array' },
+          vision: { type: 'string' },
+          mission: { type: 'string' },
+          coreValues: { type: 'string' },
+          leadershipPhilosophy: { type: 'object' },
+          products: { type: 'object' },
+          recruitmentPrinciples: { type: 'object' },
+          benefits: { type: 'object' },
+          hrJourney: { type: 'object' },
+          careerPath: { type: 'object' },
+          salaryAndBonus: { type: 'object' },
+          training: { type: 'object' },
+          gallery: { type: 'array' },
+          leaders: { type: 'object' },
+          story: { type: 'object' },
+          culture: { type: 'object' },
+          awards: { type: 'object' },
+          sectionVisibility: { type: 'object', additionalProperties: { type: 'boolean' } },
+        },
+      },
+    },
+  }, systemController.patchCompanyProfileByAdmin.bind(systemController));
+
   fastify.get('/companies/showcase/:type', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {

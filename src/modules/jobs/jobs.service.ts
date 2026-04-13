@@ -742,7 +742,7 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, salaryMin, salaryMax, skills, companyId, isActive, page, limit } = data;
+    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -795,7 +795,10 @@ export class JobsService {
     }
 
     if (salaryMin !== undefined || salaryMax !== undefined) {
-      where.AND = [];
+      where.AND = where.AND ?? [];
+      if (salaryCurrency) {
+        where.AND.push({ currency: salaryCurrency });
+      }
       if (salaryMin !== undefined) {
         where.AND.push({ salaryMin: { gte: salaryMin } });
       }

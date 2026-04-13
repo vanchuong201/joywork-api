@@ -3,7 +3,12 @@ import { SystemService } from './system.service';
 import { AppError } from '@/shared/errors/errorHandler';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import {
+  updateCompanyProfileSchema,
+  updateCompanySchema,
+} from '@/modules/companies/companies.schema';
+import {
   adminCompaniesQuerySchema,
+  adminCompanyParamSchema,
   adminCompanyShowcaseAddSchema,
   adminCompanyShowcaseCoverUploadSchema,
   adminCompanyShowcaseReorderSchema,
@@ -69,6 +74,57 @@ export class SystemController {
     }
     const result = await this.systemService.listCompaniesForAdmin(parsed.data);
     return reply.send({ data: result });
+  }
+
+  async getCompanyDetail(request: FastifyRequest, reply: FastifyReply) {
+    const parsedParams = adminCompanyParamSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsedParams.error.flatten());
+    }
+    const company = await this.systemService.getCompanyDetail(parsedParams.data.companyId);
+    return reply.send({ data: { company } });
+  }
+
+  async patchCompanyInfoByAdmin(request: AuthenticatedRequest, reply: FastifyReply) {
+    const adminId = request.user?.userId;
+    if (!adminId) {
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+    }
+
+    const parsedParams = adminCompanyParamSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsedParams.error.flatten());
+    }
+
+    const parsedBody = updateCompanySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsedBody.error.flatten());
+    }
+
+    const company = await this.systemService.adminUpdateCompany(
+      parsedParams.data.companyId,
+      adminId,
+      parsedBody.data
+    );
+    return reply.send({ data: { company } });
+  }
+
+  async patchCompanyProfileByAdmin(request: FastifyRequest, reply: FastifyReply) {
+    const parsedParams = adminCompanyParamSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsedParams.error.flatten());
+    }
+
+    const parsedBody = updateCompanyProfileSchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsedBody.error.flatten());
+    }
+
+    const profile = await this.systemService.adminUpdateCompanyProfile(
+      parsedParams.data.companyId,
+      parsedBody.data
+    );
+    return reply.send({ data: { profile } });
   }
 
   async listCompanyShowcase(request: FastifyRequest, reply: FastifyReply) {

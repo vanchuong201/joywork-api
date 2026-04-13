@@ -86,6 +86,26 @@ function extractCompanyIdFromKey(key: string): string | null {
 }
 
 export class UploadsService {
+  private async hasCompanyAssetPermission(userId: string, companyId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (user?.role === 'ADMIN') {
+      return true;
+    }
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId,
+        companyId,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: { userId: true },
+    });
+    return Boolean(membership);
+  }
+
   async createPresignedUrl(userId: string, input: CreatePresignInput) {
     const { companyId, fileName, fileType, fileSize } = input;
 
@@ -456,16 +476,8 @@ export class UploadsService {
 
   async uploadCompanyPostImage(userId: string, input: UploadCompanyPostImageInput) {
     const { companyId, fileName, fileType, fileData, previousKey } = input;
-
-    const membership = await prisma.companyMember.findFirst({
-      where: {
-        userId,
-        companyId,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
-    });
-
-    if (!membership) {
+    const canManage = await this.hasCompanyAssetPermission(userId, companyId);
+    if (!canManage) {
       throw new AppError('Bạn không có quyền tải media cho công ty này', 403, 'FORBIDDEN');
     }
 
@@ -528,16 +540,8 @@ export class UploadsService {
 
   async uploadCompanyLogo(userId: string, input: UploadCompanyLogoInput) {
     const { companyId, fileName, fileType, fileData, previousKey } = input;
-
-    const membership = await prisma.companyMember.findFirst({
-      where: {
-        userId,
-        companyId,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
-    });
-
-    if (!membership) {
+    const canManage = await this.hasCompanyAssetPermission(userId, companyId);
+    if (!canManage) {
       throw new AppError('Bạn không có quyền tải logo cho công ty này', 403, 'FORBIDDEN');
     }
 
@@ -601,16 +605,8 @@ export class UploadsService {
 
   async uploadCompanyCover(userId: string, input: UploadCompanyCoverInput) {
     const { companyId, fileName, fileType, fileData, previousKey } = input;
-
-    const membership = await prisma.companyMember.findFirst({
-      where: {
-        userId,
-        companyId,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
-    });
-
-    if (!membership) {
+    const canManage = await this.hasCompanyAssetPermission(userId, companyId);
+    if (!canManage) {
       throw new AppError('Bạn không có quyền tải ảnh cover cho công ty này', 403, 'FORBIDDEN');
     }
 

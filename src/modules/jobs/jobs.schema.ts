@@ -110,6 +110,7 @@ export const searchJobsSchema = z.object({
   jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional(),
   salaryMin: z.coerce.number().int().min(0).optional(),
   salaryMax: z.coerce.number().int().min(0).optional(),
+  salaryCurrency: z.string().length(3).optional(),
   skills: z.string().optional(), // Comma-separated skills
   companyId: z.string().cuid('Invalid company ID').optional(),
   isActive: z.coerce.boolean().optional(),

@@ -27,6 +27,15 @@ import type {
   AdminUsersQuery,
 } from '@/modules/system/system.schema';
 import { getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
+import { assertWardsBelongToProvinces } from '@/shared/wards';
+import {
+  normalizeCompanyLocationForStorage,
+  resolveProvinceCodeForWardCheck,
+} from '@/shared/provinces';
+import type {
+  UpdateCompanyInput,
+  UpdateCompanyProfileInput,
+} from '@/modules/companies/companies.schema';
 
 export interface SystemOverview {
   users: number;
@@ -70,6 +79,45 @@ export interface AdminCompanyListItem {
   createdAt: Date;
   memberCount: number;
   jobCount: number;
+}
+
+export interface AdminCompanyDetail {
+  id: string;
+  name: string;
+  legalName: string | null;
+  slug: string;
+  tagline: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  coverUrl: string | null;
+  website: string | null;
+  location: string | null;
+  wardCodes: string[];
+  email: string | null;
+  phone: string | null;
+  industry: string | null;
+  size: string | null;
+  foundedYear: number | null;
+  headcount: number | null;
+  headcountNote: string | null;
+  metrics: Prisma.JsonValue | null;
+  profileStory: Prisma.JsonValue | null;
+  highlights: Prisma.JsonValue | null;
+  verificationStatus: string;
+  isVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  profile: Prisma.CompanyProfileGetPayload<{ select: { companyId: true; stats: true; vision: true; mission: true; coreValues: true; leadershipPhilosophy: true; products: true; recruitmentPrinciples: true; benefits: true; hrJourney: true; careerPath: true; salaryAndBonus: true; training: true; gallery: true; leaders: true; story: true; culture: true; awards: true; sectionVisibility: true; updatedAt: true } }> | null;
+  members: Array<{
+    userId: string;
+    role: string;
+    joinedAt: Date;
+    user: {
+      email: string;
+      name: string | null;
+      role: string;
+    };
+  }>;
 }
 
 export interface ReportDayPoint {
@@ -479,6 +527,261 @@ export class SystemService {
         totalPages: Math.ceil(total / limit) || 1,
       },
     };
+  }
+
+  async getCompanyDetail(companyId: string): Promise<AdminCompanyDetail> {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        name: true,
+        legalName: true,
+        slug: true,
+        tagline: true,
+        description: true,
+        logoUrl: true,
+        coverUrl: true,
+        website: true,
+        location: true,
+        wardCodes: true,
+        email: true,
+        phone: true,
+        industry: true,
+        size: true,
+        foundedYear: true,
+        headcount: true,
+        headcountNote: true,
+        metrics: true,
+        profileStory: true,
+        highlights: true,
+        verificationStatus: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+        profile: {
+          select: {
+            companyId: true,
+            stats: true,
+            vision: true,
+            mission: true,
+            coreValues: true,
+            leadershipPhilosophy: true,
+            products: true,
+            recruitmentPrinciples: true,
+            benefits: true,
+            hrJourney: true,
+            careerPath: true,
+            salaryAndBonus: true,
+            training: true,
+            gallery: true,
+            leaders: true,
+            story: true,
+            culture: true,
+            awards: true,
+            sectionVisibility: true,
+            updatedAt: true,
+          },
+        },
+        members: {
+          select: {
+            userId: true,
+            role: true,
+            joinedAt: true,
+            user: {
+              select: {
+                email: true,
+                name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!company) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    return {
+      ...company,
+      logoUrl: await resolveReadableS3ObjectUrl(company.logoUrl),
+      coverUrl: await resolveReadableS3ObjectUrl(company.coverUrl),
+    };
+  }
+
+  async adminUpdateCompany(
+    companyId: string,
+    _adminId: string,
+    data: UpdateCompanyInput
+  ): Promise<Record<string, unknown>> {
+    const { requestReVerification, ...dataWithoutFlag } = data;
+
+    if ('slug' in dataWithoutFlag && dataWithoutFlag.slug) {
+      const slugValue = dataWithoutFlag.slug;
+      if (typeof slugValue !== 'string') {
+        throw new AppError('Slug must be a string', 400, 'INVALID_SLUG_TYPE');
+      }
+
+      const normalizedSlug = slugValue
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      if (!normalizedSlug || normalizedSlug.length < 2) {
+        throw new AppError('Slug must be at least 2 characters and contain only lowercase letters, numbers, and hyphens', 400, 'INVALID_SLUG');
+      }
+
+      const existingCompany = await prisma.company.findFirst({
+        where: {
+          slug: normalizedSlug,
+          id: { not: companyId },
+        },
+      });
+
+      if (existingCompany) {
+        throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
+      }
+
+      (dataWithoutFlag as Record<string, unknown>).slug = normalizedSlug;
+    }
+
+    const { metrics, profileStory, highlights, ...rest } = dataWithoutFlag as Record<string, unknown>;
+    const updateBase = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== undefined)
+    );
+
+    if ('location' in updateBase) {
+      const rawLoc = (updateBase as { location: string | null }).location;
+      (updateBase as { location: string | null }).location =
+        rawLoc === null ? null : normalizeCompanyLocationForStorage(rawLoc);
+    }
+
+    const existingCo = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { location: true, wardCodes: true },
+    });
+    if (!existingCo) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    let nextLoc = existingCo.location ?? null;
+    if ('location' in updateBase) {
+      nextLoc = (updateBase as { location?: string | null }).location ?? null;
+    }
+
+    let nextWards = existingCo.wardCodes ?? [];
+    if ('wardCodes' in updateBase) {
+      nextWards = ((updateBase as { wardCodes?: string[] }).wardCodes ?? []) as string[];
+    }
+
+    if (!nextLoc && nextWards.length) {
+      throw new AppError('Cần chọn tỉnh/thành trước khi chọn phường/xã', 400, 'COMPANY_LOCATION_REQUIRED_FOR_WARD');
+    }
+    if (nextLoc && nextWards.length) {
+      const provinceCode = resolveProvinceCodeForWardCheck(nextLoc);
+      if (!provinceCode) {
+        throw new AppError('Tỉnh/thành không hợp lệ', 400, 'INVALID_COMPANY_LOCATION');
+      }
+      assertWardsBelongToProvinces(nextWards, new Set([provinceCode]));
+    }
+
+    if ('location' in updateBase && !(updateBase as { location?: string | null }).location) {
+      (updateBase as { wardCodes?: string[] }).wardCodes = [];
+    }
+
+    const verificationUpdate: Record<string, unknown> = {};
+    if (requestReVerification === true) {
+      verificationUpdate['verificationStatus'] = 'PENDING';
+      verificationUpdate['verificationSubmittedAt'] = new Date();
+    }
+
+    const company = await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        ...(updateBase as Prisma.CompanyUpdateInput),
+        ...(metrics !== undefined ? { metrics: metrics as Prisma.InputJsonValue } : {}),
+        ...(profileStory !== undefined ? { profileStory: profileStory as Prisma.InputJsonValue } : {}),
+        ...(highlights !== undefined ? { highlights: highlights as Prisma.InputJsonValue } : {}),
+        ...verificationUpdate,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      id: company.id,
+      name: company.name,
+      legalName: company.legalName,
+      slug: company.slug,
+      tagline: company.tagline,
+      description: company.description,
+      logoUrl: company.logoUrl,
+      coverUrl: company.coverUrl,
+      website: company.website,
+      location: company.location,
+      wardCodes: company.wardCodes,
+      email: company.email,
+      phone: company.phone,
+      industry: company.industry,
+      size: company.size,
+      foundedYear: company.foundedYear,
+      headcount: company.headcount,
+      headcountNote: company.headcountNote,
+      metrics: company.metrics,
+      profileStory: company.profileStory,
+      highlights: company.highlights,
+      verificationStatus: company.verificationStatus,
+      isVerified: company.isVerified,
+      createdAt: company.createdAt,
+      updatedAt: company.updatedAt,
+    };
+  }
+
+  async adminUpdateCompanyProfile(
+    companyId: string,
+    data: UpdateCompanyProfileInput
+  ) {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+    if (!company) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([, v]) => v !== undefined)
+    );
+
+    const visibility = cleanData['sectionVisibility'];
+    if (visibility && typeof visibility === 'object') {
+      const visibilityObj = visibility as Record<string, unknown>;
+      const normalizedVisibility: Record<string, boolean> = {};
+      Object.entries(visibilityObj).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          normalizedVisibility[key] = value === 'true' || value === '1';
+        } else {
+          normalizedVisibility[key] = Boolean(value);
+        }
+      });
+      cleanData['sectionVisibility'] = normalizedVisibility;
+    }
+
+    return prisma.companyProfile.upsert({
+      where: { companyId },
+      create: {
+        companyId,
+        ...(cleanData as Prisma.CompanyProfileUncheckedCreateInput),
+      },
+      update: {
+        ...(cleanData as Prisma.CompanyProfileUncheckedUpdateInput),
+        updatedAt: new Date(),
+      },
+    });
   }
 
   async listJobsForAdmin(query: AdminJobsQuery): Promise<{

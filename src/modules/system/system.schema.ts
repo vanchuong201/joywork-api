@@ -25,6 +25,12 @@ export const adminCompaniesQuerySchema = z.object({
 
 export type AdminCompaniesQuery = z.infer<typeof adminCompaniesQuerySchema>;
 
+export const adminCompanyParamSchema = z.object({
+  companyId: z.string().cuid(),
+});
+
+export type AdminCompanyParam = z.infer<typeof adminCompanyParamSchema>;
+
 export const adminReportTimeseriesQuerySchema = z.object({
   days: z.coerce.number().int().min(7).max(90).default(30),
 });

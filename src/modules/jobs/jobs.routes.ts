@@ -410,6 +410,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           salaryMin: { type: 'number', minimum: 0, description: 'Minimum salary filter' },
           salaryMax: { type: 'number', minimum: 0, description: 'Maximum salary filter' },
+          salaryCurrency: { type: 'string', minLength: 3, maxLength: 3, description: 'Filter by salary currency (e.g. VND, USD)' },
           skills: { type: 'string', description: 'Comma-separated skills' },
           companyId: { type: 'string', description: 'Filter by company ID' },
           isActive: { type: 'boolean', description: 'Filter by job active status' },
