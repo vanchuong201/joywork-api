@@ -20,6 +20,218 @@ export async function systemRoutes(fastify: FastifyInstance) {
   const courseAdminService = new CourseAdminService();
   const courseAdminController = new CourseAdminController(courseAdminService);
   const adminPre = [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)];
+  const adminCompanyParamsSchema = {
+    type: 'object',
+    required: ['companyId'],
+    properties: {
+      companyId: {
+        type: 'string',
+        description: 'Company ID (CUID)',
+      },
+    },
+  };
+  const adminCompanyInfoPatchBodySchema = {
+    type: 'object',
+    description: 'Partial update cho bảng Company. Chỉ gửi các trường cần sửa.',
+    properties: {
+      name: { type: 'string', minLength: 2, description: 'Tên doanh nghiệp hiển thị' },
+      legalName: { type: ['string', 'null'], description: 'Tên pháp lý theo giấy phép' },
+      slug: { type: 'string', pattern: '^[a-z0-9-]+$', description: 'Slug public của doanh nghiệp' },
+      tagline: { type: ['string', 'null'], description: 'Tagline ngắn' },
+      description: { type: ['string', 'null'], description: 'Mô tả doanh nghiệp' },
+      logoUrl: { type: ['string', 'null'], format: 'uri', description: 'URL logo (thường từ /api/uploads/company/logo)' },
+      coverUrl: { type: ['string', 'null'], format: 'uri', description: 'URL cover (thường từ /api/uploads/company/cover)' },
+      website: { type: ['string', 'null'], format: 'uri', description: 'Website doanh nghiệp' },
+      location: { type: ['string', 'null'], description: 'Mã tỉnh/thành theo hệ thống nội bộ' },
+      wardCodes: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Danh sách mã phường/xã',
+      },
+      email: { type: ['string', 'null'], format: 'email', description: 'Email doanh nghiệp' },
+      phone: { type: ['string', 'null'], description: 'Số điện thoại doanh nghiệp' },
+      industry: { type: ['string', 'null'], description: 'Ngành nghề' },
+      size: { type: 'string', description: 'Quy mô công ty' },
+      foundedYear: { type: 'integer', minimum: 1800, description: 'Năm thành lập' },
+      headcount: { type: 'integer', minimum: 1, description: 'Số lượng nhân sự' },
+      headcountNote: { type: 'string', description: 'Ghi chú headcount' },
+      metrics: {
+        type: 'array',
+        description: 'Các metric hiển thị ở profile',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+        },
+      },
+      profileStory: {
+        type: 'array',
+        description: 'Các block nội dung story trong profile',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+        },
+      },
+      highlights: {
+        type: 'array',
+        description: 'Các highlight ngắn',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+        },
+      },
+      requestReVerification: {
+        type: 'boolean',
+        description: 'Đặt true nếu cần reset trạng thái xác minh về PENDING',
+      },
+    },
+    examples: [
+      {
+        name: 'JoyWork Vietnam',
+        legalName: 'CONG TY TNHH JOYWORK',
+        slug: 'joywork-vietnam',
+        tagline: 'Nen tang tuyen dung cho the he moi',
+        industry: 'Cong nghe',
+        size: '51-200',
+        website: 'https://joywork.vn',
+        headcount: 120,
+        requestReVerification: false,
+      },
+    ],
+  };
+  const adminCompanyProfilePatchBodySchema = {
+    type: 'object',
+    description: 'Partial update cho bảng CompanyProfile (showcase). Chỉ gửi section cần sửa.',
+    properties: {
+      stats: {
+        type: 'array',
+        description: 'Danh sách thống kê nổi bật',
+        items: { type: 'object', additionalProperties: true },
+      },
+      vision: { type: 'string', description: 'Tầm nhìn' },
+      mission: { type: 'string', description: 'Sứ mệnh' },
+      coreValues: { type: 'string', description: 'Giá trị cốt lõi' },
+      leadershipPhilosophy: { type: 'object', additionalProperties: true },
+      products: { type: 'object', additionalProperties: true },
+      recruitmentPrinciples: { type: 'object', additionalProperties: true },
+      benefits: { type: 'object', additionalProperties: true },
+      hrJourney: { type: 'object', additionalProperties: true },
+      careerPath: { type: 'object', additionalProperties: true },
+      salaryAndBonus: { type: 'object', additionalProperties: true },
+      training: { type: 'object', additionalProperties: true },
+      gallery: { type: 'array', items: { type: 'object', additionalProperties: true } },
+      leaders: { type: 'object', additionalProperties: true },
+      story: { type: 'object', additionalProperties: true },
+      culture: { type: 'object', additionalProperties: true },
+      awards: { type: 'object', additionalProperties: true },
+      sectionVisibility: {
+        type: 'object',
+        description: 'Map key section -> trạng thái hiển thị',
+        additionalProperties: { type: 'boolean' },
+      },
+    },
+    examples: [
+      {
+        vision: 'Tro thanh nen tang ket noi viec lam dang tin cay nhat Viet Nam',
+        mission: 'Giup doanh nghiep va ung vien tim thay nhau nhanh hon',
+        sectionVisibility: {
+          visionMissionValues: true,
+          benefits: true,
+          gallery: true,
+        },
+      },
+    ],
+  };
+  const adminCompanyDetailResponseSchema = {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'object',
+        properties: {
+          company: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              legalName: { type: ['string', 'null'] },
+              slug: { type: 'string' },
+              tagline: { type: ['string', 'null'] },
+              description: { type: ['string', 'null'] },
+              logoUrl: { type: ['string', 'null'] },
+              coverUrl: { type: ['string', 'null'] },
+              website: { type: ['string', 'null'] },
+              location: { type: ['string', 'null'] },
+              wardCodes: { type: 'array', items: { type: 'string' } },
+              email: { type: ['string', 'null'] },
+              phone: { type: ['string', 'null'] },
+              industry: { type: ['string', 'null'] },
+              size: { type: ['string', 'null'] },
+              foundedYear: { type: ['number', 'null'] },
+              headcount: { type: ['number', 'null'] },
+              headcountNote: { type: ['string', 'null'] },
+              metrics: { type: ['array', 'null'], items: { type: 'object', additionalProperties: true } },
+              profileStory: { type: ['array', 'null'], items: { type: 'object', additionalProperties: true } },
+              highlights: { type: ['array', 'null'], items: { type: 'object', additionalProperties: true } },
+              verificationStatus: { type: 'string' },
+              isVerified: { type: 'boolean' },
+              createdAt: { type: 'string' },
+              updatedAt: { type: 'string' },
+              profile: {
+                type: ['object', 'null'],
+                additionalProperties: true,
+              },
+              members: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    userId: { type: 'string' },
+                    role: { type: 'string' },
+                    joinedAt: { type: 'string' },
+                    user: {
+                      type: 'object',
+                      properties: {
+                        email: { type: 'string' },
+                        name: { type: ['string', 'null'] },
+                        role: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+  const adminCompanyInfoResponseSchema = {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'object',
+        properties: {
+          company: {
+            type: 'object',
+            additionalProperties: true,
+          },
+        },
+      },
+    },
+  };
+  const adminCompanyProfileResponseSchema = {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'object',
+        properties: {
+          profile: {
+            type: 'object',
+            additionalProperties: true,
+          },
+        },
+      },
+    },
+  };
 
   fastify.get('/overview', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
@@ -277,15 +489,12 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.get('/companies/:companyId/detail', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {
-      description: 'Lấy chi tiết company + company profile để admin chỉnh sửa',
+      description: 'Lấy toàn bộ dữ liệu company và profile showcase để admin chỉnh sửa',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['companyId'],
-        properties: {
-          companyId: { type: 'string' },
-        },
+      params: adminCompanyParamsSchema,
+      response: {
+        200: adminCompanyDetailResponseSchema,
       },
     },
   }, systemController.getCompanyDetail.bind(systemController));
@@ -293,41 +502,13 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.patch('/companies/:companyId/info', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {
-      description: 'Admin cập nhật thông tin chung của công ty',
+      description: 'Admin cập nhật thông tin chung của doanh nghiệp (bảng Company)',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['companyId'],
-        properties: {
-          companyId: { type: 'string' },
-        },
-      },
-      body: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          legalName: { type: ['string', 'null'] },
-          slug: { type: 'string' },
-          tagline: { type: ['string', 'null'] },
-          description: { type: ['string', 'null'] },
-          logoUrl: { type: ['string', 'null'] },
-          coverUrl: { type: ['string', 'null'] },
-          website: { type: ['string', 'null'] },
-          location: { type: ['string', 'null'] },
-          wardCodes: { type: 'array', items: { type: 'string' } },
-          email: { type: ['string', 'null'] },
-          phone: { type: ['string', 'null'] },
-          industry: { type: ['string', 'null'] },
-          size: { type: 'string' },
-          foundedYear: { type: 'number' },
-          headcount: { type: 'number' },
-          headcountNote: { type: 'string' },
-          metrics: { type: 'array' },
-          profileStory: { type: 'array' },
-          highlights: { type: 'array' },
-          requestReVerification: { type: 'boolean' },
-        },
+      params: adminCompanyParamsSchema,
+      body: adminCompanyInfoPatchBodySchema,
+      response: {
+        200: adminCompanyInfoResponseSchema,
       },
     },
   }, systemController.patchCompanyInfoByAdmin.bind(systemController));
@@ -335,38 +516,13 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.patch('/companies/:companyId/profile', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {
-      description: 'Admin cập nhật hồ sơ showcase của công ty',
+      description: 'Admin cập nhật hồ sơ showcase của doanh nghiệp (bảng CompanyProfile)',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['companyId'],
-        properties: {
-          companyId: { type: 'string' },
-        },
-      },
-      body: {
-        type: 'object',
-        properties: {
-          stats: { type: 'array' },
-          vision: { type: 'string' },
-          mission: { type: 'string' },
-          coreValues: { type: 'string' },
-          leadershipPhilosophy: { type: 'object' },
-          products: { type: 'object' },
-          recruitmentPrinciples: { type: 'object' },
-          benefits: { type: 'object' },
-          hrJourney: { type: 'object' },
-          careerPath: { type: 'object' },
-          salaryAndBonus: { type: 'object' },
-          training: { type: 'object' },
-          gallery: { type: 'array' },
-          leaders: { type: 'object' },
-          story: { type: 'object' },
-          culture: { type: 'object' },
-          awards: { type: 'object' },
-          sectionVisibility: { type: 'object', additionalProperties: { type: 'boolean' } },
-        },
+      params: adminCompanyParamsSchema,
+      body: adminCompanyProfilePatchBodySchema,
+      response: {
+        200: adminCompanyProfileResponseSchema,
       },
     },
   }, systemController.patchCompanyProfileByAdmin.bind(systemController));
