@@ -7,6 +7,7 @@ import { resolveLocationsWithWards } from '@/shared/wards';
 import { emailService } from '@/shared/services/email.service';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
+import { slugifyVietnamese } from '@/shared/job-slug';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -22,6 +23,7 @@ export interface Job {
   id: string;
   companyId: string;
   title: string;
+  slug?: string | null;
   description: string;
   requirements?: string;
   responsibilities?: string;
@@ -75,6 +77,7 @@ export interface Application {
   updatedAt: Date;
   job: {
     id: string;
+    slug?: string | null;
     title: string;
     company: {
       id: string;
@@ -102,6 +105,7 @@ export interface JobFavorite {
   createdAt: Date;
   job: {
     id: string;
+    slug?: string | null;
     title: string;
     locations: string[];
     wardCodes: string[];
@@ -149,9 +153,12 @@ export class JobsService {
     if (data.wardCodes !== undefined) locInput.wardCodes = data.wardCodes;
     const resolved = resolveLocationsWithWards(null, locInput);
 
+    const generatedSlug = slugifyVietnamese(data.title);
+
     const jobData: any = {
       companyId,
       title: data.title,
+      slug: generatedSlug,
       locations: resolved.locations,
       wardCodes: resolved.wardCodes,
       remote: data.remote,
@@ -208,6 +215,7 @@ export class JobsService {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
+      slug: job.slug,
       locations: job.locations,
       wardCodes: job.wardCodes,
       ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
@@ -288,7 +296,10 @@ export class JobsService {
     };
     
     // Basic info
-    if (data.title !== undefined) updateData.title = data.title;
+    if (data.title !== undefined) {
+      updateData.title = data.title;
+      updateData.slug = slugifyVietnamese(data.title);
+    }
     if (data.locations !== undefined || data.location !== undefined || data.wardCodes !== undefined) {
       const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
       if (data.locations !== undefined) locInput.locations = data.locations;
@@ -367,6 +378,7 @@ export class JobsService {
       id: updatedJob.id,
       companyId: updatedJob.companyId,
       title: updatedJob.title,
+      slug: updatedJob.slug,
       locations: updatedJob.locations,
       wardCodes: updatedJob.wardCodes,
       ...(updatedJob.locations.length > 0 ? { location: getProvinceNameByCode(updatedJob.locations[0]) ?? updatedJob.locations[0] } : {}),
@@ -492,6 +504,7 @@ export class JobsService {
       id: job.id,
       companyId: job.companyId,
       title: job.title,
+      slug: job.slug,
       locations: job.locations,
       wardCodes: job.wardCodes,
       ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
@@ -683,6 +696,7 @@ export class JobsService {
         id: job.id,
         companyId: job.companyId,
         title: job.title,
+        slug: job.slug,
         locations: job.locations,
         wardCodes: job.wardCodes,
         ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
@@ -869,6 +883,7 @@ export class JobsService {
         id: job.id,
         companyId: job.companyId,
         title: job.title,
+        slug: job.slug,
         locations: job.locations,
         wardCodes: job.wardCodes,
         ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
@@ -1155,6 +1170,7 @@ export class JobsService {
         updatedAt: app.updatedAt,
         job: {
           id: app.job.id,
+          slug: app.job.slug,
           title: app.job.title,
           company: {
             id: app.job.company.id,
@@ -1369,6 +1385,7 @@ export class JobsService {
         updatedAt: app.updatedAt,
         job: {
           id: app.job.id,
+          slug: app.job.slug,
           title: app.job.title,
           company: {
             id: app.job.company.id,
@@ -1444,6 +1461,7 @@ export class JobsService {
         createdAt: fav.createdAt,
         job: {
           id: fav.job.id,
+          slug: fav.job.slug,
           title: fav.job.title,
           isActive: fav.job.isActive,
           locations: fav.job.locations,

@@ -144,6 +144,7 @@ function mapPostEntity(post: any): Post {
     jobs: Array.isArray(post.postJobs)
       ? post.postJobs.map((pj: any) => ({
           id: pj.job.id,
+          slug: pj.job.slug,
           title: pj.job.title,
           locations: pj.job.locations,
           ...(pj.job.locations.length > 0 ? { location: pj.job.locations[0] } : {}),
@@ -272,7 +273,7 @@ export class PostsService {
         },
         postJobs: {
           include: {
-            job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } },
+            job: { select: { id: true, slug: true, title: true, locations: true, employmentType: true, isActive: true } },
           },
         },
         hashtags: {
@@ -544,7 +545,7 @@ export class PostsService {
         },
         postJobs: {
           include: {
-            job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } },
+            job: { select: { id: true, slug: true, title: true, locations: true, employmentType: true, isActive: true } },
           },
         },
         hashtags: {
@@ -760,7 +761,7 @@ export class PostsService {
             orderBy: { order: 'asc' },
           },
           postJobs: {
-            include: { job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } } },
+            include: { job: { select: { id: true, slug: true, title: true, locations: true, employmentType: true, isActive: true } } },
           },
           hashtags: {
             include: {
@@ -948,7 +949,7 @@ export class PostsService {
             orderBy: { order: 'asc' },
           },
           postJobs: {
-            include: { job: { select: { id: true, title: true, locations: true, employmentType: true, isActive: true } } },
+            include: { job: { select: { id: true, slug: true, title: true, locations: true, employmentType: true, isActive: true } } },
           },
           hashtags: {
             include: {

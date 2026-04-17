@@ -526,6 +526,7 @@ model Job {
   id                  String          @id @default(cuid())
   companyId           String
   title               String
+  slug                String?
   locations           String[]        @default([])
   wardCodes           String[]        @default([])
   remote              Boolean         @default(false)
@@ -570,6 +571,7 @@ model Job {
   favorites    JobFavorite[]
   PostJob      PostJob[]
 
+  @@index([slug])
   @@map("jobs")
 }
 
