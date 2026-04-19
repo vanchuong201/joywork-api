@@ -77,6 +77,14 @@ export class AuthService {
       },
     });
 
+    // Create user profile with gender
+    await prisma.userProfile.create({
+      data: {
+        userId: user.id,
+        gender: data.gender ?? 'MALE',
+      },
+    });
+
     // Generate verification token
     const verificationToken = randomUUID();
     const expiresAt = new Date();

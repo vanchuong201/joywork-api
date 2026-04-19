@@ -80,6 +80,10 @@ export const updateProfileSchema = z.object({
   workMode: z.string().max(100, 'Work mode must be less than 100 characters').optional().nullable().transform((val) => val === '' ? null : val),
   expectedCulture: z.string().max(500, 'Expected culture must be less than 500 characters').optional().nullable().transform((val) => val === '' ? null : val),
   careerGoals: z.array(z.string()).max(10, 'Maximum 10 career goals allowed').optional(),
+  // Personal info
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
+  yearOfBirth: z.number().int().min(1900).max(new Date().getFullYear() - 16, 'Must be at least 16 years old'),
+  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER']).optional().nullable(),
 });
 
 // Experience schema

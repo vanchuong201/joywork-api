@@ -276,6 +276,9 @@ export class UserProfileService {
         status: user.profile.status,
         isSearchingJob: user.profile.isSearchingJob,
         allowCvFlip: user.profile.allowCvFlip,
+        gender: user.profile.gender,
+        yearOfBirth: user.profile.yearOfBirth,
+        educationLevel: user.profile.educationLevel,
         createdAt: user.profile.createdAt,
         updatedAt: user.profile.updatedAt,
       };
@@ -419,6 +422,9 @@ export class UserProfileService {
             workMode: user.profile.workMode,
             expectedCulture: user.profile.expectedCulture,
             careerGoals: user.profile.careerGoals,
+            gender: user.profile.gender,
+            yearOfBirth: user.profile.yearOfBirth,
+            educationLevel: user.profile.educationLevel,
             createdAt: user.profile.createdAt,
             updatedAt: user.profile.updatedAt,
           }
@@ -517,6 +523,9 @@ export class UserProfileService {
       'workMode',
       'expectedCulture',
       'careerGoals',
+      'gender',
+      'yearOfBirth',
+      'educationLevel',
     ];
 
     for (const field of profileFields) {

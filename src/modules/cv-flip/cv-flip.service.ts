@@ -269,6 +269,10 @@ export class CvFlipService {
       salaryMax,
       salaryCurrency,
       workMode,
+      gender,
+      yearOfBirthMin,
+      yearOfBirthMax,
+      educationLevel,
     } = query;
 
     const where: Prisma.UserWhereInput = {
@@ -361,6 +365,31 @@ export class CvFlipService {
       andConditions.push(salaryFilter);
     }
 
+    if (gender) {
+      andConditions.push({
+        profile: { is: { gender } },
+      });
+    }
+
+    if (yearOfBirthMin !== undefined || yearOfBirthMax !== undefined) {
+      andConditions.push({
+        profile: {
+          is: {
+            yearOfBirth: {
+              ...(yearOfBirthMin !== undefined ? { gte: yearOfBirthMin } : {}),
+              ...(yearOfBirthMax !== undefined ? { lte: yearOfBirthMax } : {}),
+            },
+          },
+        },
+      });
+    }
+
+    if (educationLevel) {
+      andConditions.push({
+        profile: { is: { educationLevel } },
+      });
+    }
+
     if (andConditions.length > 0) {
       where.AND = andConditions;
     }
@@ -395,6 +424,9 @@ export class CvFlipService {
               expectedSalaryMax: true,
               salaryCurrency: true,
               workMode: true,
+              gender: true,
+              yearOfBirth: true,
+              educationLevel: true,
             },
           },
         },
@@ -416,6 +448,9 @@ export class CvFlipService {
         expectedSalaryMax: user.profile?.expectedSalaryMax ?? null,
         salaryCurrency: user.profile?.salaryCurrency ?? null,
         workMode: user.profile?.workMode ?? null,
+        gender: user.profile?.gender ?? null,
+        yearOfBirth: user.profile?.yearOfBirth ?? null,
+        educationLevel: user.profile?.educationLevel ?? null,
         experiences: user.experiences.map((e) => ({
           id: e.id,
           role: e.role,

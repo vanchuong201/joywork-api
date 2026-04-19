@@ -84,6 +84,11 @@ export const candidatesQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   location: z.string().trim().max(200).optional(),
   ward: z.string().trim().max(200).optional(),
+  // New filters
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
+  yearOfBirthMin: z.coerce.number().int().min(1900).max(2100).optional(),
+  yearOfBirthMax: z.coerce.number().int().min(1900).max(2100).optional(),
+  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER']).optional(),
 });
 
 export type CandidatesQuery = z.infer<typeof candidatesQuerySchema>;

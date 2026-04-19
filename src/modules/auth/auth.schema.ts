@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Gender } from '@prisma/client';
 
 // Register schema
 export const registerSchema = z.object({
@@ -10,6 +11,7 @@ export const registerSchema = z.object({
     .regex(/^[0-9]*$/, 'Số điện thoại chỉ được chứa chữ số')
     .optional()
     .or(z.literal('')),
+  gender: z.nativeEnum(Gender).optional().default(Gender.MALE),
 });
 
 // Login schema

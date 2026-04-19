@@ -113,6 +113,12 @@ enum UserStatus {
   LOOKING
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 // UserProfile - Extended user information
 model UserProfile {
   id       String   @id @default(cuid())
@@ -155,6 +161,11 @@ model UserProfile {
 
   // Career Goals
   careerGoals String[]
+
+  // Personal info for candidate filters
+  gender        Gender?       @default(MALE)
+  yearOfBirth  Int
+  educationLevel EducationLevel?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -624,6 +635,7 @@ enum EducationLevel {
   BACHELOR
   MASTER
   PHD
+  TRAINING_CENTER
 }
 
 // Application model - Job applications

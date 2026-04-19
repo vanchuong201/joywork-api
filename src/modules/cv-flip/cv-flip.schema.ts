@@ -25,6 +25,11 @@ export const candidatesQuerySchema = z.object({
   salaryMax: z.coerce.number().int().min(0).optional(),
   salaryCurrency: z.enum(['VND', 'USD']).optional().default('VND'),
   workMode: z.string().trim().max(100).optional(),
+  // New filters
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
+  yearOfBirthMin: z.coerce.number().int().min(1900).max(2100).optional(),
+  yearOfBirthMax: z.coerce.number().int().min(1900).max(2100).optional(),
+  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER']).optional(),
 });
 
 export type CandidatesQuery = z.infer<typeof candidatesQuerySchema>;

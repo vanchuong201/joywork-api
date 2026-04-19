@@ -556,7 +556,7 @@ export class TalentPoolService {
   }
 
   async listCandidates(query: CandidatesQuery) {
-    const { page, limit, q, location, ward } = query;
+    const { page, limit, q, location, ward, gender, yearOfBirthMin, yearOfBirthMax, educationLevel } = query;
 
     const where: Prisma.TalentPoolMemberWhereInput = {
       status: 'ACTIVE',
@@ -586,6 +586,29 @@ export class TalentPoolService {
       });
     }
 
+    if (gender) {
+      conditions.push({
+        profile: { gender },
+      });
+    }
+
+    if (yearOfBirthMin !== undefined || yearOfBirthMax !== undefined) {
+      conditions.push({
+        profile: {
+          yearOfBirth: {
+            ...(yearOfBirthMin !== undefined ? { gte: yearOfBirthMin } : {}),
+            ...(yearOfBirthMax !== undefined ? { lte: yearOfBirthMax } : {}),
+          },
+        },
+      });
+    }
+
+    if (educationLevel) {
+      conditions.push({
+        profile: { educationLevel },
+      });
+    }
+
     if (conditions.length > 0) {
       where.user = { AND: conditions };
     }
@@ -609,6 +632,7 @@ export class TalentPoolService {
                   expectedSalaryMin: true, expectedSalaryMax: true, salaryCurrency: true, workMode: true, expectedCulture: true,
                   isPublic: true, visibility: true,
                   title: true, fullName: true,
+                  gender: true, yearOfBirth: true, educationLevel: true,
                 },
               },
               experiences: {
@@ -639,6 +663,9 @@ export class TalentPoolService {
           slug: u.slug,
           isPublic: p?.isPublic ?? false,
           profile: null,
+          gender: p?.gender ?? null,
+          yearOfBirth: p?.yearOfBirth ?? null,
+          educationLevel: p?.educationLevel ?? null,
           experiences: [],
           educations: [],
         };
@@ -670,6 +697,9 @@ export class TalentPoolService {
           salaryCurrency: vis['expectations'] !== false ? p.salaryCurrency : null,
           workMode: vis['expectations'] !== false ? p.workMode : null,
           expectedCulture: vis['expectations'] !== false ? p.expectedCulture : null,
+          gender: p.gender,
+          yearOfBirth: p.yearOfBirth,
+          educationLevel: p.educationLevel,
         },
         experiences: vis['experience'] !== false ? u.experiences : [],
         educations: vis['education'] !== false ? u.educations : [],
