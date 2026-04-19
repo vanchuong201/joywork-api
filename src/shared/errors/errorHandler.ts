@@ -1,6 +1,7 @@
 import { FastifyError, FastifyRequest, FastifyReply } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
+import * as Sentry from '@sentry/node';
 
 export interface ApiError {
   code: string;
@@ -22,6 +23,19 @@ export class AppError extends Error {
   }
 }
 
+function captureException(error: unknown, request: FastifyRequest) {
+  Sentry.withScope((scope) => {
+    scope.setTag('method', request.method);
+    scope.setTag('route', request.url);
+    scope.setContext('request', {
+      method: request.method,
+      url: request.url,
+      ip: request.ip,
+    });
+    Sentry.captureException(error);
+  });
+}
+
 export function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
   const { log } = request.server;
 
@@ -36,6 +50,10 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
 
   // Handle different error types
   if (error instanceof AppError) {
+    if (error.statusCode >= 500) {
+      captureException(error, request);
+    }
+
     return reply.status(error.statusCode).send({
       error: {
         code: error.code,
@@ -73,6 +91,7 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
           },
         });
       default:
+        captureException(error, request);
         return reply.status(500).send({
           error: {
             code: 'DATABASE_ERROR',
@@ -124,6 +143,10 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
   // Default error response
   const statusCode = error.statusCode || 500;
   const code = statusCode === 500 ? 'INTERNAL_ERROR' : 'UNKNOWN_ERROR';
+
+  if (statusCode >= 500) {
+    captureException(error, request);
+  }
 
   return reply.status(statusCode).send({
     error: {

@@ -1,3 +1,6 @@
+import './instrument';
+
+import * as Sentry from '@sentry/node';
 import { createApp } from './app';
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
@@ -32,6 +35,8 @@ async function start() {
 
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    Sentry.captureException(error);
+    await Sentry.close(2000);
     process.exit(1);
   }
 }

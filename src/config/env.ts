@@ -4,6 +4,9 @@ import { config as loadEnv } from 'dotenv';
 // Load environment variables from .env file
 loadEnv();
 
+const emptyToUndefined = (val: unknown) =>
+  typeof val === 'string' && val.trim() === '' ? undefined : val;
+
 const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -20,13 +23,15 @@ const envSchema = z.object({
   // Frontend
   FRONTEND_ORIGIN: z.string().url().default('http://localhost:3000'),
   /** Optional admin dashboard origin (CORS), e.g. https://admin-cp.joywork.vn */
-  ADMIN_CP_ORIGIN: z.preprocess(
-    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
-    z.string().url().optional()
-  ),
+  ADMIN_CP_ORIGIN: z.preprocess(emptyToUndefined, z.string().url().optional()),
   
   // API
   API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
+
+  // Sentry
+  SENTRY_DSN: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  SENTRY_ENVIRONMENT: z.string().default('development'),
+  SENTRY_RELEASE: z.preprocess(emptyToUndefined, z.string().optional()),
 
   // AWS S3
   AWS_ACCESS_KEY_ID: z.string().min(1, 'AWS_ACCESS_KEY_ID is required'),
