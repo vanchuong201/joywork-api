@@ -608,7 +608,16 @@ export class TalentPoolService {
                   locations: true, wardCodes: true, knowledge: true, attitude: true,
                   expectedSalaryMin: true, expectedSalaryMax: true, salaryCurrency: true, workMode: true, expectedCulture: true,
                   isPublic: true, visibility: true,
+                  title: true, fullName: true,
                 },
+              },
+              experiences: {
+                orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
+                select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
+              },
+              educations: {
+                orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
+                select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
               },
             },
           },
@@ -630,6 +639,8 @@ export class TalentPoolService {
           slug: u.slug,
           isPublic: p?.isPublic ?? false,
           profile: null,
+          experiences: [],
+          educations: [],
         };
       }
 
@@ -639,7 +650,7 @@ export class TalentPoolService {
         memberId: m.id,
         joinedAt: m.createdAt,
         userId: u.id,
-        name: u.name,
+        name: u.profile?.fullName || u.name,
         slug: u.slug,
         isPublic: true,
         profile: {
@@ -649,6 +660,8 @@ export class TalentPoolService {
           skills: p.skills,
           locations: p.locations,
           wardCodes: p.wardCodes,
+          title: p.title,
+          fullName: p.fullName,
           ...(p.locations.length > 0 ? { location: getProvinceNameByCode(p.locations[0]) ?? p.locations[0] } : {}),
           knowledge: vis['ksa'] !== false ? p.knowledge : [],
           attitude: vis['ksa'] !== false ? p.attitude : [],
@@ -658,6 +671,8 @@ export class TalentPoolService {
           workMode: vis['expectations'] !== false ? p.workMode : null,
           expectedCulture: vis['expectations'] !== false ? p.expectedCulture : null,
         },
+        experiences: vis['experience'] !== false ? u.experiences : [],
+        educations: vis['education'] !== false ? u.educations : [],
       };
     });
 
