@@ -17,6 +17,7 @@ import {
 } from './auth.schema';
 
 const RESEND_VERIFICATION_COOLDOWN_MS = 2 * 60 * 1000;
+const DEFAULT_PROFILE_YEAR_OF_BIRTH = new Date().getFullYear() - 18;
 
 export interface AuthTokens {
   accessToken: string;
@@ -82,6 +83,7 @@ export class AuthService {
       data: {
         userId: user.id,
         gender: data.gender ?? 'MALE',
+        yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
       },
     });
 

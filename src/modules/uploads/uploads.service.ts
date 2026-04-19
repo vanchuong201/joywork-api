@@ -47,6 +47,7 @@ const ALLOWED_COURSE_ATTACHMENT_TYPES = new Set<string>([
   'application/zip',
   'application/x-zip-compressed',
 ]);
+const DEFAULT_PROFILE_YEAR_OF_BIRTH = new Date().getFullYear() - 18;
 
 function getExtensionFromMime(mime: string): string | null {
   if (mime === 'image/jpeg') return '.jpg';
@@ -462,6 +463,7 @@ export class UploadsService {
         create: {
           userId,
           avatar: assetUrl,
+          yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
         },
         select: { id: true, userId: true, avatar: true },
       });
@@ -732,6 +734,7 @@ export class UploadsService {
       create: {
         userId,
         cvUrl: assetUrl,
+        yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
       },
       select: { id: true, userId: true, cvUrl: true },
     });
@@ -909,4 +912,3 @@ export class UploadsService {
     return { url };
   }
 }
-
