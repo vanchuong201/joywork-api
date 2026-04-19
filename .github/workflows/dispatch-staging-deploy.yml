@@ -1,0 +1,25 @@
+name: Dispatch Staging Deploy
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch deploy repo workflow
+        shell: bash
+        env:
+          DEPLOY_REPO_PAT: ${{ secrets.DEPLOY_REPO_PAT }}
+        run: |
+          if [ -z "${DEPLOY_REPO_PAT}" ]; then
+            echo "Missing secret DEPLOY_REPO_PAT"
+            exit 1
+          fi
+
+          curl -fsS -X POST "https://api.github.com/repos/vanchuong201/joywork-deploy/dispatches" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${DEPLOY_REPO_PAT}" \
+            -d "{\"event_type\":\"app_develop_pushed\",\"client_payload\":{\"service\":\"api\",\"sha\":\"${{ github.sha }}\",\"source_repo\":\"${{ github.repository }}\"}}"
