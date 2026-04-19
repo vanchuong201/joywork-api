@@ -1,4 +1,4 @@
-name: Dispatch Staging Deploy
+name: API - Dispatch Staging Deploy
 
 on:
   push:
