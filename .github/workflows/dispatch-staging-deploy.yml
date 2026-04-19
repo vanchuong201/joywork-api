@@ -22,4 +22,4 @@ jobs:
           curl -fsS -X POST "https://api.github.com/repos/vanchuong201/joywork-deploy/dispatches" \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token ${DEPLOY_REPO_PAT}" \
-            -d "{\"event_type\":\"app_develop_pushed\",\"client_payload\":{\"service\":\"api\",\"sha\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"source_repo\":\"${{ github.repository }}\"}}"
+            -d "{\"event_type\":\"app_branch_pushed\",\"client_payload\":{\"service\":\"api\",\"sha\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"source_repo\":\"${{ github.repository }}\"}}"
