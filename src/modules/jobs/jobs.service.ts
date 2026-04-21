@@ -756,7 +756,7 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive, page, limit } = data;
+    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, educationLevel, gender, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -800,25 +800,82 @@ export class JobsService {
       where.employmentType = employmentType;
     }
 
+    // Build nullable field filters
+    // If JD has no value for a nullable field, it matches any filter value
+    const nullableFieldFilters: any[] = [];
+
+    // jobLevel is nullable - match null OR exact value
+    if (jobLevel) {
+      nullableFieldFilters.push({
+        OR: [
+          { jobLevel: null },
+          { jobLevel: jobLevel },
+        ],
+      });
+    }
+
+    // educationLevel is nullable - match null OR exact value
+    if (educationLevel) {
+      nullableFieldFilters.push({
+        OR: [
+          { educationLevel: null },
+          { educationLevel: educationLevel },
+        ],
+      });
+    }
+
+    // gender is nullable - match null OR exact value
+    if (gender) {
+      nullableFieldFilters.push({
+        OR: [
+          { gender: null },
+          { gender: gender },
+        ],
+      });
+    }
+
+    if (nullableFieldFilters.length > 0) {
+      where.AND = [...(where.AND ?? []), ...nullableFieldFilters];
+    }
+
+    // experienceLevel always has a default value, so we do exact match only
     if (experienceLevel) {
       where.experienceLevel = experienceLevel;
     }
 
-    if (jobLevel) {
-      where.jobLevel = jobLevel;
-    }
-
+    // Salary filter: match if JD has no salary set OR salary ranges overlap
     if (salaryMin !== undefined || salaryMax !== undefined) {
-      where.AND = where.AND ?? [];
-      if (salaryCurrency) {
-        where.AND.push({ currency: salaryCurrency });
-      }
+      // Jobs without salary set (both null) match any salary filter
+      // Jobs with salary set need to have overlapping range with user filter
+      const salaryConditions: any[] = [];
+
+      // JD with no salary set matches
+      salaryConditions.push({
+        AND: [
+          { salaryMin: null },
+          { salaryMax: null },
+        ],
+      });
+
+      // JD with salary set - check overlap
+      // Overlap: JD.salaryMin <= user.salaryMax AND JD.salaryMax >= user.salaryMin
+      const overlapCondition: any = { AND: [] };
+
       if (salaryMin !== undefined) {
-        where.AND.push({ salaryMin: { gte: salaryMin } });
+        overlapCondition.AND.push({ salaryMax: { gte: salaryMin } });
       }
       if (salaryMax !== undefined) {
-        where.AND.push({ salaryMax: { lte: salaryMax } });
+        overlapCondition.AND.push({ salaryMin: { lte: salaryMax } });
       }
+      if (salaryCurrency) {
+        overlapCondition.AND.push({ currency: salaryCurrency });
+      }
+
+      if (overlapCondition.AND.length > 0) {
+        salaryConditions.push(overlapCondition);
+      }
+
+      where.AND = [...(where.AND ?? []), { OR: salaryConditions }];
     }
 
     if (skills) {
@@ -907,6 +964,7 @@ export class JobsService {
         department: job.department,
         jobLevel: job.jobLevel,
         educationLevel: job.educationLevel,
+        gender: job.gender,
         // Required JD fields
         generalInfo: job.generalInfo,
         mission: job.mission,
@@ -915,7 +973,7 @@ export class JobsService {
         skills: job.skills,
         attitude: job.attitude,
       };
-      
+
       // Optional fields
       if (job.salaryMin !== null) jobResult.salaryMin = job.salaryMin;
       if (job.salaryMax !== null) jobResult.salaryMax = job.salaryMax;

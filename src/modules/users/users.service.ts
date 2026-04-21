@@ -17,6 +17,7 @@ export interface UserProfile {
   cvUrl?: string;
   locations: string[];
   wardCodes: string[];
+  specificAddress?: string | null;
   website?: string;
   linkedin?: string;
   github?: string;
@@ -72,6 +73,7 @@ export class UsersService {
       if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
       result.profile.locations = user.profile.locations;
       result.profile.wardCodes = user.profile.wardCodes;
+      result.profile.specificAddress = user.profile.specificAddress;
       if (user.profile.locations.length > 0) {
         result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
       }
@@ -133,6 +135,7 @@ export class UsersService {
     if (profileInput.website !== undefined) profileData.website = profileInput.website ?? null;
     if (profileInput.linkedin !== undefined) profileData.linkedin = profileInput.linkedin ?? null;
     if (profileInput.github !== undefined) profileData.github = profileInput.github ?? null;
+    if (profileInput.specificAddress !== undefined) profileData.specificAddress = profileInput.specificAddress ?? null;
     
     await prisma.userProfile.upsert({
       where: { userId },
@@ -283,6 +286,7 @@ export class UsersService {
       if (user.profile.bio) result.profile.bio = user.profile.bio;
       result.profile.locations = user.profile.locations;
       result.profile.wardCodes = user.profile.wardCodes;
+      result.profile.specificAddress = user.profile.specificAddress;
       if (user.profile.locations.length > 0) {
         result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
       }

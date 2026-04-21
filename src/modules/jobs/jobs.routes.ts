@@ -76,7 +76,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           educationLevel: { 
             type: 'string', 
-            enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
+            enum: ['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
             description: 'Education level / Học vấn'
           },
         },
@@ -907,7 +907,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
             anyOf: [
               {
                 type: 'string',
-                enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
+                enum: ['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
               },
               { type: 'null' },
             ],

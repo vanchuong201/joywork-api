@@ -266,6 +266,7 @@ export class UserProfileService {
         headline: user.profile.headline,
         locations: user.profile.locations,
         wardCodes: user.profile.wardCodes,
+        specificAddress: user.profile.specificAddress,
         ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
         website: user.profile.website,
         linkedin: user.profile.linkedin,
@@ -402,6 +403,7 @@ export class UserProfileService {
             cvUrl: user.profile.cvUrl,
             locations: user.profile.locations,
             wardCodes: user.profile.wardCodes,
+            specificAddress: user.profile.specificAddress,
             ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
             website: user.profile.website,
             linkedin: user.profile.linkedin,
@@ -526,6 +528,7 @@ export class UserProfileService {
       'gender',
       'yearOfBirth',
       'educationLevel',
+      'specificAddress',
     ];
 
     for (const field of profileFields) {

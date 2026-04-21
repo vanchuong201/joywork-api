@@ -131,6 +131,8 @@ model UserProfile {
   locations String[] @default([])
   /// Mã phường/xã canonical: `{provinceCode}/{officialWardCode}` — ví dụ `ha-noi/00004`
   wardCodes String[] @default([])
+  /// Địa chỉ cụ thể: số nhà, tên đường, khu xóm
+  specificAddress String?
   website  String?
   linkedin String?
   github   String?
@@ -164,7 +166,7 @@ model UserProfile {
 
   // Personal info for candidate filters
   gender        Gender?       @default(MALE)
-  yearOfBirth  Int
+  yearOfBirth  Int?
   educationLevel EducationLevel?
 
   createdAt DateTime @default(now())
@@ -554,6 +556,7 @@ model Job {
   department     String? // Bộ phận
   jobLevel       JobLevel? // Cấp bậc
   educationLevel EducationLevel? // Học vấn
+  gender        Gender? // Giới tính (nullable - không giới hạn)
 
   // JD chuẩn - Required fields
   generalInfo String @db.Text // "1. Thông tin chung" - markdown/rich text
@@ -605,7 +608,7 @@ enum EmploymentType {
   PART_TIME
   CONTRACT
   INTERNSHIP
-  FREELANCE
+  REMOTE
 }
 
 enum ExperienceLevel {
@@ -629,13 +632,12 @@ enum JobLevel {
 }
 
 enum EducationLevel {
-  NONE
-  HIGH_SCHOOL
+  TRAINING_CENTER
+  INTERMEDIATE
   COLLEGE
   BACHELOR
   MASTER
   PHD
-  TRAINING_CENTER
 }
 
 // Application model - Job applications

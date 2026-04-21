@@ -78,17 +78,26 @@ export type AdminToggleEntitlementBody = z.infer<typeof adminToggleEntitlementBo
 
 // ── Company: candidates list ──
 
+const csvToArray = (value: unknown): string[] | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const parts = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts : undefined;
+};
+
 export const candidatesQuerySchema = z.object({
   page: pageSchema,
   limit: limitSchema,
   q: z.string().trim().max(200).optional(),
   location: z.string().trim().max(200).optional(),
   ward: z.string().trim().max(200).optional(),
-  // New filters
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
+  // Updated filters
+  gender: z.enum(['MALE', 'FEMALE']).optional(),
   yearOfBirthMin: z.coerce.number().int().min(1900).max(2100).optional(),
   yearOfBirthMax: z.coerce.number().int().min(1900).max(2100).optional(),
-  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER']).optional(),
+  educationLevels: z.preprocess(csvToArray, z.array(z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'])).max(6).optional()),
 });
 
 export type CandidatesQuery = z.infer<typeof candidatesQuerySchema>;

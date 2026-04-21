@@ -23,7 +23,7 @@ export const createJobSchema = z.object({
   salaryMin: z.number().int().min(0).optional(),
   salaryMax: z.number().int().min(0).optional(),
   currency: z.string().length(3).default('VND'),
-  employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).default('FULL_TIME'),
+  employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE']).optional().default('FULL_TIME'),
   experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).default('NO_EXPERIENCE'),
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional(),
@@ -31,7 +31,8 @@ export const createJobSchema = z.object({
   // Header fields
   department: z.string().max(100, 'Department must be less than 100 characters').optional(),
   jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional(),
-  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional(),
+  educationLevel: z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional(),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   
   // Required JD fields (rich text/markdown)
   generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional(),
@@ -62,7 +63,7 @@ export const updateJobSchema = z.object({
   salaryMin: z.number().int().min(0).optional().nullable(),
   salaryMax: z.number().int().min(0).optional().nullable(),
   currency: z.string().length(3).optional().nullable(),
-  employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
+  employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE']).optional(),
   experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).optional(),
   tags: z.array(z.string()).max(10, 'Maximum 10 tags allowed').optional(),
   applicationDeadline: z.string().datetime().optional().nullable(),
@@ -70,7 +71,8 @@ export const updateJobSchema = z.object({
   // Header fields
   department: z.string().max(100, 'Department must be less than 100 characters').optional().nullable(),
   jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional().nullable(),
-  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional().nullable(),
+  educationLevel: z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional().nullable(),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
   
   // Required JD fields (rich text/markdown)
   generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional(),
@@ -105,9 +107,11 @@ export const searchJobsSchema = z.object({
   location: locationCodeSchema.optional(),
   ward: wardCodeSchema.optional(),
   remote: z.coerce.boolean().optional(),
-  employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE']).optional(),
+  employmentType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE']).optional(),
   experienceLevel: z.enum(['NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10']).optional(),
   jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional(),
+  educationLevel: z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional(),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   salaryMin: z.coerce.number().int().min(0).optional(),
   salaryMax: z.coerce.number().int().min(0).optional(),
   salaryCurrency: z.string().length(3).optional(),

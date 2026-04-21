@@ -97,7 +97,7 @@ interface ParsedJob {
 // ── Enum values for validation ──
 
 const EMPLOYMENT_TYPES = new Set([
-  'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE',
+  'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE',
 ]);
 const EXPERIENCE_LEVELS = new Set([
   'NO_EXPERIENCE', 'LT_1_YEAR', 'Y1_2', 'Y2_3', 'Y3_5', 'Y5_10', 'GT_10',

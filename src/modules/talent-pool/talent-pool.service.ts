@@ -556,7 +556,7 @@ export class TalentPoolService {
   }
 
   async listCandidates(query: CandidatesQuery) {
-    const { page, limit, q, location, ward, gender, yearOfBirthMin, yearOfBirthMax, educationLevel } = query;
+    const { page, limit, q, location, ward, gender, yearOfBirthMin, yearOfBirthMax, educationLevels } = query;
 
     const where: Prisma.TalentPoolMemberWhereInput = {
       status: 'ACTIVE',
@@ -603,9 +603,9 @@ export class TalentPoolService {
       });
     }
 
-    if (educationLevel) {
+    if (educationLevels && educationLevels.length > 0) {
       conditions.push({
-        profile: { educationLevel },
+        profile: { educationLevel: { in: educationLevels } },
       });
     }
 

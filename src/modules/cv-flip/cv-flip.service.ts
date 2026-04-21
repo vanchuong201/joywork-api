@@ -1,7 +1,7 @@
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { resolveProvinceCode } from '@/shared/provinces';
+import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
 import { emailService } from '@/shared/services/email.service';
 import { notificationService } from '@/shared/services/notification.service';
@@ -272,7 +272,7 @@ export class CvFlipService {
       gender,
       yearOfBirthMin,
       yearOfBirthMax,
-      educationLevel,
+      educationLevels,
     } = query;
 
     const where: Prisma.UserWhereInput = {
@@ -290,9 +290,9 @@ export class CvFlipService {
     if (keyword) {
       andConditions.push({
         OR: [
-          // Ưu tiên match trên tiêu đề nghề nghiệp để bám sát ngữ cảnh CV.
-          { profile: { is: { headline: { contains: keyword, mode: 'insensitive' } } } },
+          // Ưu tiên match trên vị trí ứng tuyển (title) trước, rồi đến tiêu đề nghề nghiệp (headline).
           { profile: { is: { title: { contains: keyword, mode: 'insensitive' } } } },
+          { profile: { is: { headline: { contains: keyword, mode: 'insensitive' } } } },
           { profile: { is: { fullName: { contains: keyword, mode: 'insensitive' } } } },
           { name: { contains: keyword, mode: 'insensitive' } },
           { profile: { is: { bio: { contains: keyword, mode: 'insensitive' } } } },
@@ -384,9 +384,9 @@ export class CvFlipService {
       });
     }
 
-    if (educationLevel) {
+    if (educationLevels && educationLevels.length > 0) {
       andConditions.push({
-        profile: { is: { educationLevel } },
+        profile: { is: { educationLevel: { in: educationLevels } } },
       });
     }
 
@@ -394,48 +394,98 @@ export class CvFlipService {
       where.AND = andConditions;
     }
 
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+    // Relevance-based ordering: title match (weight 7) > headline match (weight 6) >
+    // fullName match (weight 5) > name match (weight 4) > bio match (weight 3) >
+    // skills/knowledge match (weight 2) > fallback by updatedAt
+    // Note: Prisma $queryRaw for weighted relevance scoring
+    let orderedUserIds: string[] | null = null;
+    if (keyword) {
+      const escapedKeyword = keyword.replace(/'/g, "''");
+      const rankedUsers = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT u.id
+        FROM users u
+        LEFT JOIN user_profiles p ON p."userId" = u.id
+        WHERE u."accountStatus" = 'ACTIVE'
+          AND p."isPublic" = true
+          AND p."isSearchingJob" = true
+        ORDER BY
+          CASE
+            WHEN p.title ILIKE ${`%${escapedKeyword}%`} THEN 7
+            WHEN p.headline ILIKE ${`%${escapedKeyword}%`} THEN 6
+            WHEN p."fullName" ILIKE ${`%${escapedKeyword}%`} THEN 5
+            WHEN u.name ILIKE ${`%${escapedKeyword}%`} THEN 4
+            WHEN p.bio ILIKE ${`%${escapedKeyword}%`} THEN 3
+            WHEN p.skills::text ILIKE ${`%${escapedKeyword}%`} OR p.knowledge::text ILIKE ${`%${escapedKeyword}%`} THEN 2
+            ELSE 1
+          END DESC,
+          u."updatedAt" DESC
+        LIMIT 10000
+      `;
+      orderedUserIds = rankedUsers.map((r) => r.id);
+    }
+
+    // Paginate ordered IDs
+    const total = orderedUserIds ? orderedUserIds.length : await prisma.user.count({ where });
+    const pageIds = orderedUserIds
+      ? orderedUserIds.slice((page - 1) * limit, page * limit)
+      : null;
+
+    // Build query based on pagination mode
+    const userSelect = {
+      id: true,
+      name: true,
+      slug: true,
+      experiences: {
+        orderBy: [{ order: 'asc' as const }, { startDate: 'desc' as const }],
+        select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
+      },
+      educations: {
+        orderBy: [{ order: 'asc' as const }, { startDate: 'desc' as const }],
+        select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
+      },
+      profile: {
         select: {
-          id: true,
-          name: true,
-          slug: true,
-          experiences: {
-            orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
-            select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
-          },
-          educations: {
-            orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
-            select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
-          },
-          profile: {
-            select: {
-              avatar: true,
-              fullName: true,
-              headline: true,
-              title: true,
-              skills: true,
-              locations: true,
-              expectedSalaryMin: true,
-              expectedSalaryMax: true,
-              salaryCurrency: true,
-              workMode: true,
-              gender: true,
-              yearOfBirth: true,
-              educationLevel: true,
-            },
-          },
+          avatar: true,
+          fullName: true,
+          headline: true,
+          title: true,
+          skills: true,
+          locations: true,
+          expectedSalaryMin: true,
+          expectedSalaryMax: true,
+          salaryCurrency: true,
+          workMode: true,
+          gender: true,
+          yearOfBirth: true,
+          educationLevel: true,
         },
-      }),
-      prisma.user.count({ where }),
-    ]);
+      },
+    };
+
+    const users = pageIds
+      ? await prisma.user.findMany({
+          where: { ...where, id: { in: pageIds } },
+          skip: 0,
+          take: limit,
+          select: userSelect,
+        })
+      : await prisma.user.findMany({
+          where,
+          orderBy: [{ updatedAt: 'desc' as const }],
+          skip: (page - 1) * limit,
+          take: limit,
+          select: userSelect,
+        });
+
+    // Reorder users to match relevance order when keyword search
+    let orderedUsers = users;
+    if (pageIds) {
+      const userMap = new Map(users.map((u) => [u.id, u]));
+      orderedUsers = pageIds.map((id) => userMap.get(id)).filter((u): u is NonNullable<typeof u> => u !== undefined);
+    }
 
     return {
-      candidates: users.map((user) => ({
+      candidates: orderedUsers.map((user) => ({
         userId: user.id,
         slug: user.slug,
         name: user.profile?.fullName || user.name,
@@ -552,6 +602,8 @@ export class CvFlipService {
           skills: candidate.profile!.skills,
           locations: candidate.profile!.locations,
           wardCodes: candidate.profile!.wardCodes,
+          specificAddress: candidate.profile!.specificAddress,
+          ...(candidate.profile!.locations.length > 0 ? { location: getProvinceNameByCode(candidate.profile!.locations[0]) ?? candidate.profile!.locations[0] } : {}),
           website: opts.website,
           linkedin: opts.linkedin,
           github: opts.github,
