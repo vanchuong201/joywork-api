@@ -7,23 +7,7 @@ import {
   getProvinceNameByCode,
   resolveProvinceCode,
 } from '@/shared/provinces';
-
-// ── Slugify (mirrors shared/provinces but exported for company names) ──
-
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function slugify(value: string): string {
-  return normalizeText(value).replace(/\s+/g, '-');
-}
+import { slugify } from '@/shared/slug';
 
 // ── Types ──
 

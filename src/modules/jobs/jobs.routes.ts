@@ -50,7 +50,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           currency: { type: 'string', minLength: 3, maxLength: 3, default: 'VND', description: 'Salary currency' },
           employmentType: { 
             type: 'string', 
-            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE'],
+            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'],
             default: 'FULL_TIME',
             description: 'Employment type'
           },
@@ -108,6 +108,8 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     benefitsPerks: { type: 'string', nullable: true },
                     contact: { type: 'string', nullable: true },
                     locations: { type: 'array', items: { type: 'string' } },
+                    wardCodes: { type: 'array', items: { type: 'string' } },
+                    specificAddress: { type: 'string', nullable: true },
                     remote: { type: 'boolean' },
                     salaryMin: { type: 'number', nullable: true },
                     salaryMax: { type: 'number', nullable: true },
@@ -257,6 +259,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       contact: { type: 'string', nullable: true },
                       locations: { type: 'array', items: { type: 'string' } },
                       wardCodes: { type: 'array', items: { type: 'string' } },
+                      specificAddress: { type: 'string', nullable: true },
                       remote: { type: 'boolean' },
                       salaryMin: { type: 'number', nullable: true },
                       salaryMax: { type: 'number', nullable: true },
@@ -395,7 +398,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           remote: { type: 'boolean', description: 'Filter by remote work' },
           employmentType: { 
             type: 'string', 
-            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE'],
+            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'],
             description: 'Filter by employment type'
           },
           experienceLevel: { 
@@ -448,6 +451,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       contact: { type: 'string', nullable: true },
                       locations: { type: 'array', items: { type: 'string' } },
                       wardCodes: { type: 'array', items: { type: 'string' } },
+                      specificAddress: { type: 'string', nullable: true },
                       remote: { type: 'boolean' },
                       salaryMin: { type: 'number', nullable: true },
                       salaryMax: { type: 'number', nullable: true },
@@ -876,7 +880,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           currency: { type: 'string', minLength: 3, maxLength: 3, nullable: true, description: 'Salary currency' },
           employmentType: { 
             type: 'string', 
-            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE'],
+            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'],
             description: 'Employment type'
           },
           experienceLevel: { 
@@ -942,6 +946,8 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     benefitsPerks: { type: 'string', nullable: true },
                     contact: { type: 'string', nullable: true },
                     locations: { type: 'array', items: { type: 'string' } },
+                    wardCodes: { type: 'array', items: { type: 'string' } },
+                    specificAddress: { type: 'string', nullable: true },
                     remote: { type: 'boolean' },
                     salaryMin: { type: 'number', nullable: true },
                     salaryMax: { type: 'number', nullable: true },

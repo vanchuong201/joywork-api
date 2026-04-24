@@ -166,6 +166,8 @@ model UserProfile {
 
   // Personal info for candidate filters
   gender        Gender?       @default(MALE)
+  dayOfBirth    Int?
+  monthOfBirth  Int?
   yearOfBirth  Int?
   educationLevel EducationLevel?
 
@@ -542,6 +544,7 @@ model Job {
   slug                String?
   locations           String[]        @default([])
   wardCodes           String[]        @default([])
+  specificAddress     String?
   remote              Boolean         @default(false)
   salaryMin           Int?
   salaryMax           Int?

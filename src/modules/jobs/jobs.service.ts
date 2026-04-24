@@ -174,6 +174,7 @@ export class JobsService {
       department: data.department ?? null,
       jobLevel: data.jobLevel ?? null,
       educationLevel: data.educationLevel ?? null,
+      gender: data.gender ?? null,
       // Required JD fields
       generalInfo: data.generalInfo ?? '',
       mission: data.mission,
@@ -218,6 +219,7 @@ export class JobsService {
       slug: job.slug,
       locations: job.locations,
       wardCodes: job.wardCodes,
+      specificAddress: job.specificAddress,
       ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
       remote: job.remote,
       currency: job.currency,
@@ -324,6 +326,7 @@ export class JobsService {
     if (data.department !== undefined) updateData.department = data.department ?? null;
     if (data.jobLevel !== undefined) updateData.jobLevel = data.jobLevel ?? null;
     if (data.educationLevel !== undefined) updateData.educationLevel = data.educationLevel ?? null;
+    if (data.gender !== undefined) updateData.gender = data.gender ?? null;
     
     // Handle applicationDeadline
     if (data.applicationDeadline !== undefined) {
@@ -507,6 +510,7 @@ export class JobsService {
       slug: job.slug,
       locations: job.locations,
       wardCodes: job.wardCodes,
+      specificAddress: job.specificAddress,
       ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
       remote: job.remote,
       currency: job.currency,
@@ -699,6 +703,7 @@ export class JobsService {
         slug: job.slug,
         locations: job.locations,
         wardCodes: job.wardCodes,
+        specificAddress: job.specificAddress,
         ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
         remote: job.remote,
         currency: job.currency,
@@ -943,6 +948,7 @@ export class JobsService {
         slug: job.slug,
         locations: job.locations,
         wardCodes: job.wardCodes,
+        specificAddress: job.specificAddress,
         ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
         remote: job.remote,
         currency: job.currency,

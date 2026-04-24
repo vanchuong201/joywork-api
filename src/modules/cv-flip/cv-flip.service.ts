@@ -399,33 +399,70 @@ export class CvFlipService {
     // skills/knowledge match (weight 2) > fallback by updatedAt
     // Note: Prisma $queryRaw for weighted relevance scoring
     let orderedUserIds: string[] | null = null;
+    let useRelevanceOrdering = Boolean(keyword);
+
     if (keyword) {
       const escapedKeyword = keyword.replace(/'/g, "''");
-      const rankedUsers = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT u.id
-        FROM users u
-        LEFT JOIN user_profiles p ON p."userId" = u.id
-        WHERE u."accountStatus" = 'ACTIVE'
-          AND p."isPublic" = true
-          AND p."isSearchingJob" = true
-        ORDER BY
-          CASE
-            WHEN p.title ILIKE ${`%${escapedKeyword}%`} THEN 7
-            WHEN p.headline ILIKE ${`%${escapedKeyword}%`} THEN 6
-            WHEN p."fullName" ILIKE ${`%${escapedKeyword}%`} THEN 5
-            WHEN u.name ILIKE ${`%${escapedKeyword}%`} THEN 4
-            WHEN p.bio ILIKE ${`%${escapedKeyword}%`} THEN 3
-            WHEN p.skills::text ILIKE ${`%${escapedKeyword}%`} OR p.knowledge::text ILIKE ${`%${escapedKeyword}%`} THEN 2
-            ELSE 1
-          END DESC,
-          u."updatedAt" DESC
-        LIMIT 10000
-      `;
-      orderedUserIds = rankedUsers.map((r) => r.id);
+
+      // Only use relevance ordering if there are no additional complex filters
+      // that would cause mismatch between raw query results and actual filtered results
+      const hasComplexFilters = Boolean(skills?.length) || ward || education || workMode || salaryFilter;
+
+      if (!hasComplexFilters) {
+        // Include keyword filter in WHERE clause to ensure total matches actual results
+        const rankedUsers = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT u.id
+          FROM users u
+          LEFT JOIN user_profiles p ON p."userId" = u.id
+          WHERE u."accountStatus" = 'ACTIVE'
+            AND p."isPublic" = true
+            AND p."isSearchingJob" = true
+            AND (
+              p.title ILIKE ${`%${escapedKeyword}%`}
+              OR p.headline ILIKE ${`%${escapedKeyword}%`}
+              OR p."fullName" ILIKE ${`%${escapedKeyword}%`}
+              OR u.name ILIKE ${`%${escapedKeyword}%`}
+              OR p.bio ILIKE ${`%${escapedKeyword}%`}
+              OR p.skills::text ILIKE ${`%${escapedKeyword}%`}
+              OR p.knowledge::text ILIKE ${`%${escapedKeyword}%`}
+            )
+          ORDER BY
+            CASE
+              WHEN p.title ILIKE ${`%${escapedKeyword}%`} THEN 7
+              WHEN p.headline ILIKE ${`%${escapedKeyword}%`} THEN 6
+              WHEN p."fullName" ILIKE ${`%${escapedKeyword}%`} THEN 5
+              WHEN u.name ILIKE ${`%${escapedKeyword}%`} THEN 4
+              WHEN p.bio ILIKE ${`%${escapedKeyword}%`} THEN 3
+              WHEN p.skills::text ILIKE ${`%${escapedKeyword}%`} OR p.knowledge::text ILIKE ${`%${escapedKeyword}%`} THEN 2
+              ELSE 1
+            END DESC,
+            u."updatedAt" DESC
+          LIMIT 10000
+        `;
+        orderedUserIds = rankedUsers.map((r) => r.id);
+      } else {
+        // Fallback: use updatedAt ordering when there are complex filters
+        // to ensure total and results are consistent
+        useRelevanceOrdering = false;
+      }
     }
 
-    // Paginate ordered IDs
-    const total = orderedUserIds ? orderedUserIds.length : await prisma.user.count({ where });
+    // Paginate ordered IDs or count total with Prisma
+    // When using relevance ordering, count with Prisma if there are additional filters
+    // to ensure total matches actual filtered results
+    let total: number;
+    if (orderedUserIds && !useRelevanceOrdering) {
+      // Fallback path: using updatedAt ordering, count with Prisma
+      total = await prisma.user.count({ where });
+      orderedUserIds = null; // Clear to use Prisma pagination below
+    } else if (orderedUserIds) {
+      // Relevance ordering without additional filters
+      total = orderedUserIds.length;
+    } else {
+      // No keyword search, use Prisma count
+      total = await prisma.user.count({ where });
+    }
+
     const pageIds = orderedUserIds
       ? orderedUserIds.slice((page - 1) * limit, page * limit)
       : null;
@@ -456,6 +493,8 @@ export class CvFlipService {
           salaryCurrency: true,
           workMode: true,
           gender: true,
+          dayOfBirth: true,
+          monthOfBirth: true,
           yearOfBirth: true,
           educationLevel: true,
         },
@@ -499,6 +538,8 @@ export class CvFlipService {
         salaryCurrency: user.profile?.salaryCurrency ?? null,
         workMode: user.profile?.workMode ?? null,
         gender: user.profile?.gender ?? null,
+        dayOfBirth: user.profile?.dayOfBirth ?? null,
+        monthOfBirth: user.profile?.monthOfBirth ?? null,
         yearOfBirth: user.profile?.yearOfBirth ?? null,
         educationLevel: user.profile?.educationLevel ?? null,
         experiences: user.experiences.map((e) => ({

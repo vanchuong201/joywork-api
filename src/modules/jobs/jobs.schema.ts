@@ -19,6 +19,7 @@ export const createJobSchema = z.object({
   location: locationCodeSchema.optional(),
   locations: z.array(locationCodeSchema).max(20, 'Maximum 20 locations allowed').optional(),
   wardCodes: z.array(wardCodeSchema).max(30, 'Maximum 30 wards allowed').optional(),
+  specificAddress: z.string().max(200, 'Specific address must be less than 200 characters').optional(),
   remote: z.boolean().default(false),
   salaryMin: z.number().int().min(0).optional(),
   salaryMax: z.number().int().min(0).optional(),
@@ -32,8 +33,8 @@ export const createJobSchema = z.object({
   department: z.string().max(100, 'Department must be less than 100 characters').optional(),
   jobLevel: z.enum(['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE']).optional(),
   educationLevel: z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
-  
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
+
   // Required JD fields (rich text/markdown)
   generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional(),
   mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(5000, 'Sứ mệnh/Vai trò must be less than 5000 characters'),
@@ -59,6 +60,7 @@ export const updateJobSchema = z.object({
   location: locationCodeSchema.optional().nullable(),
   locations: z.array(locationCodeSchema).max(20, 'Maximum 20 locations allowed').optional(),
   wardCodes: z.array(wardCodeSchema).max(30, 'Maximum 30 wards allowed').optional(),
+  specificAddress: z.string().max(200, 'Specific address must be less than 200 characters').optional().nullable(),
   remote: z.boolean().optional(),
   salaryMin: z.number().int().min(0).optional().nullable(),
   salaryMax: z.number().int().min(0).optional().nullable(),

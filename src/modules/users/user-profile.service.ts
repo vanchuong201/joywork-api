@@ -2,22 +2,16 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
+import { slugify } from '@/shared/slug';
 import {
   UpdateProfileInput,
 } from './users.schema';
 
 const TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
 
-// Helper: Generate slug from name
+// Helper: Generate slug from name — uses slugify package with Vietnamese locale
 export function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-    .trim()
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-'); // Replace multiple hyphens with single
+  return slugify(name);
 }
 
 // Helper: Ensure unique slug
@@ -278,6 +272,8 @@ export class UserProfileService {
         isSearchingJob: user.profile.isSearchingJob,
         allowCvFlip: user.profile.allowCvFlip,
         gender: user.profile.gender,
+        dayOfBirth: user.profile.dayOfBirth,
+        monthOfBirth: user.profile.monthOfBirth,
         yearOfBirth: user.profile.yearOfBirth,
         educationLevel: user.profile.educationLevel,
         createdAt: user.profile.createdAt,
@@ -425,6 +421,8 @@ export class UserProfileService {
             expectedCulture: user.profile.expectedCulture,
             careerGoals: user.profile.careerGoals,
             gender: user.profile.gender,
+            dayOfBirth: user.profile.dayOfBirth,
+            monthOfBirth: user.profile.monthOfBirth,
             yearOfBirth: user.profile.yearOfBirth,
             educationLevel: user.profile.educationLevel,
             createdAt: user.profile.createdAt,
@@ -526,6 +524,8 @@ export class UserProfileService {
       'expectedCulture',
       'careerGoals',
       'gender',
+      'dayOfBirth',
+      'monthOfBirth',
       'yearOfBirth',
       'educationLevel',
       'specificAddress',

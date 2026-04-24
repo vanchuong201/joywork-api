@@ -1,20 +1,11 @@
 import { prisma } from '@/shared/database/prisma';
 import { DEFAULT_PROVINCES, ProvinceItem, ProvinceRegion } from './province-defaults';
+import slugifyLib from 'slugify';
 
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const slugify = (value: string): string =>
+  slugifyLib(value, { locale: 'vi', lower: true, replacement: ' ', trim: true });
 
-function slugify(value: string): string {
-  return normalizeText(value).replace(/\s+/g, '-');
-}
+const normalizeText = slugify;
 
 function hydrateRegistry(items: ProvinceItem[]): void {
   PROVINCES.splice(0, PROVINCES.length, ...items);
@@ -24,11 +15,11 @@ function hydrateRegistry(items: ProvinceItem[]): void {
   for (const province of PROVINCES) {
     PROVINCE_BY_CODE.set(province.code, province);
     PROVINCE_NAME_TO_CODE.set(normalizeText(province.name), province.code);
-    PROVINCE_NAME_TO_CODE.set(slugify(province.name), province.code);
+    PROVINCE_NAME_TO_CODE.set(slugify(province.name).replace(/ /g, '-'), province.code);
 
     for (const oldName of province.merged_from ?? []) {
       PROVINCE_NAME_TO_CODE.set(normalizeText(oldName), province.code);
-      PROVINCE_NAME_TO_CODE.set(slugify(oldName), province.code);
+      PROVINCE_NAME_TO_CODE.set(slugify(oldName).replace(/ /g, '-'), province.code);
     }
 
     for (const oldCode of province.merged_from_codes ?? []) {

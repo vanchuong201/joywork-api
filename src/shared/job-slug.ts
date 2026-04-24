@@ -1,32 +1,16 @@
 /**
  * Shared utilities for Job URL slug generation, building, and parsing.
- * Used by backend services to auto-generate slugs and build canonical URLs.
+ * Uses the slugify package with Vietnamese locale.
  */
+import { slugify } from './slug';
 
 const CUID_PATTERN = /^[a-z][a-z0-9]{24}$/;
 
 /**
- * Normalize a Vietnamese title string to a URL-friendly slug.
- *
- * Steps:
- * 1. Decompose Unicode (NFD) to separate base chars from diacritics
- * 2. Remove Vietnamese diacritics (combining marks \u0300-\u036f)
- * 3. Lowercase
- * 4. Replace any non-alphanumeric / space chars with space
- * 5. Trim and collapse multiple spaces to single hyphen
- * 6. Collapse multiple hyphens to single hyphen
- * 7. Trim leading/trailing hyphens
+ * Alias for backward compatibility with code that uses `slugifyVietnamese`.
+ * @deprecated Use `slugify` from `@/shared/slug` instead.
  */
-export function slugifyVietnamese(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
+export const slugifyVietnamese = slugify;
 
 /**
  * Build the canonical SEO-friendly URL for a job.
@@ -35,7 +19,7 @@ export function slugifyVietnamese(text: string): string {
  * one from the job title (useful for jobs created before this feature).
  */
 export function buildJobUrl(job: { id: string; slug?: string | null; title: string }): string {
-  const slug = job.slug ?? slugifyVietnamese(job.title);
+  const slug = job.slug ?? slugify(job.title);
   return `/jobs/${slug}--${job.id}`;
 }
 

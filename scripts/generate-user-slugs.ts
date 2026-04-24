@@ -1,20 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { slugify } from '../src/shared/slug';
 
 const prisma = new PrismaClient();
 
-// Helper: Generate slug from name
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-    .trim()
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-'); // Replace multiple hyphens with single
-}
-
-// Helper: Ensure unique slug
+// Helper: Ensure unique slug for users
 async function ensureUniqueSlug(baseSlug: string, excludeUserId?: string): Promise<string> {
   let slug = baseSlug;
   let counter = 1;
@@ -37,37 +26,26 @@ async function ensureUniqueSlug(baseSlug: string, excludeUserId?: string): Promi
 async function main() {
   console.log('🚀 Starting slug generation for users...\n');
 
-  // Get all users without slug
-  const usersWithoutSlug = await prisma.user.findMany({
-    where: {
-      OR: [
-        { slug: null },
-        { slug: '' },
-      ],
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-    },
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true, slug: true },
   });
 
-  console.log(`Found ${usersWithoutSlug.length} users without slug\n`);
+  console.log(`Found ${users.length} users to process\n`);
 
-  if (usersWithoutSlug.length === 0) {
-    console.log('✅ All users already have slugs!');
+  if (users.length === 0) {
+    console.log('No users found!');
     return;
   }
 
   let successCount = 0;
+  let unchangedCount = 0;
   let errorCount = 0;
 
-  for (const user of usersWithoutSlug) {
+  for (const user of users) {
     try {
-      // Generate slug from name or email
       const baseName = user.name?.trim() || user.email.split('@')[0];
-      const baseSlug = generateSlug(baseName);
-      
+      const baseSlug = slugify(baseName);
+
       if (!baseSlug) {
         console.log(`⚠️  Skipping user ${user.id} - cannot generate slug from name/email`);
         errorCount++;
@@ -75,6 +53,11 @@ async function main() {
       }
 
       const uniqueSlug = await ensureUniqueSlug(baseSlug, user.id);
+
+      if (user.slug === uniqueSlug) {
+        unchangedCount++;
+        continue;
+      }
 
       await prisma.user.update({
         where: { id: user.id },
@@ -90,9 +73,10 @@ async function main() {
   }
 
   console.log(`\n📊 Summary:`);
-  console.log(`   ✅ Success: ${successCount}`);
+  console.log(`   ✅ Updated: ${successCount}`);
+  console.log(`   ➖ Unchanged: ${unchangedCount}`);
   console.log(`   ❌ Errors: ${errorCount}`);
-  console.log(`   📝 Total: ${usersWithoutSlug.length}`);
+  console.log(`   📝 Total: ${users.length}`);
 }
 
 main()
@@ -103,4 +87,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

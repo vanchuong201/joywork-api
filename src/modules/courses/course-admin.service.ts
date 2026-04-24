@@ -8,6 +8,7 @@ import type {
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { buildS3ObjectUrl, resolveReadableS3ObjectUrl } from '@/shared/storage/s3';
+import { slugify } from '@/shared/slug';
 import type { AdminCoursesQuery } from '@/modules/courses/course-admin.schema';
 import {
   adminCourseCreateSchema,
@@ -28,13 +29,7 @@ type CoursePatch = z.infer<typeof adminCoursePatchSchema>;
 type EnrollmentCreate = z.infer<typeof adminCourseEnrollmentCreateSchema>;
 
 function baseSlug(title: string): string {
-  const s = title
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
+  const s = slugify(title).slice(0, 80);
   return s || 'course';
 }
 

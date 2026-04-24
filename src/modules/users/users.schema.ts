@@ -82,6 +82,8 @@ export const updateProfileSchema = z.object({
   careerGoals: z.array(z.string()).max(10, 'Maximum 10 career goals allowed').optional(),
   // Personal info
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
+  dayOfBirth: z.number().int().min(1).max(31).optional().nullable(),
+  monthOfBirth: z.number().int().min(1).max(12).optional().nullable(),
   yearOfBirth: z.number().int().min(1900).max(new Date().getFullYear() - 16, 'Must be at least 16 years old').optional().nullable(),
   educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER']).optional().nullable(),
   // Address info
