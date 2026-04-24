@@ -98,6 +98,10 @@ export const candidatesQuerySchema = z.object({
   yearOfBirthMin: z.coerce.number().int().min(1900).max(2100).optional(),
   yearOfBirthMax: z.coerce.number().int().min(1900).max(2100).optional(),
   educationLevels: z.preprocess(csvToArray, z.array(z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'])).max(6).optional()),
+  // Salary filters: BigInt compatible (up to 9,223,372,036,854,775,807)
+  salaryMin: z.coerce.bigint().min(0n).optional(),
+  salaryMax: z.coerce.bigint().min(0n).optional(),
+  salaryCurrency: z.enum(['VND', 'USD']).optional(),
 });
 
 export type CandidatesQuery = z.infer<typeof candidatesQuerySchema>;

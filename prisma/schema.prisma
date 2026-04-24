@@ -155,8 +155,8 @@ model UserProfile {
   attitude  String[] // Array of attitude items
 
   // Expectations
-  expectedSalaryMin Int?
-  expectedSalaryMax Int?
+  expectedSalaryMin BigInt?
+  expectedSalaryMax BigInt?
   salaryCurrency    String?   @default("VND")
   workMode          String?
   expectedCulture   String?

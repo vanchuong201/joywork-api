@@ -75,17 +75,17 @@ export class CvFlipService {
   }
 
   private normalizeSalaryRange(
-    salaryMin: number | undefined,
-    salaryMax: number | undefined
+    salaryMin: bigint | number | undefined,
+    salaryMax: bigint | number | undefined
   ): { min: number | undefined; max: number | undefined } {
-    const min = salaryMin !== undefined ? Math.floor(salaryMin * 0.8) : undefined;
-    const max = salaryMax !== undefined ? Math.ceil(salaryMax * 1.2) : undefined;
+    const min = salaryMin !== undefined ? Math.floor(Number(salaryMin) * 0.8) : undefined;
+    const max = salaryMax !== undefined ? Math.ceil(Number(salaryMax) * 1.2) : undefined;
     return { min, max };
   }
 
   private buildSalaryFilter(params: {
-    salaryMin: number | undefined;
-    salaryMax: number | undefined;
+    salaryMin: bigint | number | undefined;
+    salaryMax: bigint | number | undefined;
     salaryCurrency: 'VND' | 'USD';
   }): Prisma.UserWhereInput | null {
     const { salaryMin, salaryMax } = params;
@@ -533,8 +533,8 @@ export class CvFlipService {
         title: user.profile?.title ?? null,
         skills: user.profile?.skills ?? [],
         locations: user.profile?.locations ?? [],
-        expectedSalaryMin: user.profile?.expectedSalaryMin ?? null,
-        expectedSalaryMax: user.profile?.expectedSalaryMax ?? null,
+        expectedSalaryMin: user.profile?.expectedSalaryMin != null ? Number(user.profile.expectedSalaryMin) : null,
+        expectedSalaryMax: user.profile?.expectedSalaryMax != null ? Number(user.profile.expectedSalaryMax) : null,
         salaryCurrency: user.profile?.salaryCurrency ?? null,
         workMode: user.profile?.workMode ?? null,
         gender: user.profile?.gender ?? null,
@@ -651,8 +651,8 @@ export class CvFlipService {
           status: candidate.profile!.status,
           knowledge: candidate.profile!.knowledge,
           attitude: candidate.profile!.attitude,
-          expectedSalaryMin: candidate.profile!.expectedSalaryMin,
-          expectedSalaryMax: candidate.profile!.expectedSalaryMax,
+          expectedSalaryMin: candidate.profile!.expectedSalaryMin != null ? Number(candidate.profile!.expectedSalaryMin) : null,
+          expectedSalaryMax: candidate.profile!.expectedSalaryMax != null ? Number(candidate.profile!.expectedSalaryMax) : null,
           salaryCurrency: candidate.profile!.salaryCurrency,
           workMode: candidate.profile!.workMode,
           expectedCulture: candidate.profile!.expectedCulture,

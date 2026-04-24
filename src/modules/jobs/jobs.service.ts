@@ -355,6 +355,7 @@ export class JobsService {
     if (data.benefitsIncome !== undefined) updateData.benefitsIncome = data.benefitsIncome ?? null;
     if (data.benefitsPerks !== undefined) updateData.benefitsPerks = data.benefitsPerks ?? null;
     if (data.contact !== undefined) updateData.contact = data.contact ?? null;
+    if (data.specificAddress !== undefined) updateData.specificAddress = data.specificAddress ?? null;
     
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
@@ -384,6 +385,7 @@ export class JobsService {
       slug: updatedJob.slug,
       locations: updatedJob.locations,
       wardCodes: updatedJob.wardCodes,
+      specificAddress: updatedJob.specificAddress,
       ...(updatedJob.locations.length > 0 ? { location: getProvinceNameByCode(updatedJob.locations[0]) ?? updatedJob.locations[0] } : {}),
       remote: updatedJob.remote,
       currency: updatedJob.currency,

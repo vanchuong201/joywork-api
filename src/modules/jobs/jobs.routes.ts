@@ -342,6 +342,8 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     benefitsPerks: { type: 'string', nullable: true },
                     contact: { type: 'string', nullable: true },
                     locations: { type: 'array', items: { type: 'string' } },
+                    wardCodes: { type: 'array', items: { type: 'string' } },
+                    specificAddress: { type: 'string', nullable: true },
                     remote: { type: 'boolean' },
                     salaryMin: { type: 'number', nullable: true },
                     salaryMax: { type: 'number', nullable: true },

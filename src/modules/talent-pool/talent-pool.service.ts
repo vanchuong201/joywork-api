@@ -556,7 +556,7 @@ export class TalentPoolService {
   }
 
   async listCandidates(query: CandidatesQuery) {
-    const { page, limit, q, location, ward, gender, yearOfBirthMin, yearOfBirthMax, educationLevels } = query;
+    const { page, limit, q, location, ward, gender, yearOfBirthMin, yearOfBirthMax, educationLevels, salaryMin, salaryMax, salaryCurrency } = query;
 
     const where: Prisma.TalentPoolMemberWhereInput = {
       status: 'ACTIVE',
@@ -607,6 +607,36 @@ export class TalentPoolService {
       conditions.push({
         profile: { educationLevel: { in: educationLevels } },
       });
+    }
+
+    // Salary filter: match if candidate expected salary range overlaps with filter range
+    // Overlap: candidate.salaryMin <= filter.salaryMax AND candidate.salaryMax >= filter.salaryMin
+    if (salaryMin !== undefined || salaryMax !== undefined) {
+      const salaryCondition: Prisma.UserWhereInput = {
+        profile: {
+          AND: [
+            // Candidate must have at least one salary value set
+            {
+              OR: [
+                { expectedSalaryMin: { not: null } },
+                { expectedSalaryMax: { not: null } },
+              ],
+            },
+            // Overlap condition: candidate range overlaps with filter range
+            // candidate.salaryMin <= filter.salaryMax
+            ...(salaryMax !== undefined
+              ? [{ expectedSalaryMin: { lte: salaryMax } }]
+              : []),
+            // candidate.salaryMax >= filter.salaryMin
+            ...(salaryMin !== undefined
+              ? [{ expectedSalaryMax: { gte: salaryMin } }]
+              : []),
+            // Currency match if specified
+            ...(salaryCurrency ? [{ salaryCurrency }] : []),
+          ],
+        },
+      };
+      conditions.push(salaryCondition);
     }
 
     if (conditions.length > 0) {
@@ -694,8 +724,8 @@ export class TalentPoolService {
           ...(p.locations.length > 0 ? { location: getProvinceNameByCode(p.locations[0]) ?? p.locations[0] } : {}),
           knowledge: vis['ksa'] !== false ? p.knowledge : [],
           attitude: vis['ksa'] !== false ? p.attitude : [],
-          expectedSalaryMin: vis['expectations'] !== false ? p.expectedSalaryMin : null,
-          expectedSalaryMax: vis['expectations'] !== false ? p.expectedSalaryMax : null,
+          expectedSalaryMin: vis['expectations'] !== false && p.expectedSalaryMin != null ? Number(p.expectedSalaryMin) : null,
+          expectedSalaryMax: vis['expectations'] !== false && p.expectedSalaryMax != null ? Number(p.expectedSalaryMax) : null,
           salaryCurrency: vis['expectations'] !== false ? p.salaryCurrency : null,
           workMode: vis['expectations'] !== false ? p.workMode : null,
           expectedCulture: vis['expectations'] !== false ? p.expectedCulture : null,
