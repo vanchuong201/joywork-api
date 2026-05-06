@@ -1,11 +1,20 @@
+# syntax=docker/dockerfile:1
+
 # ---------- Builder stage ----------
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
+# Resilient installs when registry or network is flaky (e.g. CI Docker builds)
+RUN npm config set fetch-retries 5 \
+  && npm config set fetch-retry-mintimeout 20000 \
+  && npm config set fetch-retry-maxtimeout 120000 \
+  && npm config set fetch-timeout 300000
+
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+  npm ci
 
 # Generate Prisma client
 COPY prisma ./prisma
@@ -28,8 +37,14 @@ WORKDIR /app
 ENV NODE_ENV=development
 ENV PORT=4000
 
+RUN npm config set fetch-retries 5 \
+  && npm config set fetch-retry-mintimeout 20000 \
+  && npm config set fetch-retry-maxtimeout 120000 \
+  && npm config set fetch-timeout 300000
+
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+  npm ci
 
 COPY prisma ./prisma
 RUN npm run db:generate
