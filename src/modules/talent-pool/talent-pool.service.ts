@@ -609,34 +609,36 @@ export class TalentPoolService {
       });
     }
 
-    // Salary filter: match if candidate expected salary range overlaps with filter range
+    // Salary filter: overlap với khoảng lọc, hoặc ứng viên không khai báo lương (thỏa thuận → khớp mọi lọc).
     // Overlap: candidate.salaryMin <= filter.salaryMax AND candidate.salaryMax >= filter.salaryMin
     if (salaryMin !== undefined || salaryMax !== undefined) {
-      const salaryCondition: Prisma.UserWhereInput = {
+      const negotiableSalary: Prisma.UserWhereInput = {
+        profile: {
+          AND: [{ expectedSalaryMin: null }, { expectedSalaryMax: null }],
+        },
+      };
+      const statedSalaryOverlap: Prisma.UserWhereInput = {
         profile: {
           AND: [
-            // Candidate must have at least one salary value set
             {
               OR: [
                 { expectedSalaryMin: { not: null } },
                 { expectedSalaryMax: { not: null } },
               ],
             },
-            // Overlap condition: candidate range overlaps with filter range
-            // candidate.salaryMin <= filter.salaryMax
             ...(salaryMax !== undefined
               ? [{ expectedSalaryMin: { lte: salaryMax } }]
               : []),
-            // candidate.salaryMax >= filter.salaryMin
             ...(salaryMin !== undefined
               ? [{ expectedSalaryMax: { gte: salaryMin } }]
               : []),
-            // Currency match if specified
             ...(salaryCurrency ? [{ salaryCurrency }] : []),
           ],
         },
       };
-      conditions.push(salaryCondition);
+      conditions.push({
+        OR: [negotiableSalary, statedSalaryOverlap],
+      });
     }
 
     if (conditions.length > 0) {

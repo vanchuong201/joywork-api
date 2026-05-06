@@ -118,7 +118,17 @@ export class CvFlipService {
     const vndConditions = buildRangeConditions(vndRange);
     const usdConditions = buildRangeConditions(usdRange);
 
-    return {
+    // Không khai báo mức lương mong muốn → coi như thỏa thuận, khớp mọi khoảng lọc lương.
+    const negotiableSalary: Prisma.UserWhereInput = {
+      profile: {
+        is: {
+          expectedSalaryMin: null,
+          expectedSalaryMax: null,
+        },
+      },
+    };
+
+    const statedSalaryRange: Prisma.UserWhereInput = {
       OR: [
         {
           profile: {
@@ -145,6 +155,10 @@ export class CvFlipService {
           },
         },
       ],
+    };
+
+    return {
+      OR: [negotiableSalary, statedSalaryRange],
     };
   }
 
