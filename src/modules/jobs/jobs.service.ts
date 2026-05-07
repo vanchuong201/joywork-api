@@ -1048,7 +1048,7 @@ export class JobsService {
     });
 
     if (existingApplication) {
-      throw new AppError('Bạn đã ứng tuyển cho việc làm này', 409, 'ALREADY_APPLIED');
+      throw new AppError('Lỗi: Bạn đã từng ứng tuyển cho vị trí này rồi', 409, 'ALREADY_APPLIED');
     }
 
     const applicant = await prisma.user.findUnique({
