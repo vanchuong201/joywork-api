@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PROVINCE_BY_CODE } from '@/shared/provinces';
 import { WARD_BY_CODE, WARD_CODE_PATTERN } from '@/shared/wards';
+import { TIME_PATTERN, WORKING_DAYS, WORKING_DAY_INDEX } from '@/shared/working-time';
 
 const locationCodeSchema = z
   .string()
@@ -11,6 +12,26 @@ const wardCodeSchema = z
   .string()
   .regex(WARD_CODE_PATTERN, 'Invalid ward code format')
   .refine((code) => WARD_BY_CODE.has(code), 'Unknown ward code');
+
+const workingTimeRangeSchema = z
+  .object({
+    dayFrom: z.enum(WORKING_DAYS),
+    dayTo: z.enum(WORKING_DAYS),
+    timeStart: z.string().regex(TIME_PATTERN, 'Định dạng giờ không hợp lệ (HH:mm)'),
+    timeEnd: z.string().regex(TIME_PATTERN, 'Định dạng giờ không hợp lệ (HH:mm)'),
+  })
+  .refine(
+    (range) => WORKING_DAY_INDEX[range.dayFrom] <= WORKING_DAY_INDEX[range.dayTo],
+    'Ngày bắt đầu phải đứng trước hoặc bằng ngày kết thúc',
+  )
+  .refine((range) => range.timeStart < range.timeEnd, 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc');
+
+const workingTimeRangesSchema = z
+  .array(workingTimeRangeSchema)
+  .max(7, 'Tối đa 7 dòng thời gian làm việc');
+const workingTimeNoteSchema = z
+  .string()
+  .max(1000, 'Ghi chú thời gian làm việc tối đa 1000 ký tự');
 
 // Create job schema - Standard JD format
 export const createJobSchema = z.object({
@@ -51,6 +72,10 @@ export const createJobSchema = z.object({
   benefitsIncome: z.string().max(200, 'Thu nhập must be less than 200 characters').optional(),
   benefitsPerks: z.string().max(2000, 'Phúc lợi must be less than 2000 characters').optional(),
   contact: z.string().max(500, 'Thông tin liên hệ must be less than 500 characters').optional(),
+
+  // Working time
+  workingTimeRanges: workingTimeRangesSchema.optional(),
+  workingTimeNote: workingTimeNoteSchema.optional(),
 });
 
 // Update job schema - Standard JD format
@@ -92,6 +117,10 @@ export const updateJobSchema = z.object({
   benefitsIncome: z.string().max(200, 'Thu nhập must be less than 200 characters').optional().nullable(),
   benefitsPerks: z.string().max(2000, 'Phúc lợi must be less than 2000 characters').optional().nullable(),
   contact: z.string().max(500, 'Thông tin liên hệ must be less than 500 characters').optional().nullable(),
+
+  // Working time
+  workingTimeRanges: workingTimeRangesSchema.optional().nullable(),
+  workingTimeNote: workingTimeNoteSchema.optional().nullable(),
 });
 
 // Get job schema
@@ -120,6 +149,11 @@ export const searchJobsSchema = z.object({
   skills: z.string().optional(), // Comma-separated skills
   companyId: z.string().cuid('Invalid company ID').optional(),
   isActive: z.coerce.boolean().optional(),
+  // Saturday working filter
+  // WORK = JD ghi rõ làm thứ 7
+  // REST = JD ghi rõ nghỉ thứ 7 (có khai báo thời gian nhưng không bao gồm thứ 7)
+  // UNSPECIFIED = JD chưa khai báo thời gian làm việc
+  worksOnSaturday: z.enum(['WORK', 'REST', 'UNSPECIFIED']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });
