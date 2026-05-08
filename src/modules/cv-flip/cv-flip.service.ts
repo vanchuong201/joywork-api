@@ -107,10 +107,10 @@ export class CvFlipService {
     const buildRangeConditions = (range: { min: number | undefined; max: number | undefined }): Prisma.UserProfileWhereInput[] => {
       const conditions: Prisma.UserProfileWhereInput[] = [];
       if (range.min !== undefined) {
-        conditions.push({ expectedSalaryMax: { gte: Math.floor(range.min) } });
+        conditions.push({ expectedSalaryMax: { gte: BigInt(Math.floor(range.min)) } });
       }
       if (range.max !== undefined) {
-        conditions.push({ expectedSalaryMin: { lte: Math.ceil(range.max) } });
+        conditions.push({ expectedSalaryMin: { lte: BigInt(Math.ceil(range.max)) } });
       }
       return conditions;
     };
