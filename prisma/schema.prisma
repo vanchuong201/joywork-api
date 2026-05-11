@@ -578,6 +578,11 @@ model Job {
   benefitsPerks  String? @db.Text // "9. Quyền lợi - Phúc lợi" - markdown/rich text
   contact        String? // Thông tin liên hệ - plain text
 
+  // Working time
+  workingTimeRanges Json?   // [{ dayFrom: 'MON'..'SUN', dayTo, timeStart: 'HH:mm', timeEnd: 'HH:mm' }]
+  workingTimeNote   String? @db.Text // Ghi chú thời gian làm việc (tự do)
+  worksOnSaturday   Boolean? // Derived: null=unspecified, true=working Saturday, false=resting Saturday
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   reminderSentAt DateTime?
@@ -589,6 +594,7 @@ model Job {
   PostJob      PostJob[]
 
   @@index([slug])
+  @@index([worksOnSaturday])
   @@map("jobs")
 }
 

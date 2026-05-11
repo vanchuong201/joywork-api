@@ -8,6 +8,7 @@ import { emailService } from '@/shared/services/email.service';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
 import { slugifyVietnamese } from '@/shared/job-slug';
+import { computeWorksOnSaturday, type WorkingTimeRange } from '@/shared/working-time';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -190,6 +191,12 @@ export class JobsService {
       benefitsIncome: data.benefitsIncome ?? null,
       benefitsPerks: data.benefitsPerks ?? null,
       contact: data.contact ?? null,
+      // Working time
+      workingTimeRanges: data.workingTimeRanges && data.workingTimeRanges.length > 0
+        ? (data.workingTimeRanges as Prisma.InputJsonValue)
+        : null,
+      workingTimeNote: data.workingTimeNote?.trim() ? data.workingTimeNote.trim() : null,
+      worksOnSaturday: computeWorksOnSaturday(data.workingTimeRanges as WorkingTimeRange[] | undefined),
     };
     
     const job = await prisma.job.create({
@@ -261,6 +268,9 @@ export class JobsService {
     if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
     if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
+    if (job.workingTimeRanges) result.workingTimeRanges = job.workingTimeRanges;
+    if (job.workingTimeNote) result.workingTimeNote = job.workingTimeNote;
+    if (job.worksOnSaturday !== null) result.worksOnSaturday = job.worksOnSaturday;
     
     return result;
   }
@@ -356,6 +366,22 @@ export class JobsService {
     if (data.benefitsPerks !== undefined) updateData.benefitsPerks = data.benefitsPerks ?? null;
     if (data.contact !== undefined) updateData.contact = data.contact ?? null;
     if (data.specificAddress !== undefined) updateData.specificAddress = data.specificAddress ?? null;
+
+    // Working time
+    if (data.workingTimeRanges !== undefined) {
+      const ranges = data.workingTimeRanges ?? null;
+      const hasRanges = Array.isArray(ranges) && ranges.length > 0;
+      updateData.workingTimeRanges = hasRanges
+        ? (ranges as Prisma.InputJsonValue)
+        : Prisma.JsonNull;
+      updateData.worksOnSaturday = computeWorksOnSaturday(
+        hasRanges ? (ranges as WorkingTimeRange[]) : null,
+      );
+    }
+    if (data.workingTimeNote !== undefined) {
+      const note = data.workingTimeNote?.trim();
+      updateData.workingTimeNote = note ? note : null;
+    }
     
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
@@ -427,6 +453,9 @@ export class JobsService {
     if (updatedJob.benefitsPerks) result.benefitsPerks = updatedJob.benefitsPerks;
     if (updatedJob.contact) result.contact = updatedJob.contact;
     if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
+    if (updatedJob.workingTimeRanges) result.workingTimeRanges = updatedJob.workingTimeRanges;
+    if (updatedJob.workingTimeNote) result.workingTimeNote = updatedJob.workingTimeNote;
+    if (updatedJob.worksOnSaturday !== null) result.worksOnSaturday = updatedJob.worksOnSaturday;
     
     return result;
   }
@@ -555,6 +584,9 @@ export class JobsService {
     if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
     if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
+    if (job.workingTimeRanges) result.workingTimeRanges = job.workingTimeRanges;
+    if (job.workingTimeNote) result.workingTimeNote = job.workingTimeNote;
+    if (job.worksOnSaturday !== null) result.worksOnSaturday = job.worksOnSaturday;
     
     return result;
   }
@@ -748,6 +780,9 @@ export class JobsService {
       if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
       if (job.contact) result.contact = job.contact;
       if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
+      if (job.workingTimeRanges) result.workingTimeRanges = job.workingTimeRanges;
+      if (job.workingTimeNote) result.workingTimeNote = job.workingTimeNote;
+      if (job.worksOnSaturday !== null) result.worksOnSaturday = job.worksOnSaturday;
 
       return result;
     });
@@ -763,7 +798,7 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, educationLevel, gender, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive, page, limit } = data;
+    const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, educationLevel, gender, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive, worksOnSaturday, page, limit } = data;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -898,6 +933,16 @@ export class JobsService {
       where.companyId = companyId;
     }
 
+    if (worksOnSaturday) {
+      if (worksOnSaturday === 'WORK') {
+        where.worksOnSaturday = true;
+      } else if (worksOnSaturday === 'REST') {
+        where.worksOnSaturday = false;
+      } else if (worksOnSaturday === 'UNSPECIFIED') {
+        where.worksOnSaturday = null;
+      }
+    }
+
     // Get jobs with pagination
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
@@ -994,6 +1039,9 @@ export class JobsService {
       if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
       if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
+      if (job.workingTimeRanges) jobResult.workingTimeRanges = job.workingTimeRanges;
+      if (job.workingTimeNote) jobResult.workingTimeNote = job.workingTimeNote;
+      if (job.worksOnSaturday !== null) jobResult.worksOnSaturday = job.worksOnSaturday;
       
       jobsWithApplications.push(jobResult);
     }
