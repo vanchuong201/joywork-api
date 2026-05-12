@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PROVINCE_BY_CODE } from '@/shared/provinces';
 import { WARD_BY_CODE, WARD_CODE_PATTERN } from '@/shared/wards';
+import { COMPANY_SIZE_BANDS, isCompanySizeBand, normalizeCompanySize } from '@/shared/company-size';
 
 const metricSchema = z.object({
   id: z.string().optional(),
@@ -57,11 +58,31 @@ const trainingProgramSchema = z.object({
 const trainingSectionSchema = z.object({
   description: z.string().max(5000, 'Training/introduction description must be less than 5000 characters').optional(),
   image: z.string().url('Invalid training/introduction image URL').optional(),
-  workforceSize: z.string().max(120, 'Workforce size must be less than 120 characters').optional(),
+  /**
+   * @deprecated The canonical workforce size lives on `companies.size`. The field is still
+   * accepted here for backward compatibility with older clients; the service layer mirrors it
+   * onto `companies.size` and removes it from the stored profile JSON.
+   */
+  workforceSize: z.string().max(20, 'Workforce size must be less than 20 characters').optional(),
   // Keep for backward compatibility with old payloads
   budget: z.string().max(120, 'Training budget must be less than 120 characters').optional(),
   programs: z.array(trainingProgramSchema).optional(),
 });
+
+/**
+ * Accepts the canonical band strings (e.g. "0-10", "1000+"), gracefully normalizes spaced
+ * variants ("0 - 10") and legacy enum values (STARTUP, SMALL, …) into the matching band,
+ * and rejects anything else.
+ */
+const companySizeBandSchema = z
+  .preprocess((val) => {
+    if (val === '' || val == null) return undefined;
+    if (typeof val !== 'string') return val;
+    return normalizeCompanySize(val) ?? undefined;
+  }, z.string().refine(isCompanySizeBand, {
+    message: `Size must be one of: ${COMPANY_SIZE_BANDS.join(', ')}`,
+  }))
+  .optional();
 
 // Helper để chấp nhận empty string hoặc null cho các trường optional
 // Nếu là empty string hoặc null thì không validate format, nếu có giá trị thì validate
@@ -119,7 +140,7 @@ const baseCompanySchema = {
   email: optionalEmail(),
   phone: optionalString(50),
   industry: optionalString(200),
-  size: z.string().max(20, 'Size must be less than 20 characters').optional(),
+  size: companySizeBandSchema,
   foundedYear: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
   headcount: z.number().int().min(1, 'Headcount must be a positive number').max(200000, 'Headcount is unrealistically high').optional(),
   headcountNote: z.string().max(200, 'Headcount note must be less than 200 characters').optional(),
@@ -179,7 +200,7 @@ export const searchCompaniesSchema = z.object({
     .regex(/^[a-z0-9-]+$/, 'Invalid location code format')
     .refine((code) => PROVINCE_BY_CODE.has(code), 'Unknown location code')
     .optional(),
-  size: z.string().max(20).optional(),
+  size: companySizeBandSchema,
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });

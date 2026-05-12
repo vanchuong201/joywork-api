@@ -1,0 +1,37 @@
+-- Update application status workflow:
+-- RECEIVED -> SUITABLE -> INTERVIEW_SCHEDULED -> OFFER_SENT -> HIRED / NOT_SUITABLE
+CREATE TYPE "ApplicationStatus_new" AS ENUM (
+  'RECEIVED',
+  'SUITABLE',
+  'INTERVIEW_SCHEDULED',
+  'OFFER_SENT',
+  'HIRED',
+  'NOT_SUITABLE'
+);
+
+ALTER TABLE "applications"
+  ALTER COLUMN "status" DROP DEFAULT;
+
+ALTER TABLE "applications"
+  ALTER COLUMN "status" TYPE "ApplicationStatus_new"
+  USING (
+    CASE "status"::text
+      WHEN 'PENDING' THEN 'RECEIVED'
+      WHEN 'REVIEWING' THEN 'SUITABLE'
+      WHEN 'SHORTLISTED' THEN 'INTERVIEW_SCHEDULED'
+      WHEN 'REJECTED' THEN 'NOT_SUITABLE'
+      WHEN 'HIRED' THEN 'HIRED'
+      WHEN 'RECEIVED' THEN 'RECEIVED'
+      WHEN 'SUITABLE' THEN 'SUITABLE'
+      WHEN 'INTERVIEW_SCHEDULED' THEN 'INTERVIEW_SCHEDULED'
+      WHEN 'OFFER_SENT' THEN 'OFFER_SENT'
+      WHEN 'NOT_SUITABLE' THEN 'NOT_SUITABLE'
+      ELSE 'RECEIVED'
+    END
+  )::"ApplicationStatus_new";
+
+DROP TYPE "ApplicationStatus";
+ALTER TYPE "ApplicationStatus_new" RENAME TO "ApplicationStatus";
+
+ALTER TABLE "applications"
+  ALTER COLUMN "status" SET DEFAULT 'RECEIVED';

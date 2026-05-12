@@ -62,7 +62,7 @@ Company {
   slug: "joywork-tech"
   description: "Platform connecting good companies with right people"
   industry: "Technology"
-  size: "STARTUP"
+  size: "10-30"
   location: "Ho Chi Minh City"
   website: "https://joywork.vn"
 }

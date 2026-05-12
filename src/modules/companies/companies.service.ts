@@ -20,6 +20,7 @@ import {
   CreatePostFromStatementInput,
   CompanyShowcaseQueryInput,
 } from './companies.schema';
+import { normalizeCompanySize } from '@/shared/company-size';
 import { PostsService } from '@/modules/posts/posts.service';
 import crypto from 'crypto';
 import { emailService } from '@/shared/services/email.service';
@@ -777,17 +778,42 @@ export class CompaniesService {
         cleanData['sectionVisibility'] = normalizedVisibility;
     }
 
-    const profile = await prisma.companyProfile.upsert({
-        where: { companyId },
-        create: {
-            companyId,
-            ...(cleanData as any)
-        },
-        update: {
-            ...(cleanData as any),
-            updatedAt: new Date()
+    // Workforce size lives on companies.size (canonical). If the incoming training payload
+    // still carries the deprecated workforceSize, mirror it to the company row and drop the
+    // duplicate JSON key so the two sources cannot drift in the future.
+    let mirroredSize: string | null | undefined;
+    const trainingPayload = cleanData['training'];
+    if (trainingPayload && typeof trainingPayload === 'object') {
+        const trainingObj = trainingPayload as Record<string, unknown>;
+        if ('workforceSize' in trainingObj) {
+            const rawWorkforce = trainingObj['workforceSize'];
+            mirroredSize =
+                typeof rawWorkforce === 'string' ? normalizeCompanySize(rawWorkforce) : null;
+            delete trainingObj['workforceSize'];
         }
-    });
+    }
+
+    const [profile] = await prisma.$transaction([
+        prisma.companyProfile.upsert({
+            where: { companyId },
+            create: {
+                companyId,
+                ...(cleanData as any),
+            },
+            update: {
+                ...(cleanData as any),
+                updatedAt: new Date(),
+            },
+        }),
+        ...(mirroredSize !== undefined
+            ? [
+                prisma.company.update({
+                    where: { id: companyId },
+                    data: { size: mirroredSize },
+                }),
+            ]
+            : []),
+    ]);
 
     return profile;
   }

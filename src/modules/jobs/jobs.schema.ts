@@ -169,7 +169,7 @@ export const applyJobSchema = z.object({
 export const getApplicationsSchema = z.object({
   jobId: z.string().cuid('Invalid job ID').optional(),
   companyId: z.string().cuid('Invalid company ID').optional(),
-  status: z.enum(['PENDING', 'REVIEWING', 'SHORTLISTED', 'REJECTED', 'HIRED']).optional(),
+  status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });
@@ -177,13 +177,13 @@ export const getApplicationsSchema = z.object({
 // Update application status schema
 export const updateApplicationStatusSchema = z.object({
   applicationId: z.string().cuid('Invalid application ID'),
-  status: z.enum(['PENDING', 'REVIEWING', 'SHORTLISTED', 'REJECTED', 'HIRED']),
+  status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']),
   notes: z.string().max(1000, 'Notes must be less than 1000 characters').optional(),
 });
 
 // Get my applications schema
 export const getMyApplicationsSchema = z.object({
-  status: z.enum(['PENDING', 'REVIEWING', 'SHORTLISTED', 'REJECTED', 'HIRED']).optional(),
+  status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });

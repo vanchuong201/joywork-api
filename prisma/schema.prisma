@@ -654,7 +654,7 @@ model Application {
   id          String            @id @default(cuid())
   jobId       String
   userId      String
-  status      ApplicationStatus @default(PENDING)
+  status      ApplicationStatus @default(RECEIVED)
   coverLetter String?
   resumeUrl   String?
   notes       String?
@@ -671,10 +671,11 @@ model Application {
 }
 
 enum ApplicationStatus {
-  PENDING
-  REVIEWING
-  SHORTLISTED
-  REJECTED
+  RECEIVED
+  SUITABLE
+  INTERVIEW_SCHEDULED
+  OFFER_SENT
+  NOT_SUITABLE
   HIRED
 }
 

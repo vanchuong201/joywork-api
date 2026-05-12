@@ -55,11 +55,12 @@ export interface Job {
 }
 
 const APPLICATION_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Đang chờ',
-  REVIEWING: 'Đang xem xét',
-  SHORTLISTED: 'Đã shortlist',
-  REJECTED: 'Từ chối',
-  HIRED: 'Đã tuyển',
+  RECEIVED: 'Tiếp nhận',
+  SUITABLE: 'Phù hợp',
+  INTERVIEW_SCHEDULED: 'Hẹn phỏng vấn',
+  OFFER_SENT: 'Gửi đề nghị',
+  HIRED: 'Nhận việc',
+  NOT_SUITABLE: 'Chưa phù hợp',
 };
 
 export interface JobWithApplication extends Job {
@@ -1115,7 +1116,7 @@ export class JobsService {
         jobId: data.jobId,
         coverLetter: data.coverLetter ?? null,
         resumeUrl: data.resumeUrl ?? null,
-        status: 'PENDING',
+        status: 'RECEIVED',
       },
     });
 

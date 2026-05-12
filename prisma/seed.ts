@@ -57,7 +57,14 @@ async function main() {
     "Logistics",
   ];
   const locations = ["Hanoi", "Ho Chi Minh", "Da Nang", "Remote", "Hybrid HN", "Hybrid HCM"];
-  const companySizes = ["STARTUP", "SMALL", "MEDIUM", "LARGE", "ENTERPRISE"] as const;
+  const companySizes = [
+    "10-30",
+    "30-50",
+    "100-150",
+    "300-500",
+    "500-700",
+    "1000+",
+  ] as const;
   const employmentTypes = Object.values(EmploymentType);
   const experienceLevels = Object.values(ExperienceLevel);
 
@@ -154,7 +161,7 @@ async function main() {
         website: `https://www.${slug}.com`,
         location: sample(locations),
         industry: sample(industries),
-        size: sample(companySizes) as any,
+        size: sample(companySizes),
         foundedYear: 2000 + randInt(0, 24),
         isVerified: Math.random() < 0.35,
       },

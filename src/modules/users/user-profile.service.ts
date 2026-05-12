@@ -73,7 +73,7 @@ export class UserProfileService {
     const hasAppliedToCompany = await prisma.application.findFirst({
       where: {
         userId: profileUserId,
-        status: { not: 'REJECTED' },
+        status: { not: 'NOT_SUITABLE' },
         job: { companyId: cid },
       },
       select: { id: true },

@@ -8,6 +8,7 @@ import {
   resolveProvinceCode,
 } from '@/shared/provinces';
 import { slugify } from '@/shared/slug';
+import { normalizeCompanySize, isCompanySizeBand } from '@/shared/company-size';
 
 // ── Types ──
 
@@ -576,6 +577,9 @@ export async function importCompaniesAndJobs(
           const locationDisplayName =
             locationCode != null ? (getProvinceNameByCode(locationCode) ?? null) : null;
 
+          const normalizedSize = normalizeCompanySize(company.size);
+          const sizeForStorage = isCompanySizeBand(normalizedSize) ? normalizedSize : null;
+
           const created = await tx.company.create({
             data: {
               name: company.name,
@@ -589,7 +593,7 @@ export async function importCompaniesAndJobs(
               email: company.email ?? null,
               phone: company.phone ?? null,
               industry: company.industry ?? null,
-              size: company.size ?? null,
+              size: sizeForStorage,
               foundedYear: company.foundedYear ?? null,
             },
           });
@@ -602,14 +606,12 @@ export async function importCompaniesAndJobs(
             },
           });
 
-          const hasIntroTraining =
-            company.description ||
-            company.size ||
-            company.introductionImageUrl;
+          // companies.size is the canonical workforce-size source, so do not duplicate it
+          // inside the profile JSON. The introduction section reads from companies.size.
+          const hasIntroTraining = company.description || company.introductionImageUrl;
           const trainingJson: Prisma.InputJsonValue = {
             programs: [],
             ...(company.description ? { description: company.description } : {}),
-            ...(company.size ? { workforceSize: company.size } : {}),
             ...(company.introductionImageUrl ? { image: company.introductionImageUrl } : {}),
           };
 

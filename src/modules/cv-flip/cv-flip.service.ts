@@ -620,7 +620,7 @@ export class CvFlipService {
         const application = await prisma.application.findFirst({
           where: {
             userId: candidate.id,
-            status: { not: 'REJECTED' },
+            status: { not: 'NOT_SUITABLE' },
             job: { companyId: normalizedCompanyId },
           },
           select: { id: true },

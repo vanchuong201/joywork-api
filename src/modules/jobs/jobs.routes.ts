@@ -630,9 +630,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         properties: {
           jobId: { type: 'string', description: 'Filter by job ID' },
           companyId: { type: 'string', description: 'Filter by company ID' },
-          status: { 
-            type: 'string', 
-            enum: ['PENDING', 'REVIEWING', 'SHORTLISTED', 'REJECTED', 'HIRED'],
+          status: {
+            type: 'string',
+            enum: ['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE'],
             description: 'Filter by application status'
           },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
@@ -733,9 +733,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         type: 'object',
         required: ['status'],
         properties: {
-          status: { 
-            type: 'string', 
-            enum: ['PENDING', 'REVIEWING', 'SHORTLISTED', 'REJECTED', 'HIRED'],
+          status: {
+            type: 'string',
+            enum: ['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE'],
             description: 'New application status'
           },
           notes: { type: 'string', maxLength: 1000, description: 'Notes about the application' },
@@ -767,9 +767,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
-          status: { 
-            type: 'string', 
-            enum: ['PENDING', 'REVIEWING', 'SHORTLISTED', 'REJECTED', 'HIRED'],
+          status: {
+            type: 'string',
+            enum: ['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE'],
             description: 'Filter by application status'
           },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },

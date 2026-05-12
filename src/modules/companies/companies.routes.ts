@@ -99,10 +99,24 @@ export async function companiesRoutes(fastify: FastifyInstance) {
           email: { type: 'string', format: 'email', maxLength: 200, description: 'Company contact email' },
           phone: { type: 'string', minLength: 8, maxLength: 50, description: 'Company contact phone' },
           industry: { type: 'string', maxLength: 200, description: 'Company industry' },
-          size: { 
-            type: 'string', 
-            enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
-            description: 'Company size'
+          size: {
+            type: 'string',
+            enum: [
+              '0-10',
+              '10-30',
+              '30-50',
+              '50-70',
+              '70-100',
+              '100-150',
+              '150-200',
+              '200-300',
+              '300-500',
+              '500-700',
+              '700-1000',
+              '1000+',
+              '2000+',
+            ],
+            description: 'Company headcount band (canonical workforce size)',
           },
           foundedYear: { 
             type: 'number', 
@@ -642,10 +656,24 @@ export async function companiesRoutes(fastify: FastifyInstance) {
           q: { type: 'string', description: 'Search query' },
           industry: { type: 'string', description: 'Filter by industry' },
           location: { type: 'string', description: 'Filter by location' },
-          size: { 
-            type: 'string', 
-            enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
-            description: 'Filter by company size'
+          size: {
+            type: 'string',
+            enum: [
+              '0-10',
+              '10-30',
+              '30-50',
+              '50-70',
+              '70-100',
+              '100-150',
+              '150-200',
+              '200-300',
+              '300-500',
+              '500-700',
+              '700-1000',
+              '1000+',
+              '2000+',
+            ],
+            description: 'Filter by company headcount band',
           },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
@@ -859,16 +887,41 @@ export async function companiesRoutes(fastify: FastifyInstance) {
           email: { type: ['string', 'null'], description: 'Company contact email (empty string or null allowed)' },
           phone: { type: ['string', 'null'], maxLength: 50, description: 'Company contact phone number' },
           industry: { type: 'string', maxLength: 200, description: 'Company industry' },
-          size: { 
-            type: 'string', 
-            enum: ['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'],
-            description: 'Company size'
+          size: {
+            type: 'string',
+            enum: [
+              '0-10',
+              '10-30',
+              '30-50',
+              '50-70',
+              '70-100',
+              '100-150',
+              '150-200',
+              '200-300',
+              '300-500',
+              '500-700',
+              '700-1000',
+              '1000+',
+              '2000+',
+            ],
+            description: 'Company headcount band (canonical workforce size)',
           },
           foundedYear: { 
             type: 'number', 
             minimum: 1800, 
             maximum: 2025,
             description: 'Year company was founded'
+          },
+          headcount: {
+            type: 'number',
+            minimum: 1,
+            maximum: 200000,
+            description: 'Approximate exact headcount (internal/reporting)',
+          },
+          headcountNote: {
+            type: 'string',
+            maxLength: 200,
+            description: 'Additional note for headcount',
           },
         },
       },
