@@ -59,6 +59,9 @@ const envSchema = z.object({
   FACEBOOK_CLIENT_ID: z.string().optional(),
   FACEBOOK_CLIENT_SECRET: z.string().optional(),
 
+  // Elasticsearch (optional — search falls back to Prisma if unset)
+  ELASTICSEARCH_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+
   // JoyWork Support Company ID (allows support tickets even if user is a member)
   JOYWORK_COMPANY_ID: z.string().optional(),
   // Lark webhook for company verification notifications
