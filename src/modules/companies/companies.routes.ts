@@ -85,7 +85,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
-        required: ['name', 'slug', 'legalName'],
+        required: ['name', 'slug', 'legalName', 'email', 'phone'],
         properties: {
           name: { type: 'string', minLength: 2, description: 'Company name' },
           legalName: { type: 'string', minLength: 2, maxLength: 200, description: 'Registered business name' },
@@ -96,6 +96,8 @@ export async function companiesRoutes(fastify: FastifyInstance) {
           coverUrl: { type: 'string', format: 'uri', description: 'Company cover image URL' },
           website: { type: 'string', format: 'uri', description: 'Company website URL' },
           location: { type: 'string', maxLength: 120, description: 'Company location' },
+          email: { type: 'string', format: 'email', maxLength: 200, description: 'Company contact email' },
+          phone: { type: 'string', minLength: 8, maxLength: 50, description: 'Company contact phone' },
           industry: { type: 'string', maxLength: 200, description: 'Company industry' },
           size: { 
             type: 'string', 
