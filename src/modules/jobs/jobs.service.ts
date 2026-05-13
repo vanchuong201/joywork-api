@@ -8,6 +8,9 @@ import { emailService } from '@/shared/services/email.service';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
 import { slugifyVietnamese } from '@/shared/job-slug';
+import { isElasticsearchEnabled } from '@/shared/search/elasticsearch';
+import { searchIndexService } from '@/shared/search/search-index.service';
+import { searchQueryService } from '@/shared/search/search-query.service';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -249,6 +252,8 @@ export class JobsService {
       attitude: job.attitude,
     };
     
+    await searchIndexService.indexJob(job.id);
+
     // Optional fields
     if (job.salaryMin !== null) result.salaryMin = job.salaryMin;
     if (job.salaryMax !== null) result.salaryMax = job.salaryMax;
@@ -427,6 +432,8 @@ export class JobsService {
     if (updatedJob.benefitsPerks) result.benefitsPerks = updatedJob.benefitsPerks;
     if (updatedJob.contact) result.contact = updatedJob.contact;
     if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
+
+    await searchIndexService.indexJob(updatedJob.id);
     
     return result;
   }
@@ -463,6 +470,8 @@ export class JobsService {
       where: { id: jobId },
       data: refreshData as Prisma.JobUncheckedUpdateInput,
     });
+
+    await searchIndexService.indexJob(jobId);
   }
 
   // Get job by ID
@@ -898,32 +907,63 @@ export class JobsService {
       where.companyId = companyId;
     }
 
-    // Get jobs with pagination
-    const [jobs, total] = await Promise.all([
-      prisma.job.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              legalName: true,
-              slug: true,
-              logoUrl: true,
+    let jobs;
+    let total;
+
+    if (isElasticsearchEnabled()) {
+      const searchResult = await searchQueryService.searchJobs({ q, location, ward, remote, employmentType, experienceLevel, jobLevel, educationLevel, gender, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive: where.isActive, page, limit });
+      const jobIds = searchResult.ids;
+      const order = new Map(jobIds.map((id, index) => [id, index]));
+
+      jobs = jobIds.length > 0
+        ? (await prisma.job.findMany({
+          where: { id: { in: jobIds } },
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                legalName: true,
+                slug: true,
+                logoUrl: true,
+              },
+            },
+            _count: {
+              select: {
+                applications: true,
+              },
             },
           },
-          _count: {
-            select: {
-              applications: true,
+        })).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+        : [];
+      total = searchResult.total;
+    } else {
+      [jobs, total] = await Promise.all([
+        prisma.job.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                legalName: true,
+                slug: true,
+                logoUrl: true,
+              },
+            },
+            _count: {
+              select: {
+                applications: true,
+              },
             },
           },
-        },
-      }),
-      prisma.job.count({ where }),
-    ]);
+        }),
+        prisma.job.count({ where }),
+      ]);
+    }
 
     const totalPages = Math.ceil(total / limit);
 
@@ -1080,6 +1120,7 @@ export class JobsService {
       where: { id: job.id },
       data: interactionData as Prisma.JobUncheckedUpdateInput,
     });
+    await searchIndexService.indexJob(job.id);
 
     const companyAdmins = await prisma.companyMember.findMany({
       where: {
@@ -1628,5 +1669,7 @@ export class JobsService {
     await prisma.job.delete({
       where: { id: jobId },
     });
+
+    await searchIndexService.deleteJob(jobId);
   }
 }

@@ -26,6 +26,9 @@ import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { buildS3ObjectUrl, getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
+import { isElasticsearchEnabled } from '@/shared/search/elasticsearch';
+import { searchIndexService } from '@/shared/search/search-index.service';
+import { searchQueryService } from '@/shared/search/search-query.service';
 
 export interface Company {
   id: string;
@@ -300,6 +303,8 @@ export class CompaniesService {
         data: { companyId: company.id }
     });
 
+    await searchIndexService.indexCompany(company.id);
+
     return {
       id: company.id,
       name: company.name,
@@ -556,6 +561,8 @@ export class CompaniesService {
       }
     }
 
+    await searchIndexService.indexCompany(company.id);
+
     return {
       id: company.id,
       name: company.name,
@@ -789,6 +796,8 @@ export class CompaniesService {
         }
     });
 
+    await searchIndexService.indexCompany(companyId);
+
     return profile;
   }
 
@@ -831,16 +840,30 @@ export class CompaniesService {
       where.size = size;
     }
 
-    // Get companies with pagination
-    const [companies, total] = await Promise.all([
-      prisma.company.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.company.count({ where }),
-    ]);
+    let companies;
+    let total;
+
+    if (isElasticsearchEnabled()) {
+      const searchResult = await searchQueryService.searchCompanies({ q, industry, location, size, page, limit });
+      const companyIds = searchResult.ids;
+      const order = new Map(companyIds.map((id, index) => [id, index]));
+
+      companies = companyIds.length > 0
+        ? (await prisma.company.findMany({ where: { id: { in: companyIds } } }))
+          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+        : [];
+      total = searchResult.total;
+    } else {
+      [companies, total] = await Promise.all([
+        prisma.company.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.company.count({ where }),
+      ]);
+    }
 
     const totalPages = Math.ceil(total / limit);
 

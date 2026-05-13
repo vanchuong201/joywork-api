@@ -17,6 +17,7 @@ import {
   s3Client,
 } from '@/shared/storage/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { searchIndexService } from '@/shared/search/search-index.service';
 import crypto from 'crypto';
 import type {
   AdminCompaniesQuery,
@@ -390,6 +391,7 @@ export class SystemService {
           accountStatus: true,
         },
       });
+      await searchIndexService.indexCandidate(updated.id);
       return updated;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
@@ -711,6 +713,8 @@ export class SystemService {
         updatedAt: new Date(),
       },
     });
+
+    await searchIndexService.indexCompany(company.id);
 
     return {
       id: company.id,
@@ -1373,6 +1377,8 @@ export class SystemService {
       },
     });
 
+    await searchIndexService.indexJob(updated.id);
+
     return {
       id: updated.id,
       reminderSentAt: updated.reminderSentAt as Date,
@@ -1391,6 +1397,7 @@ export class SystemService {
           isActive: true,
         },
       });
+      await searchIndexService.indexJob(updated.id);
       return updated;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -1402,17 +1409,25 @@ export class SystemService {
 
   async closeExpiredJobsByAdmin(): Promise<{ closedCount: number }> {
     const twentyDaysAgo = subtractDays(new Date(), 20);
-    const result = await prisma.job.updateMany({
+    const expiredJobs = await prisma.job.findMany({
       where: {
         isActive: true,
         updatedAt: {
           lt: twentyDaysAgo,
         },
       },
+      select: { id: true },
+    });
+    const result = await prisma.job.updateMany({
+      where: {
+        id: { in: expiredJobs.map((job) => job.id) },
+      },
       data: {
         isActive: false,
       },
     });
+
+    await Promise.all(expiredJobs.map((job) => searchIndexService.indexJob(job.id)));
 
     return { closedCount: result.count };
   }
@@ -1650,6 +1665,8 @@ export class SystemService {
       // Don't throw - email failure shouldn't block the approval
     }
 
+    await searchIndexService.indexCompany(company.id);
+
     return company;
   }
 
@@ -1703,6 +1720,8 @@ export class SystemService {
       console.error('Failed to send verification rejected email', error);
       // Don't throw - email failure shouldn't block the rejection
     }
+
+    await searchIndexService.indexCompany(company.id);
 
     return company;
   }

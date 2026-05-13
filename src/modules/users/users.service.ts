@@ -2,6 +2,9 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
+import { isElasticsearchEnabled } from '@/shared/search/elasticsearch';
+import { searchIndexService } from '@/shared/search/search-index.service';
+import { searchQueryService } from '@/shared/search/search-query.service';
 import {
   UpdateProfileInput,
   SearchUsersInput,
@@ -146,6 +149,8 @@ export class UsersService {
       },
     });
 
+    await searchIndexService.indexCandidate(userId);
+
     const updated = await this.getUserProfile(userId);
 
     if (!updated) {
@@ -198,19 +203,37 @@ export class UsersService {
       };
     }
 
-    // Get users with pagination
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        include: {
-          profile: true,
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.user.count({ where }),
-    ]);
+    let users;
+    let total;
+
+    if (isElasticsearchEnabled()) {
+      const searchResult = await searchQueryService.searchCandidates({ q, skills, location, page, limit });
+      const userIds = searchResult.ids;
+      const order = new Map(userIds.map((id, index) => [id, index]));
+
+      users = userIds.length > 0
+        ? (await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          include: {
+            profile: true,
+          },
+        })).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+        : [];
+      total = searchResult.total;
+    } else {
+      [users, total] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          include: {
+            profile: true,
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.user.count({ where }),
+      ]);
+    }
 
     const totalPages = Math.ceil(total / limit);
 

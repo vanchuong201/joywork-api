@@ -2,6 +2,7 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { ExperienceInput } from './users.schema';
 import { removeUndefined } from '@/shared/utils';
+import { searchIndexService } from '@/shared/search/search-index.service';
 
 export class UserExperienceService {
   // Get all experiences for a user
@@ -27,7 +28,7 @@ export class UserExperienceService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    return await prisma.userExperience.create({
+    const result = await prisma.userExperience.create({
       data: {
         userId,
         role: data.role,
@@ -40,6 +41,10 @@ export class UserExperienceService {
         order: data.order,
       },
     });
+
+    await searchIndexService.indexCandidate(userId);
+
+    return result;
   }
 
   // Update experience
@@ -60,10 +65,14 @@ export class UserExperienceService {
 
     const cleanData = removeUndefined(data);
 
-    return await prisma.userExperience.update({
+    const result = await prisma.userExperience.update({
       where: { id: experienceId },
       data: cleanData as any,
     });
+
+    await searchIndexService.indexCandidate(userId);
+
+    return result;
   }
 
   // Delete experience
@@ -85,6 +94,8 @@ export class UserExperienceService {
     await prisma.userExperience.delete({
       where: { id: experienceId },
     });
+
+    await searchIndexService.indexCandidate(userId);
 
     return { success: true };
   }

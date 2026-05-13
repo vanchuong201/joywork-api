@@ -2,6 +2,7 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { EducationInput } from './users.schema';
 import { removeUndefined } from '@/shared/utils';
+import { searchIndexService } from '@/shared/search/search-index.service';
 
 export class UserEducationService {
   // Get all educations for a user
@@ -27,7 +28,7 @@ export class UserEducationService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    return await prisma.userEducation.create({
+    const result = await prisma.userEducation.create({
       data: {
         userId,
         school: data.school,
@@ -40,6 +41,10 @@ export class UserEducationService {
         order: data.order,
       },
     });
+
+    await searchIndexService.indexCandidate(userId);
+
+    return result;
   }
 
   // Update education
@@ -60,10 +65,14 @@ export class UserEducationService {
 
     const cleanData = removeUndefined(data);
 
-    return await prisma.userEducation.update({
+    const result = await prisma.userEducation.update({
       where: { id: educationId },
       data: cleanData as any,
     });
+
+    await searchIndexService.indexCandidate(userId);
+
+    return result;
   }
 
   // Delete education
@@ -85,6 +94,8 @@ export class UserEducationService {
     await prisma.userEducation.delete({
       where: { id: educationId },
     });
+
+    await searchIndexService.indexCandidate(userId);
 
     return { success: true };
   }
