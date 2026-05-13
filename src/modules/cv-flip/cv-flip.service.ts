@@ -238,6 +238,7 @@ export class CvFlipService {
           select: {
             id: true,
             name: true,
+            legalName: true,
             slug: true,
             logoUrl: true,
             featureEntitlements: {
@@ -258,6 +259,7 @@ export class CvFlipService {
         return {
           id: item.company.id,
           name: item.company.name,
+          legalName: item.company.legalName,
           slug: item.company.slug,
           logoUrl: item.company.logoUrl,
           role: item.role,
