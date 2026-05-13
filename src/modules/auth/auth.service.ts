@@ -6,6 +6,7 @@ import { prisma } from '@/shared/database/prisma';
 import { config } from '@/config/env';
 import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
+import { searchIndexService } from '@/shared/search/search-index.service';
 import { generateSlug, ensureUniqueSlug } from '../users/user-profile.service';
 import {
   RegisterInput,
@@ -86,6 +87,8 @@ export class AuthService {
         yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
       },
     });
+
+    await searchIndexService.indexCandidate(user.id);
 
     // Generate verification token
     const verificationToken = randomUUID();

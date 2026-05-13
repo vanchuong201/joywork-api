@@ -38,6 +38,15 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().min(1, 'AWS_SECRET_ACCESS_KEY is required'),
   AWS_REGION: z.string().default('ap-southeast-1'),
   AWS_S3_BUCKET: z.string().min(1, 'AWS_S3_BUCKET is required'),
+
+  // Elasticsearch search engine
+  ELASTICSEARCH_ENABLED: z.coerce.boolean().default(false),
+  ELASTICSEARCH_NODE: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  ELASTICSEARCH_USERNAME: z.preprocess(emptyToUndefined, z.string().optional()),
+  ELASTICSEARCH_PASSWORD: z.preprocess(emptyToUndefined, z.string().optional()),
+  ELASTICSEARCH_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  ELASTICSEARCH_INDEX_PREFIX: z.string().default('joywork'),
+  ELASTICSEARCH_REFRESH_ON_WRITE: z.coerce.boolean().default(false),
   
   // Email (AWS SES via SMTP)
   SMTP_HOST: z.string().optional(),

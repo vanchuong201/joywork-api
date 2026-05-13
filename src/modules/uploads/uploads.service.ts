@@ -17,6 +17,7 @@ import {
 } from './uploads.schema';
 import { config } from '@/config/env';
 import { emailService } from '@/shared/services/email.service';
+import { searchIndexService } from '@/shared/search/search-index.service';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
@@ -455,6 +456,7 @@ export class UploadsService {
         select: { id: true, avatar: true },
       });
       console.log(`[Upload] Updated User.avatar for userId=${userId}, avatar=${updated.avatar}`);
+      await searchIndexService.indexCandidate(userId);
     } else {
       // Update or create profile
       const updated = await prisma.userProfile.upsert({
@@ -468,6 +470,7 @@ export class UploadsService {
         select: { id: true, userId: true, avatar: true },
       });
       console.log(`[Upload] Updated UserProfile.avatar for userId=${userId}, avatar=${updated.avatar}`);
+      await searchIndexService.indexCandidate(userId);
     }
 
     return {
@@ -585,6 +588,7 @@ export class UploadsService {
         where: { id: companyId },
         data: { logoUrl: buildS3ObjectUrl(key) },
       });
+      await searchIndexService.indexCompany(companyId);
 
     } catch (error) {
       console.error('Failed to upload company logo to S3 or update DB', error);
@@ -650,6 +654,7 @@ export class UploadsService {
         where: { id: companyId },
         data: { coverUrl: buildS3ObjectUrl(key) },
       });
+      await searchIndexService.indexCompany(companyId);
 
     } catch (error) {
       console.error('Failed to upload company cover to S3 or update DB', error);
@@ -739,6 +744,7 @@ export class UploadsService {
       select: { id: true, userId: true, cvUrl: true },
     });
     console.log(`[Upload] Updated UserProfile.cvUrl for userId=${userId}, cvUrl=${updated.cvUrl}`);
+    await searchIndexService.indexCandidate(userId);
 
     return {
       key,

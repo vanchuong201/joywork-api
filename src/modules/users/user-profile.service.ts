@@ -3,6 +3,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
 import { slugify } from '@/shared/slug';
+import { searchIndexService } from '@/shared/search/search-index.service';
 import {
   UpdateProfileInput,
 } from './users.schema';
@@ -564,6 +565,8 @@ export class UserProfileService {
         ...profileData,
       },
     });
+
+    await searchIndexService.indexCandidate(userId);
 
     return await this.getOwnProfile(userId);
   }
