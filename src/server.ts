@@ -6,6 +6,7 @@ import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { initializeProvinceRegistry } from '@/shared/provinces';
 import { initializeWardRegistry, isWardRegistryTableMissing } from '@/shared/wards';
+import { initializeIndices } from '@/shared/elasticsearch/indices';
 
 async function start() {
   try {
@@ -18,6 +19,13 @@ async function start() {
       console.warn(
         '⚠️  Bảng ward_registry chưa có trên DB. Chạy: npx prisma migrate deploy — sau đó npm run db:seed:wards nếu cần danh sách phường/xã.',
       );
+    }
+
+    // Initialize Elasticsearch indices (non-blocking — falls back to Prisma if unavailable)
+    try {
+      await initializeIndices();
+    } catch (err) {
+      console.warn('⚠️  Elasticsearch initialization failed — search will use Prisma fallback:', err);
     }
 
     // Create Fastify app

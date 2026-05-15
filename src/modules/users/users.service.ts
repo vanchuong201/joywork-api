@@ -6,6 +6,9 @@ import {
   UpdateProfileInput,
   SearchUsersInput,
 } from './users.schema';
+import { getEsClient } from '@/shared/elasticsearch/client';
+import { USERS_INDEX } from '@/shared/elasticsearch/indices';
+import { syncUserToEs } from '@/shared/elasticsearch/sync';
 
 export interface UserProfile {
   id: string;
@@ -152,6 +155,16 @@ export class UsersService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
+    // Sync to Elasticsearch (fire-and-forget)
+    const userForEs = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, name: true, email: true, slug: true, createdAt: true,
+        profile: { select: { headline: true, bio: true, skills: true, locations: true, isPublic: true, isSearchingJob: true } },
+      },
+    });
+    if (userForEs) void syncUserToEs(userForEs);
+
     return updated;
   }
 
@@ -165,6 +178,45 @@ export class UsersService {
       totalPages: number;
     };
   }> {
+    // Try Elasticsearch first for text queries
+    if (data.q) {
+      try {
+        const ids = await this.searchUsersInEs(data);
+        if (ids !== null) {
+          if (ids.length === 0) {
+            return { users: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
+          }
+          const users = await prisma.user.findMany({ where: { id: { in: ids } }, include: { profile: true } });
+          const userMap = new Map(users.map(u => [u.id, u]));
+          const ordered = ids.map(id => userMap.get(id)).filter(Boolean) as typeof users;
+          return {
+            users: ordered.map(user => {
+              const result: any = { id: user.id, role: user.role, createdAt: user.createdAt };
+              if (user.name) result.name = user.name;
+              if (user.profile) {
+                result.profile = {
+                  id: user.profile.id, userId: user.profile.userId,
+                  skills: user.profile.skills, createdAt: user.profile.createdAt, updatedAt: user.profile.updatedAt,
+                };
+                if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
+                if (user.profile.headline) result.profile.headline = user.profile.headline;
+                if (user.profile.bio) result.profile.bio = user.profile.bio;
+                result.profile.locations = user.profile.locations;
+                result.profile.wardCodes = user.profile.wardCodes;
+                if (user.profile.locations.length > 0) {
+                  result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
+                }
+              }
+              return result;
+            }),
+            pagination: { page: data.page, limit: data.limit, total: ids.length, totalPages: Math.ceil(ids.length / data.limit) },
+          };
+        }
+      } catch (err) {
+        console.warn('[ES] User search failed, falling back to Prisma:', err);
+      }
+    }
+
     const { q, skills, location, page, limit } = data;
     const skip = (page - 1) * limit;
 
@@ -296,5 +348,49 @@ export class UsersService {
     }
     
     return result;
+  }
+
+  // ─── Elasticsearch search helpers ─────────────────────────────────────────
+
+  private async searchUsersInEs(data: SearchUsersInput): Promise<string[] | null> {
+    const client = getEsClient();
+    if (!client) return null;
+
+    const must: object[] = [];
+    const filter: object[] = [];
+
+    if (data.q) {
+      must.push({
+        multi_match: {
+          query: data.q,
+          fields: ['name^3', 'headline^2', 'bio', 'email'],
+          type: 'best_fields',
+          fuzziness: 'AUTO',
+        },
+      });
+    }
+
+    if (data.skills) {
+      const skillArray = data.skills.split(',').map((s: string) => s.trim());
+      filter.push({ terms: { profileSkills: skillArray } });
+    }
+
+    if (data.location) {
+      const code = resolveProvinceCode(data.location) ?? data.location;
+      filter.push({ term: { profileLocations: code } });
+    }
+
+    const response = await client.search({
+      index: USERS_INDEX,
+      query: { bool: { must, filter } },
+      _source: ['id'],
+      size: data.limit,
+      from: (data.page - 1) * data.limit,
+      sort: must.length > 0
+        ? [{ _score: { order: 'desc' } }, { createdAt: { order: 'desc' } }]
+        : [{ createdAt: { order: 'desc' } }],
+    });
+
+    return (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
   }
 }

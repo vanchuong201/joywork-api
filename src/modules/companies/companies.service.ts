@@ -8,6 +8,9 @@ import {
   resolveProvinceCodeForWardCheck,
 } from '@/shared/provinces';
 import { assertWardsBelongToProvinces } from '@/shared/wards';
+import { getEsClient } from '@/shared/elasticsearch/client';
+import { COMPANIES_INDEX } from '@/shared/elasticsearch/indices';
+import { syncCompanyToEs } from '@/shared/elasticsearch/sync';
 import {
   CreateCompanyInput,
   UpdateCompanyInput,
@@ -300,7 +303,7 @@ export class CompaniesService {
         data: { companyId: company.id }
     });
 
-    return {
+    const result = {
       id: company.id,
       name: company.name,
       legalName: company.legalName,
@@ -333,6 +336,16 @@ export class CompaniesService {
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
     };
+
+    // Sync to Elasticsearch (fire-and-forget)
+    void syncCompanyToEs({
+      id: company.id, slug: company.slug, name: company.name, legalName: company.legalName,
+      tagline: company.tagline, description: company.description,
+      industry: company.industry, location: company.location, size: company.size,
+      isVerified: company.isVerified, createdAt: company.createdAt,
+    });
+
+    return result;
   }
 
   // List followers of a company (members only)
@@ -556,7 +569,7 @@ export class CompaniesService {
       }
     }
 
-    return {
+    const result = {
       id: company.id,
       name: company.name,
       legalName: company.legalName,
@@ -582,6 +595,16 @@ export class CompaniesService {
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
     };
+
+    // Sync to Elasticsearch (fire-and-forget)
+    void syncCompanyToEs({
+      id: company.id, slug: company.slug, name: company.name, legalName: company.legalName,
+      tagline: company.tagline, description: company.description,
+      industry: company.industry, location: company.location, size: company.size,
+      isVerified: company.isVerified, createdAt: company.createdAt,
+    });
+
+    return result;
   }
 
   // Get company by ID (for support tickets)
@@ -802,6 +825,42 @@ export class CompaniesService {
       totalPages: number;
     };
   }> {
+    // Try Elasticsearch first for text queries
+    if (data.q) {
+      try {
+        const ids = await this.searchCompaniesInEs(data);
+        if (ids !== null) {
+          if (ids.length === 0) {
+            return { companies: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
+          }
+          const companies = await prisma.company.findMany({ where: { id: { in: ids } } });
+          const companyMap = new Map(companies.map(c => [c.id, c]));
+          const ordered = ids.map(id => companyMap.get(id)).filter(Boolean) as typeof companies;
+          return {
+            companies: ordered.map(company => ({
+              id: company.id, name: company.name, legalName: company.legalName, slug: company.slug,
+              ...(company.tagline != null ? { tagline: company.tagline } : {}),
+              ...(company.description != null ? { description: company.description } : {}),
+              ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+              ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
+              ...(company.website != null ? { website: company.website } : {}),
+              ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
+              ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
+              ...(company.email != null ? { email: company.email } : {}),
+              ...(company.phone != null ? { phone: company.phone } : {}),
+              ...(company.industry != null ? { industry: company.industry } : {}),
+              ...(company.size != null ? { size: company.size } : {}),
+              ...(company.foundedYear != null ? { foundedYear: company.foundedYear } : {}),
+              isVerified: company.isVerified, createdAt: company.createdAt, updatedAt: company.updatedAt,
+            })),
+            pagination: { page: data.page, limit: data.limit, total: ids.length, totalPages: Math.ceil(ids.length / data.limit) },
+          };
+        }
+      } catch (err) {
+        console.warn('[ES] Company search failed, falling back to Prisma:', err);
+      }
+    }
+
     const { q, industry, location, size, page, limit } = data;
     const skip = (page - 1) * limit;
 
@@ -2129,5 +2188,47 @@ export class CompaniesService {
     });
 
     return updatedPost;
+  }
+
+  // ─── Elasticsearch search helpers ─────────────────────────────────────────
+
+  private async searchCompaniesInEs(data: SearchCompaniesInput): Promise<string[] | null> {
+    const client = getEsClient();
+    if (!client) return null;
+
+    const must: object[] = [];
+    const filter: object[] = [];
+
+    if (data.q) {
+      must.push({
+        multi_match: {
+          query: data.q,
+          fields: ['name^3', 'legalName^2', 'tagline', 'description'],
+          type: 'best_fields',
+          fuzziness: 'AUTO',
+        },
+      });
+    }
+
+    if (data.industry) filter.push({ term: { industry: data.industry } });
+    if (data.size) filter.push({ term: { size: data.size } });
+
+    if (data.location) {
+      const code = resolveProvinceCode(data.location) ?? data.location;
+      filter.push({ term: { location: code } });
+    }
+
+    const response = await client.search({
+      index: COMPANIES_INDEX,
+      query: { bool: { must, filter } },
+      _source: ['id'],
+      size: data.limit,
+      from: (data.page - 1) * data.limit,
+      sort: must.length > 0
+        ? [{ _score: { order: 'desc' } }, { createdAt: { order: 'desc' } }]
+        : [{ createdAt: { order: 'desc' } }],
+    });
+
+    return (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
   }
 }

@@ -4,6 +4,9 @@ import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
+import { getEsClient } from '@/shared/elasticsearch/client';
+import { JOBS_INDEX } from '@/shared/elasticsearch/indices';
+import { syncJobToEs, deleteJobFromEs } from '@/shared/elasticsearch/sync';
 import { emailService } from '@/shared/services/email.service';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
@@ -261,7 +264,21 @@ export class JobsService {
     if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
     if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
-    
+
+    // Sync to Elasticsearch (fire-and-forget)
+    void syncJobToEs({
+      id: job.id, companyId: job.companyId, slug: job.slug,
+      title: job.title, generalInfo: job.generalInfo, mission: job.mission,
+      tasks: job.tasks, knowledge: job.knowledge, skills: job.skills, attitude: job.attitude,
+      locations: job.locations, wardCodes: job.wardCodes,
+      remote: job.remote, isActive: job.isActive,
+      employmentType: job.employmentType, experienceLevel: job.experienceLevel,
+      jobLevel: job.jobLevel, educationLevel: job.educationLevel, gender: job.gender,
+      salaryMin: job.salaryMin, salaryMax: job.salaryMax, currency: job.currency,
+      tags: job.tags, applicationDeadline: job.applicationDeadline,
+      createdAt: job.createdAt, updatedAt: job.updatedAt,
+    });
+
     return result;
   }
 
@@ -427,7 +444,21 @@ export class JobsService {
     if (updatedJob.benefitsPerks) result.benefitsPerks = updatedJob.benefitsPerks;
     if (updatedJob.contact) result.contact = updatedJob.contact;
     if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
-    
+
+    // Sync to Elasticsearch (fire-and-forget)
+    void syncJobToEs({
+      id: updatedJob.id, companyId: updatedJob.companyId, slug: updatedJob.slug,
+      title: updatedJob.title, generalInfo: updatedJob.generalInfo, mission: updatedJob.mission,
+      tasks: updatedJob.tasks, knowledge: updatedJob.knowledge, skills: updatedJob.skills,
+      attitude: updatedJob.attitude, locations: updatedJob.locations, wardCodes: updatedJob.wardCodes,
+      remote: updatedJob.remote, isActive: updatedJob.isActive,
+      employmentType: updatedJob.employmentType, experienceLevel: updatedJob.experienceLevel,
+      jobLevel: updatedJob.jobLevel, educationLevel: updatedJob.educationLevel, gender: updatedJob.gender,
+      salaryMin: updatedJob.salaryMin, salaryMax: updatedJob.salaryMax, currency: updatedJob.currency,
+      tags: updatedJob.tags, applicationDeadline: updatedJob.applicationDeadline,
+      createdAt: updatedJob.createdAt, updatedAt: updatedJob.updatedAt,
+    });
+
     return result;
   }
 
@@ -763,6 +794,18 @@ export class JobsService {
       totalPages: number;
     };
   }> {
+    // Try Elasticsearch first for text/skills queries
+    if (data.q || data.skills) {
+      try {
+        const ids = await this.searchJobsInEs(data);
+        if (ids !== null) {
+          return await this.fetchJobsByIds(ids, data.page, data.limit, userId);
+        }
+      } catch (err) {
+        console.warn('[ES] Job search failed, falling back to Prisma:', err);
+      }
+    }
+
     const { q, location, ward, remote, employmentType, experienceLevel, jobLevel, educationLevel, gender, salaryMin, salaryMax, salaryCurrency, skills, companyId, isActive, page, limit } = data;
     const skip = (page - 1) * limit;
 
@@ -1628,5 +1671,172 @@ export class JobsService {
     await prisma.job.delete({
       where: { id: jobId },
     });
+
+    // Remove from Elasticsearch (fire-and-forget)
+    void deleteJobFromEs(jobId);
+  }
+
+  // ─── Elasticsearch search helpers ─────────────────────────────────────────
+
+  private async searchJobsInEs(data: SearchJobsInput): Promise<string[] | null> {
+    const client = getEsClient();
+    if (!client) return null;
+
+    const must: object[] = [];
+    const filter: object[] = [];
+
+    if (data.q) {
+      must.push({
+        multi_match: {
+          query: data.q,
+          fields: ['title^3', 'skills^2', 'generalInfo', 'mission', 'tasks', 'knowledge', 'attitude'],
+          type: 'best_fields',
+          fuzziness: 'AUTO',
+        },
+      });
+    }
+
+    if (data.skills) {
+      const skillTerms = data.skills.split(',').map((s: string) => s.trim()).join(' ');
+      must.push({
+        multi_match: {
+          query: skillTerms,
+          fields: ['skills^3', 'knowledge', 'tasks'],
+          type: 'best_fields',
+        },
+      });
+    }
+
+    const activeFilter = data.isActive !== undefined ? data.isActive : (data.companyId ? undefined : true);
+    if (activeFilter !== undefined) filter.push({ term: { isActive: activeFilter } });
+    if (data.remote !== undefined) filter.push({ term: { remote: data.remote } });
+    if (data.employmentType) filter.push({ term: { employmentType: data.employmentType } });
+    if (data.experienceLevel) filter.push({ term: { experienceLevel: data.experienceLevel } });
+    if (data.companyId) filter.push({ term: { companyId: data.companyId } });
+
+    if (data.location) {
+      const code = resolveProvinceCode(data.location) ?? data.location;
+      filter.push({ term: { locations: code } });
+    }
+    if (data.ward) filter.push({ term: { wardCodes: data.ward } });
+
+    const buildNullableFilter = (field: string, value: string): object => ({
+      bool: {
+        should: [
+          { term: { [field]: value } },
+          { bool: { must_not: { exists: { field } } } },
+        ],
+        minimum_should_match: 1,
+      },
+    });
+    if (data.jobLevel) filter.push(buildNullableFilter('jobLevel', data.jobLevel));
+    if (data.educationLevel) filter.push(buildNullableFilter('educationLevel', data.educationLevel));
+    if (data.gender) filter.push(buildNullableFilter('gender', data.gender));
+
+    if (data.salaryMin !== undefined || data.salaryMax !== undefined) {
+      const overlapMust: object[] = [];
+      if (data.salaryMin !== undefined) overlapMust.push({ range: { salaryMax: { gte: data.salaryMin } } });
+      if (data.salaryMax !== undefined) overlapMust.push({ range: { salaryMin: { lte: data.salaryMax } } });
+      if (data.salaryCurrency) overlapMust.push({ term: { currency: data.salaryCurrency } });
+
+      filter.push({
+        bool: {
+          should: [
+            // Jobs without salary set match all salary filters
+            { bool: { must_not: [{ exists: { field: 'salaryMin' } }, { exists: { field: 'salaryMax' } }] } },
+            // Jobs with overlapping range
+            { bool: { must: overlapMust } },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
+
+    const response = await client.search({
+      index: JOBS_INDEX,
+      query: { bool: { must, filter } },
+      _source: ['id'],
+      size: data.limit,
+      from: (data.page - 1) * data.limit,
+      sort: must.length > 0
+        ? [{ _score: { order: 'desc' } }, { createdAt: { order: 'desc' } }]
+        : [{ createdAt: { order: 'desc' } }],
+    });
+
+    return (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
+  }
+
+  private async fetchJobsByIds(
+    ids: string[],
+    page: number,
+    limit: number,
+    userId?: string,
+  ): Promise<{ jobs: JobWithApplication[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+    if (ids.length === 0) {
+      return { jobs: [], pagination: { page, limit, total: 0, totalPages: 0 } };
+    }
+
+    const jobs = await prisma.job.findMany({
+      where: { id: { in: ids } },
+      include: {
+        company: {
+          select: { id: true, name: true, legalName: true, slug: true, logoUrl: true },
+        },
+        _count: { select: { applications: true } },
+      },
+    });
+
+    // Restore ES relevance order
+    const jobMap = new Map(jobs.map(j => [j.id, j]));
+    const orderedJobs = ids.map(id => jobMap.get(id)).filter(Boolean) as typeof jobs;
+
+    const jobsWithApplications: JobWithApplication[] = [];
+    for (const job of orderedJobs) {
+      let hasApplied = false;
+      if (userId) {
+        const application = await prisma.application.findUnique({
+          where: { userId_jobId: { userId, jobId: job.id } },
+        });
+        hasApplied = !!application;
+      }
+
+      const jobResult: any = {
+        id: job.id, companyId: job.companyId, title: job.title, slug: job.slug,
+        locations: job.locations, wardCodes: job.wardCodes, specificAddress: job.specificAddress,
+        ...(job.locations.length > 0 ? { location: getProvinceNameByCode(job.locations[0]) ?? job.locations[0] } : {}),
+        remote: job.remote, currency: job.currency,
+        employmentType: job.employmentType, experienceLevel: job.experienceLevel,
+        tags: job.tags, isActive: job.isActive,
+        createdAt: job.createdAt, updatedAt: job.updatedAt,
+        company: {
+          id: job.company.id, name: job.company.name,
+          ...(job.company.legalName ? { legalName: job.company.legalName } : {}),
+          slug: job.company.slug,
+        },
+        _count: job._count, hasApplied,
+        department: job.department, jobLevel: job.jobLevel, educationLevel: job.educationLevel, gender: job.gender,
+        generalInfo: job.generalInfo, mission: job.mission, tasks: job.tasks,
+        knowledge: job.knowledge, skills: job.skills, attitude: job.attitude,
+      };
+
+      if (job.salaryMin !== null) jobResult.salaryMin = job.salaryMin;
+      if (job.salaryMax !== null) jobResult.salaryMax = job.salaryMax;
+      if (job.applicationDeadline) jobResult.applicationDeadline = job.applicationDeadline;
+      if (job.kpis) jobResult.kpis = job.kpis;
+      if (job.authority) jobResult.authority = job.authority;
+      if (job.relationships) jobResult.relationships = job.relationships;
+      if (job.careerPath) jobResult.careerPath = job.careerPath;
+      if (job.benefitsIncome) jobResult.benefitsIncome = job.benefitsIncome;
+      if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
+      if (job.contact) jobResult.contact = job.contact;
+      if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
+
+      jobsWithApplications.push(jobResult);
+    }
+
+    return {
+      jobs: jobsWithApplications,
+      pagination: { page, limit, total: ids.length, totalPages: Math.ceil(ids.length / limit) },
+    };
   }
 }
