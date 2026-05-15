@@ -60,12 +60,12 @@ const envSchema = z.object({
   FACEBOOK_CLIENT_SECRET: z.string().optional(),
 
   // Elasticsearch (optional — search falls back to Prisma if unset)
-  ELASTICSEARCH_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  ELASTICSEARCH_URL: z.preprocess(emptyToUndefined, z.url().optional()),
 
   // JoyWork Support Company ID (allows support tickets even if user is a member)
   JOYWORK_COMPANY_ID: z.string().optional(),
   // Lark webhook for company verification notifications
-  LARK_COMPANY_VERIFICATION_WEBHOOK: z.string().url().default('https://open.larksuite.com/open-apis/bot/v2/hook/9e14fa1a-7a41-412b-9763-eec3bea6f245'),
+  LARK_COMPANY_VERIFICATION_WEBHOOK: z.url().default('https://open.larksuite.com/open-apis/bot/v2/hook/9e14fa1a-7a41-412b-9763-eec3bea6f245'),
 });
 
 export const config = envSchema.parse(process.env);
