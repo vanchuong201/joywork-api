@@ -51,6 +51,7 @@ model User {
   cvFlipFlippedBy         CvFlipConnection[]       @relation("CvFlipFlippedBy")
   cvFlipRequestsReceived  CvFlipRequest[]          @relation("CvFlipRequestTarget")
   cvFlipRequestsSent      CvFlipRequest[]          @relation("CvFlipRequester")
+  cvImportJobs            CvImportJob[]
 
   // Talent Pool
   talentPoolMember          TalentPoolMember?        @relation("TalentPoolMemberUser")
@@ -1132,6 +1133,46 @@ model CvFlipUsage {
 
   @@unique([companyId, month, year])
   @@map("cv_flip_usages")
+}
+
+// =========================
+// CV Import / Autofill
+// =========================
+
+enum CvImportStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  APPLIED
+}
+
+/// Lưu trạng thái parse CV của ứng viên: từ lúc tạo job, parse text, đến khi user apply
+/// vào hồ sơ JW. Cho phép preview/diff trước khi ghi đè dữ liệu profile.
+model CvImportJob {
+  id              String         @id @default(cuid())
+  userId          String
+  sourceCvUrl     String?
+  sourceKey       String?
+  fileName        String?
+  fileType        String?
+  status          CvImportStatus @default(PENDING)
+  parsedData      Json?
+  warnings        Json?
+  confidence      Float?
+  applyMode       String?
+  appliedSections String[]       @default([])
+  snapshotBefore  Json?
+  errorCode       String?
+  errorMessage    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  appliedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("cv_import_jobs")
 }
 
 model ProvinceRegistry {
