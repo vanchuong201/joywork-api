@@ -6,7 +6,7 @@ import { parsedCvSchema } from '../cv-imports.schema';
 import type { CvParserInput, CvParserProvider, CvParserResult } from './cv-parser.provider';
 
 const SYSTEM_PROMPT = `Bạn là trợ lý trích xuất dữ liệu từ CV ứng viên.
-Mục tiêu: chuyển nội dung CV thành JSON theo schema JoyWork để hệ thống tự gợi ý hồ sơ.
+Mục tiêu: chuyển nội dung CV thành JSON theo schema JOYWORK để hệ thống tự gợi ý hồ sơ.
 
 Quy tắc tuyệt đối:
 - CHỈ trả về JSON hợp lệ, không thêm markdown, không thêm bình luận.

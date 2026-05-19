@@ -257,7 +257,7 @@ export class CvImportsService {
       sourceKey = extractS3KeyFromPublicObjectUrl(cvUrl);
       if (!sourceKey) {
         throw new AppError(
-          'CV không thuộc hệ thống JoyWork. Vui lòng upload lại file qua trang hồ sơ.',
+          'CV không thuộc hệ thống JOYWORK. Vui lòng upload lại file qua trang hồ sơ.',
           400,
           'CV_IMPORT_INVALID_SOURCE'
         );
