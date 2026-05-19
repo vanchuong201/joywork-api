@@ -1,6 +1,8 @@
 import { AppError } from '@/shared/errors/errorHandler';
 import { config } from '@/config/env';
-import { parsedCvSchema, type ParsedCv } from '../cv-imports.schema';
+import { normalizeAiParsedCvPayload } from '../cv-import-normalize';
+import type { ZodError } from 'zod';
+import { parsedCvSchema } from '../cv-imports.schema';
 import type { CvParserInput, CvParserProvider, CvParserResult } from './cv-parser.provider';
 
 const SYSTEM_PROMPT = `Bạn là trợ lý trích xuất dữ liệu từ CV ứng viên.
@@ -102,7 +104,71 @@ export class OpenAiCvParserProvider implements CvParserProvider {
 
   async parse(input: CvParserInput): Promise<CvParserResult> {
     const userPrompt = this.buildUserPrompt(input);
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ];
 
+    let lastValidationIssue: string | undefined;
+    let totalUsage: NonNullable<CvParserResult['usage']> = {};
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { payload, text } = await this.requestCompletion(messages);
+      const json = tryParseJson(text);
+
+      if (!json || typeof json !== 'object') {
+        if (attempt === 0) {
+          messages.push({
+            role: 'user',
+            content:
+              'Lần trước bạn không trả JSON hợp lệ. Chỉ trả một object JSON duy nhất, không markdown, không giải thích.',
+          });
+          continue;
+        }
+        throw new AppError('CV không thể đọc được, vui lòng thử CV khác', 422, 'CV_IMPORT_PARSE_INVALID_JSON');
+      }
+
+      const normalized = normalizeAiParsedCvPayload(json);
+      const result = parsedCvSchema.safeParse(normalized);
+
+      if (result.success) {
+        const usage = this.mergeUsage(totalUsage, payload.usage);
+        return {
+          parsed: result.data,
+          modelId: this.model,
+          usage,
+        };
+      }
+
+      lastValidationIssue = summarizeZodIssue(result.error);
+      if (attempt === 0) {
+        messages.push({
+          role: 'user',
+          content: [
+            'JSON trước đó không đúng kiểu dữ liệu. Trả lại JSON với các quy tắc:',
+            '- gender chỉ được MALE, FEMALE, OTHER hoặc null',
+            '- yearOfBirth, expectedSalaryMin/Max là number (không phải string)',
+            '- skills/knowledge/attitude/careerGoals là mảng string',
+            '- linkedin/github/website phải là URL đầy đủ (có https://) hoặc null',
+            '- salaryCurrency chỉ VND hoặc USD',
+            lastValidationIssue ? `Gợi ý lỗi: ${lastValidationIssue}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        });
+      }
+    }
+
+    throw new AppError(
+      'Không thể đọc CV ổn định. Vui lòng thử lại sau vài giây.',
+      422,
+      'CV_IMPORT_PARSE_INVALID_SHAPE'
+    );
+  }
+
+  private async requestCompletion(
+    messages: Array<{ role: 'system' | 'user'; content: string }>
+  ): Promise<{ payload: OpenAiResponse; text: string }> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -113,10 +179,7 @@ export class OpenAiCvParserProvider implements CvParserProvider {
         model: this.model,
         temperature: 0,
         response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
+        messages,
       }),
     });
 
@@ -139,30 +202,24 @@ export class OpenAiCvParserProvider implements CvParserProvider {
     }
 
     const payload = (await response.json()) as OpenAiResponse;
-    const text = extractAssistantText(payload);
-    const json = tryParseJson(text);
+    return { payload, text: extractAssistantText(payload) };
+  }
 
-    if (!json || typeof json !== 'object') {
-      throw new AppError('CV không thể đọc được, vui lòng thử CV khác', 422, 'CV_IMPORT_PARSE_INVALID_JSON');
+  private mergeUsage(
+    acc: NonNullable<CvParserResult['usage']>,
+    usage?: OpenAiUsage
+  ): NonNullable<CvParserResult['usage']> {
+    const next = { ...acc };
+    if (typeof usage?.prompt_tokens === 'number') {
+      next.promptTokens = (next.promptTokens ?? 0) + usage.prompt_tokens;
     }
-
-    const result = parsedCvSchema.safeParse(json);
-    if (!result.success) {
-      throw new AppError('Dữ liệu trích xuất không hợp lệ', 422, 'CV_IMPORT_PARSE_INVALID_SHAPE', result.error.flatten());
+    if (typeof usage?.completion_tokens === 'number') {
+      next.completionTokens = (next.completionTokens ?? 0) + usage.completion_tokens;
     }
-
-    const parsed: ParsedCv = result.data;
-
-    const usage: NonNullable<CvParserResult['usage']> = {};
-    if (typeof payload.usage?.prompt_tokens === 'number') usage.promptTokens = payload.usage.prompt_tokens;
-    if (typeof payload.usage?.completion_tokens === 'number') usage.completionTokens = payload.usage.completion_tokens;
-    if (typeof payload.usage?.total_tokens === 'number') usage.totalTokens = payload.usage.total_tokens;
-
-    return {
-      parsed,
-      modelId: this.model,
-      usage,
-    };
+    if (typeof usage?.total_tokens === 'number') {
+      next.totalTokens = (next.totalTokens ?? 0) + usage.total_tokens;
+    }
+    return next;
   }
 
   private buildUserPrompt(input: CvParserInput): string {
@@ -176,4 +233,11 @@ export class OpenAiCvParserProvider implements CvParserProvider {
       '----- CV TEXT END -----',
     ].join('\n');
   }
+}
+
+function summarizeZodIssue(error: ZodError): string {
+  const first = error.issues[0];
+  if (!first) return 'schema mismatch';
+  const path = first.path.length > 0 ? first.path.map(String).join('.') : 'root';
+  return `${path}: ${first.message}`;
 }
