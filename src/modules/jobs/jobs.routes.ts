@@ -1162,4 +1162,32 @@ export async function jobsRoutes(fastify: FastifyInstance) {
       },
     },
   }, jobsController.deleteJob.bind(jobsController));
+
+  // Semantic search (for chatbot) - no auth required
+  fastify.post('/jobs/semantic-search', {
+    preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
+    schema: {
+      description: 'Semantic job search using vector similarity (for chatbot)',
+      tags: ['Jobs'],
+      body: {
+        type: 'object',
+        required: ['query'],
+        properties: {
+          query: { type: 'string', minLength: 1, maxLength: 500, description: 'Natural-language job search query' },
+          limit: { type: 'number', minimum: 1, maximum: 10, default: 5 },
+          location: { type: 'string', description: 'Province code filter' },
+          employmentType: {
+            type: 'string',
+            enum: ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'],
+          },
+          jobLevel: {
+            type: 'string',
+            enum: ['INTERN_STUDENT', 'FRESH_GRAD', 'EMPLOYEE', 'SPECIALIST_TEAM_LEAD', 'MANAGER_HEAD', 'DIRECTOR', 'EXECUTIVE'],
+          },
+          salaryMin: { type: 'number', minimum: 0 },
+          salaryMax: { type: 'number', minimum: 0 },
+        },
+      },
+    },
+  }, jobsController.semanticSearch.bind(jobsController));
 }
