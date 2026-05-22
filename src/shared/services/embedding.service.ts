@@ -65,7 +65,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     model: config.OPENAI_EMBEDDING_MODEL,
     input: text.slice(0, 8000), // stay within token limits
   });
-  return response.data[0].embedding;
+  const embedding = response.data[0]?.embedding;
+  if (!embedding) {
+    throw new Error('OpenAI embedding response did not include an embedding');
+  }
+  return embedding;
 }
 
 export async function upsertJobEmbedding(jobId: string, embedding: number[]): Promise<void> {

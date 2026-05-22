@@ -17,9 +17,9 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
   // Get notifications with pagination
   fastify.get('/', {
     schema: {
+      ...getNotificationsSchema,
       tags: ['notifications'],
       description: 'Get user notifications',
-      ...getNotificationsSchema,
       response: {
         200: {
           type: 'object',
@@ -89,9 +89,9 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
   // Mark notification as read
   fastify.patch('/:id/read', {
     schema: {
+      ...markAsReadSchema,
       tags: ['notifications'],
       description: 'Mark notification as read',
-      ...markAsReadSchema,
       response: {
         200: {
           type: 'object',
@@ -134,9 +134,9 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
   // Delete notification
   fastify.delete('/:id', {
     schema: {
+      ...deleteNotificationSchema,
       tags: ['notifications'],
       description: 'Delete notification',
-      ...deleteNotificationSchema,
       response: {
         200: {
           type: 'object',
