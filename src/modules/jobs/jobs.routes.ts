@@ -1164,7 +1164,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
   }, jobsController.deleteJob.bind(jobsController));
 
   // Semantic search (for chatbot) - no auth required
-  fastify.post('/jobs/semantic-search', {
+  fastify.post('/semantic-search', {
     preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
     schema: {
       description: 'Semantic job search using vector similarity (for chatbot)',

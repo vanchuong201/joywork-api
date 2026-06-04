@@ -240,6 +240,7 @@ model Company {
   website                  String?
   location                 String?
   wardCodes                String[]        @default([])
+  specificAddress          String?
   email                    String?
   phone                    String?
   industry                 String?

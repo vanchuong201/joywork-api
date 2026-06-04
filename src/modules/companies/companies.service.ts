@@ -43,6 +43,7 @@ export interface Company {
   website?: string;
   location?: string;
   wardCodes?: string[];
+  specificAddress?: string | null;
   industry?: string;
   size?: string;
   foundedYear?: number;
@@ -316,6 +317,7 @@ export class CompaniesService {
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
+      ...(company.specificAddress != null ? { specificAddress: company.specificAddress } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -582,6 +584,7 @@ export class CompaniesService {
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
+      ...(company.specificAddress != null ? { specificAddress: company.specificAddress } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -716,6 +719,7 @@ export class CompaniesService {
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
+      ...(company.specificAddress != null ? { specificAddress: company.specificAddress } : {}),
       ...(company.email != null ? { email: company.email } : {}),
       ...(company.phone != null ? { phone: company.phone } : {}),
       ...(company.industry != null ? { industry: company.industry } : {}),
@@ -872,6 +876,7 @@ export class CompaniesService {
               ...(company.website != null ? { website: company.website } : {}),
               ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
               ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
+              ...(company.specificAddress != null ? { specificAddress: company.specificAddress } : {}),
               ...(company.email != null ? { email: company.email } : {}),
               ...(company.phone != null ? { phone: company.phone } : {}),
               ...(company.industry != null ? { industry: company.industry } : {}),
@@ -942,6 +947,7 @@ export class CompaniesService {
         ...(company.website != null ? { website: company.website } : {}),
         ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
         ...(company.wardCodes?.length ? { wardCodes: company.wardCodes } : {}),
+        ...(company.specificAddress != null ? { specificAddress: company.specificAddress } : {}),
         ...(company.email != null ? { email: company.email } : {}),
         ...(company.phone != null ? { phone: company.phone } : {}),
         ...(company.industry != null ? { industry: company.industry } : {}),
@@ -985,6 +991,7 @@ export class CompaniesService {
         ...(membership.company.website != null ? { website: membership.company.website } : {}),
         ...(membership.company.location != null ? { location: membership.company.location, locationName: getProvinceNameByCode(membership.company.location) ?? membership.company.location } : {}),
         ...(membership.company.wardCodes?.length ? { wardCodes: membership.company.wardCodes } : {}),
+        ...(membership.company.specificAddress != null ? { specificAddress: membership.company.specificAddress } : {}),
         ...(membership.company.email != null ? { email: membership.company.email } : {}),
         ...(membership.company.phone != null ? { phone: membership.company.phone } : {}),
         ...(membership.company.industry != null ? { industry: membership.company.industry } : {}),
@@ -1070,6 +1077,7 @@ export class CompaniesService {
         ...(follow.company.website != null ? { website: follow.company.website } : {}),
         ...(follow.company.location != null ? { location: follow.company.location, locationName: getProvinceNameByCode(follow.company.location) ?? follow.company.location } : {}),
         ...(follow.company.wardCodes?.length ? { wardCodes: follow.company.wardCodes } : {}),
+        ...(follow.company.specificAddress != null ? { specificAddress: follow.company.specificAddress } : {}),
         ...(follow.company.email != null ? { email: follow.company.email } : {}),
         ...(follow.company.phone != null ? { phone: follow.company.phone } : {}),
         ...(follow.company.industry != null ? { industry: follow.company.industry } : {}),

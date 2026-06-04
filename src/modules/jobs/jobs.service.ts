@@ -1931,16 +1931,24 @@ export class JobsService {
       salaryMax: number | null;
       currency: string;
       locations: string[];
+      remote: boolean;
       employmentType: string;
       jobLevel: string | null;
       benefitsIncome: string | null;
+      companyId: string;
       companyName: string;
+      companyLegalName: string | null;
       companySlug: string;
       logoUrl: string | null;
       similarity: number;
     };
 
-    const locationFilter = params.location ?? null;
+    // Chuẩn hóa địa điểm về mã tỉnh chuẩn (vd: "Hà Nội"/"Hanoi" -> "ha-noi"),
+    // tránh phụ thuộc việc LLM tự map. Nếu không resolve được thì giữ nguyên giá
+    // trị thô (có thể đã là mã hợp lệ); nếu rỗng thì bỏ filter địa điểm.
+    const locationFilter = params.location
+      ? resolveProvinceCode(params.location) ?? params.location
+      : null;
     const employmentTypeFilter = params.employmentType ?? null;
     const jobLevelFilter = params.jobLevel ?? null;
 
@@ -1953,10 +1961,13 @@ export class JobsService {
         j."salaryMax",
         j.currency,
         j.locations,
+        j.remote,
         j."employmentType",
         j."jobLevel",
         j."benefitsIncome",
+        c.id AS "companyId",
         c.name AS "companyName",
+        c."legalName" AS "companyLegalName",
         c.slug AS "companySlug",
         c."logoUrl",
         1 - (j.embedding <=> $1::vector) AS similarity
@@ -1965,8 +1976,8 @@ export class JobsService {
       WHERE j."isActive" = true
         AND j.embedding IS NOT NULL
         AND ($2::text IS NULL OR j.locations @> ARRAY[$2]::text[])
-        AND ($3::text IS NULL OR j."employmentType" = $3)
-        AND ($4::text IS NULL OR j."jobLevel" = $4)
+        AND ($3::text IS NULL OR j."employmentType"::text = $3)
+        AND ($4::text IS NULL OR j."jobLevel"::text = $4)
       ORDER BY j.embedding <=> $1::vector
       LIMIT $5`,
       vectorLiteral,
@@ -1980,10 +1991,13 @@ export class JobsService {
       id: row.id,
       title: row.title,
       slug: row.slug,
+      companyId: row.companyId,
       companyName: row.companyName,
+      companyLegalName: row.companyLegalName ?? null,
       companySlug: row.companySlug,
       logoUrl: row.logoUrl ?? null,
       locations: row.locations,
+      remote: row.remote,
       employmentType: row.employmentType,
       jobLevel: row.jobLevel ?? null,
       salaryMin: row.salaryMin ?? null,
@@ -2002,10 +2016,13 @@ export interface SemanticJobResult {
   id: string;
   title: string;
   slug: string | null;
+  companyId: string;
   companyName: string;
+  companyLegalName: string | null;
   companySlug: string;
   logoUrl: string | null;
   locations: string[];
+  remote: boolean;
   employmentType: string;
   jobLevel: string | null;
   salaryMin: number | null;
