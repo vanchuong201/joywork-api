@@ -61,6 +61,8 @@ const envSchema = z.object({
 
   // Elasticsearch (optional — search falls back to Prisma if unset)
   ELASTICSEARCH_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  ELASTICSEARCH_USERNAME: z.preprocess(emptyToUndefined, z.string().optional()),
+  ELASTICSEARCH_PASSWORD: z.preprocess(emptyToUndefined, z.string().optional()),
 
   // OpenAI (for job embeddings & chatbot)
   OPENAI_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),

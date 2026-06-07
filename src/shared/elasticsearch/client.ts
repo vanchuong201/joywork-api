@@ -8,6 +8,9 @@ export function getEsClient(): Client | null {
   if (!_client) {
     _client = new Client({
       node: config.ELASTICSEARCH_URL,
+      ...(config.ELASTICSEARCH_USERNAME && config.ELASTICSEARCH_PASSWORD
+        ? { auth: { username: config.ELASTICSEARCH_USERNAME, password: config.ELASTICSEARCH_PASSWORD } }
+        : {}),
       requestTimeout: 5000,
       maxRetries: 1,
     });
