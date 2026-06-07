@@ -459,6 +459,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       legalName: { type: ['string', 'null'] },
                       verificationStatus: { type: 'string' },
                       isVerified: { type: 'boolean' },
+                      isGood: { type: 'boolean' },
                       isPremium: { type: 'boolean' },
                       cvFlipEnabled: { type: 'boolean' },
                       cvFlipMonthlyTotalLimit: { type: 'number' },
@@ -692,6 +693,50 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.patchCompanyPremiumStatus.bind(systemController));
+
+  fastify.patch('/companies/:companyId/good', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Cập nhật trạng thái Good của doanh nghiệp',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: {
+            type: 'string',
+          },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['isGood'],
+        properties: {
+          isGood: { type: 'boolean' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    isGood: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.patchCompanyGoodStatus.bind(systemController));
 
   fastify.patch('/companies/:companyId/cv-flip', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
