@@ -24,6 +24,7 @@ import { talentPoolRoutes } from '@/modules/talent-pool/talent-pool.routes';
 import { locationsRoutes } from '@/modules/locations/locations.routes';
 import { coursesRoutes } from '@/modules/courses/courses.routes';
 import { cvFlipRoutes } from '@/modules/cv-flip/cv-flip.routes';
+import { cvImportsRoutes } from '@/modules/cv-imports/cv-imports.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -182,6 +183,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(locationsRoutes, { prefix: '/api/locations' });
   await app.register(coursesRoutes, { prefix: '/api/courses' });
   await app.register(cvFlipRoutes, { prefix: '/api/cv-flip' });
+  await app.register(cvImportsRoutes, { prefix: '/api/cv-imports' });
 
   return app;
 }

@@ -1,0 +1,36 @@
+---
+description: Nhận diện thương hiệu — luôn hiển thị JOYWORK viết in hoa
+globs: "**/*.{tsx,md,html}"
+alwaysApply: false
+---
+
+# JOYWORK — nhận diện thương hiệu
+
+Khi viết **nội dung hiển thị cho người dùng** (UI, copy, tài liệu, email, meta/SEO, toast, placeholder…), tên sản phẩm/công ty phải là **`JOYWORK`** (toàn bộ chữ in hoa).
+
+## Không dùng
+
+- `JoyWork`, `joywork`, `Joywork`, `Joy Work` trong copy hiển thị
+
+## Vẫn giữ nguyên (không phải copy thương hiệu)
+
+- Tên kỹ thuật: `joywork-api`, `joywork-web`, `joywork-admin`, biến môi trường, URL, đường dẫn repo, tên package
+- Trích dẫn nguyên văn từ bên thứ ba
+
+## Ví dụ
+
+```tsx
+// ❌ BAD
+<p>Chào mừng đến JoyWork</p>
+<title>Joywork — Tuyển dụng</title>
+
+// ✅ GOOD
+<p>Chào mừng đến JOYWORK</p>
+<title>JOYWORK — Tuyển dụng</title>
+```
+
+```markdown
+<!-- ❌ BAD --> Nền tảng JoyWork giúp...
+
+<!-- ✅ GOOD --> Nền tảng JOYWORK giúp...
+```

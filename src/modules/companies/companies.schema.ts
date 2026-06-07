@@ -137,6 +137,7 @@ const baseCompanySchema = {
   website: optionalUrl(),
   location: optionalLocationCode(),
   wardCodes: z.array(wardCodeSchema).max(10, 'Maximum 10 wards allowed').optional(),
+  specificAddress: optionalString(255),
   email: optionalEmail(),
   phone: optionalString(50),
   industry: optionalString(200),

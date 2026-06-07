@@ -206,13 +206,28 @@ export class JobsController {
   async deleteJob(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const { jobId } = getJobSchema.parse(request.params);
-    
+
     await this.jobsService.deleteJob(jobId, userId);
-    
+
     return reply.send({
       data: {
         message: 'Job deleted successfully',
       },
     });
+  }
+
+  // Semantic search (for chatbot)
+  async semanticSearch(request: FastifyRequest, reply: FastifyReply) {
+    const body = request.body as any;
+    const result = await this.jobsService.semanticSearch({
+      query: body.query,
+      limit: body.limit,
+      location: body.location,
+      employmentType: body.employmentType,
+      jobLevel: body.jobLevel,
+      salaryMin: body.salaryMin,
+      salaryMax: body.salaryMax,
+    });
+    return reply.send({ data: result });
   }
 }
