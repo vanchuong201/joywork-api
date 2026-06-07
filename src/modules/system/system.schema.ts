@@ -57,6 +57,12 @@ export const adminCompanyCvFlipPatchSchema = z.object({
 
 export type AdminCompanyCvFlipPatch = z.infer<typeof adminCompanyCvFlipPatchSchema>;
 
+export const adminCompanyGoodPatchSchema = z.object({
+  isGood: z.boolean(),
+});
+
+export type AdminCompanyGoodPatch = z.infer<typeof adminCompanyGoodPatchSchema>;
+
 export const adminJobsQuerySchema = z.object({
   page: pageSchema,
   limit: limitSchema,

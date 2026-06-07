@@ -72,6 +72,7 @@ export interface AdminCompanyListItem {
   legalName: string | null;
   verificationStatus: string;
   isVerified: boolean;
+  isGood: boolean;
   isPremium: boolean;
   cvFlipEnabled: boolean;
   cvFlipMonthlyTotalLimit: number;
@@ -480,6 +481,7 @@ export class SystemService {
           legalName: true,
           verificationStatus: true,
           isVerified: true,
+          isGood: true,
           createdAt: true,
           _count: {
             select: { members: true, jobs: true },
@@ -508,6 +510,7 @@ export class SystemService {
         legalName: c.legalName ?? null,
         verificationStatus: c.verificationStatus,
         isVerified: c.isVerified,
+        isGood: c.isGood,
         isPremium: premiumEntitlement?.enabled ?? false,
         cvFlipEnabled: cvFlipEntitlement?.enabled ?? false,
         cvFlipMonthlyTotalLimit: cvFlipLimits.monthlyTotalLimit,
@@ -1538,6 +1541,34 @@ export class SystemService {
       enabled,
       monthlyTotalLimit: safeTotalLimit,
       monthlyRequestLimit: safeRequestLimit,
+    };
+  }
+
+  async setCompanyGoodStatus(
+    companyId: string,
+    isGood: boolean
+  ): Promise<{ id: string; isGood: boolean }> {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    const updated = await prisma.company.update({
+      where: { id: companyId },
+      data: { isGood },
+      select: {
+        id: true,
+        isGood: true,
+      },
+    });
+
+    return {
+      id: updated.id,
+      isGood: updated.isGood,
     };
   }
 

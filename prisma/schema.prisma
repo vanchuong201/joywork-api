@@ -250,6 +250,7 @@ model Company {
   profileStory             Json?
   highlights               Json?
   isVerified               Boolean                   @default(false)
+  isGood                   Boolean                   @default(false)
   verificationStatus       CompanyVerificationStatus @default(UNVERIFIED)
   verificationFileKey      String?
   verificationFileUrl      String?

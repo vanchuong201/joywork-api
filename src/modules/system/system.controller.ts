@@ -19,6 +19,7 @@ import {
   adminPostsQuerySchema,
   adminCompanyPremiumPatchSchema,
   adminCompanyCvFlipPatchSchema,
+  adminCompanyGoodPatchSchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
   adminUsersQuerySchema,
@@ -201,6 +202,16 @@ export class SystemController {
       parsed.data.monthlyTotalLimit,
       parsed.data.monthlyRequestLimit
     );
+    return reply.send({ data: { company } });
+  }
+
+  async patchCompanyGoodStatus(request: AuthenticatedRequest, reply: FastifyReply) {
+    const { companyId } = request.params as { companyId: string };
+    const parsed = adminCompanyGoodPatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const company = await this.systemService.setCompanyGoodStatus(companyId, parsed.data.isGood);
     return reply.send({ data: { company } });
   }
 
