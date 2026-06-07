@@ -20,3 +20,38 @@ Follow `.cursor/rules/*.mdc` first. Use this file as the short default guide:
 - Toàn bộ endpoint vận hành nền tảng (overview, users, companies, reports, xác minh công ty, khóa tài khoản) nằm trong module **`src/modules/system`**, prefix **`/api/system`**, bảo vệ bằng `verifyToken` + `requireAdmin`.
 - `User.accountStatus`: `ACTIVE` | `SUSPENDED` — đăng nhập và mọi request sau JWT gọi `assertUserActive` (trừ khi chỉ verify token mà không cần; optionalAuth cũng bỏ qua user nếu assert lỗi).
 - **joywork-admin** (repo riêng) dùng JWT ADMIN qua BFF; CORS tới admin origin đã có `ADMIN_CP_ORIGIN` / tương đương khi cần.
+
+## Cursor Cloud specific instructions
+
+Repo này chỉ là **JoyWork API** (Fastify + Prisma). Không có frontend hay `docker-compose` trong repo.
+
+### Khởi động nhanh
+
+1. `cp .env.example .env` — chỉnh `DATABASE_URL`, `JWT_SECRET` / `REFRESH_SECRET` (≥32 ký tự), và `AWS_*` nếu cần upload thật.
+2. `npm run db:deploy` — áp migration lên PostgreSQL (bắt buộc trước khi chạy API).
+3. `npm run dev` — API lắng nghe mặc định **port 4000** (`tsx watch src/server.ts`).
+
+`.env.example` trỏ tới PostgreSQL dev dùng chung (`123.30.48.38`). **Không chạy `npm run db:seed`** trên DB dùng chung (seed xóa toàn bộ dữ liệu). Để test auth, đăng ký user mới qua `POST /api/auth/register` hoặc dùng DB local + seed.
+
+### Kiểm tra / demo API
+
+| Endpoint | Mục đích |
+|---|---|
+| `GET /health` | Health check |
+| `GET /docs` | Swagger UI |
+| `POST /api/auth/register` | Tạo user test |
+| `POST /api/auth/login` | Lấy JWT |
+| `GET /api/jobs` | Danh sách việc làm (có/không JWT tùy route) |
+
+### Lint / test / build
+
+- `npm run type-check` — TypeScript (`tsc --noEmit`)
+- `npm test -- --run` — Vitest (mock, không cần DB)
+- `npm run build` — biên dịch `dist/`
+- `npm run lint` — **hiện lỗi cấu hình ESLint** (`@typescript-eslint/recommended` trong `.eslintrc.json` cần prefix `plugin:`); dùng `type-check` + test thay thế cho đến khi sửa config.
+
+### Dịch vụ ngoài repo (tùy chọn)
+
+- **JoyWork web** (repo riêng, port 3000) — E2E UI; set `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000`.
+- **AWS S3 / SES** — bắt buộc có giá trị trong `.env` để server boot; upload/email thật cần credential hợp lệ.
+- **joywork-admin** — repo riêng; cần `ADMIN_CP_ORIGIN` cho CORS.
