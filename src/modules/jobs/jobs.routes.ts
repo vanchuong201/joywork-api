@@ -163,6 +163,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                         legalName: { type: 'string', nullable: true },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
+                        isGood: { type: 'boolean' },
                       },
                     },
                     _count: {
@@ -328,6 +329,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                           legalName: { type: 'string', nullable: true },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
+                          isGood: { type: 'boolean' },
                         },
                       },
                       _count: {
@@ -427,6 +429,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                         legalName: { type: 'string', nullable: true },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
+                        isGood: { type: 'boolean' },
                       },
                     },
                     _count: {
@@ -557,6 +560,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                           legalName: { type: 'string', nullable: true },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
+                          isGood: { type: 'boolean' },
                         },
                       },
                       _count: {
@@ -672,6 +676,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                               name: { type: 'string' },
                               slug: { type: 'string' },
                               logoUrl: { type: 'string', nullable: true },
+                              isGood: { type: 'boolean' },
                             },
                           },
                         },
@@ -809,6 +814,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                               name: { type: 'string' },
                               slug: { type: 'string' },
                               logoUrl: { type: 'string', nullable: true },
+                              isGood: { type: 'boolean' },
                             },
                           },
                         },
@@ -900,6 +906,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                               name: { type: 'string' },
                               slug: { type: 'string' },
                               logoUrl: { type: 'string', nullable: true },
+                              isGood: { type: 'boolean' },
                             },
                           },
                         },
@@ -1085,6 +1092,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                         legalName: { type: 'string', nullable: true },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
+                        isGood: { type: 'boolean' },
                       },
                     },
                     _count: {

@@ -155,6 +155,7 @@ export interface CompanyWithMembers {
   profileStory?: CompanyStoryBlock[];
   highlights?: CompanyHighlight[];
   isVerified: boolean;
+  isGood: boolean;
   verificationStatus?: string;
   verificationFileKey?: string | null;
   verificationFileUrl?: string | null;
@@ -207,6 +208,7 @@ export interface CompanySummary {
   name: string;
   slug: string;
   logoUrl?: string;
+  isGood?: boolean;
   tagline?: string;
   location?: string;
   followersCount: number;
@@ -313,6 +315,7 @@ export class CompaniesService {
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+      isGood: company.isGood,
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -580,6 +583,7 @@ export class CompaniesService {
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+      isGood: company.isGood,
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -731,6 +735,7 @@ export class CompaniesService {
       ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
       ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
+      isGood: company.isGood,
       verificationStatus: company.verificationStatus,
       ...(company.verificationFileKey != null ? { verificationFileKey: company.verificationFileKey } : {}),
       ...(company.verificationFileUrl != null ? { verificationFileUrl: company.verificationFileUrl } : {}),
@@ -872,6 +877,7 @@ export class CompaniesService {
               ...(company.tagline != null ? { tagline: company.tagline } : {}),
               ...(company.description != null ? { description: company.description } : {}),
               ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+              isGood: company.isGood,
               ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
               ...(company.website != null ? { website: company.website } : {}),
               ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -943,6 +949,7 @@ export class CompaniesService {
         ...(company.tagline != null ? { tagline: company.tagline } : {}),
         ...(company.description != null ? { description: company.description } : {}),
         ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
+        isGood: company.isGood,
         ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
         ...(company.website != null ? { website: company.website } : {}),
         ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -987,6 +994,7 @@ export class CompaniesService {
         ...(membership.company.tagline != null ? { tagline: membership.company.tagline } : {}),
         ...(membership.company.description != null ? { description: membership.company.description } : {}),
         ...(membership.company.logoUrl != null ? { logoUrl: membership.company.logoUrl } : {}),
+        isGood: membership.company.isGood,
         ...(membership.company.coverUrl != null ? { coverUrl: membership.company.coverUrl } : {}),
         ...(membership.company.website != null ? { website: membership.company.website } : {}),
         ...(membership.company.location != null ? { location: membership.company.location, locationName: getProvinceNameByCode(membership.company.location) ?? membership.company.location } : {}),
@@ -1023,6 +1031,7 @@ export class CompaniesService {
             name: true,
             slug: true,
             logoUrl: true,
+            isGood: true,
             tagline: true,
             coverUrl: true,
           },
@@ -1042,6 +1051,7 @@ export class CompaniesService {
           name: row.name,
           slug: row.slug,
           logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
+          isGood: row.isGood,
           tagline: row.tagline ?? null,
           coverUrl: await resolveReadableS3ObjectUrl(rawCover),
           order: slot.sortOrder,
@@ -1073,6 +1083,7 @@ export class CompaniesService {
         ...(follow.company.tagline != null ? { tagline: follow.company.tagline } : {}),
         ...(follow.company.description != null ? { description: follow.company.description } : {}),
         ...(follow.company.logoUrl != null ? { logoUrl: follow.company.logoUrl } : {}),
+        isGood: follow.company.isGood,
         ...(follow.company.coverUrl != null ? { coverUrl: follow.company.coverUrl } : {}),
         ...(follow.company.website != null ? { website: follow.company.website } : {}),
         ...(follow.company.location != null ? { location: follow.company.location, locationName: getProvinceNameByCode(follow.company.location) ?? follow.company.location } : {}),
@@ -1454,6 +1465,7 @@ export class CompaniesService {
         name: true,
         slug: true,
         logoUrl: true,
+        isGood: true,
         tagline: true,
         location: true,
       },
@@ -1467,6 +1479,7 @@ export class CompaniesService {
           name: true,
           slug: true,
           logoUrl: true,
+          isGood: true,
           tagline: true,
           location: true,
         },
@@ -1493,6 +1506,7 @@ export class CompaniesService {
       name: company.name,
       slug: company.slug,
       ...(company.logoUrl ? { logoUrl: company.logoUrl } : {}),
+      isGood: company.isGood,
       ...(company.tagline ? { tagline: company.tagline } : {}),
       ...(company.location ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       followersCount,
@@ -2208,6 +2222,7 @@ export class CompaniesService {
             name: true,
             slug: true,
             logoUrl: true,
+            isGood: true,
           },
         },
         createdBy: {

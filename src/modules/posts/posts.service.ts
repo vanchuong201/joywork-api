@@ -258,6 +258,7 @@ export class PostsService {
             name: true,
             slug: true,
             logoUrl: true,
+            isGood: true,
           },
         },
         createdBy: {
@@ -530,6 +531,7 @@ export class PostsService {
             name: true,
             slug: true,
             logoUrl: true,
+            isGood: true,
           },
         },
         createdBy: {
@@ -599,6 +601,7 @@ export class PostsService {
             name: true,
             slug: true,
             logoUrl: true,
+            isGood: true,
           },
         },
         createdBy: {
@@ -747,6 +750,7 @@ export class PostsService {
               name: true,
               slug: true,
               logoUrl: true,
+              isGood: true,
             },
           },
           createdBy: {
@@ -935,6 +939,7 @@ export class PostsService {
               name: true,
               slug: true,
               logoUrl: true,
+              isGood: true,
             },
           },
           createdBy: {

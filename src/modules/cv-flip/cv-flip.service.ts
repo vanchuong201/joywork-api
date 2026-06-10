@@ -241,6 +241,7 @@ export class CvFlipService {
             legalName: true,
             slug: true,
             logoUrl: true,
+            isGood: true,
             featureEntitlements: {
               where: { featureKey: CV_FLIP_FEATURE_KEY },
               take: 1,
@@ -262,6 +263,7 @@ export class CvFlipService {
           legalName: item.company.legalName,
           slug: item.company.slug,
           logoUrl: item.company.logoUrl,
+          isGood: item.company.isGood,
           role: item.role,
           isPremium: entitlement?.enabled ?? false,
           cvFlipEnabled: entitlement?.enabled ?? false,
@@ -1025,6 +1027,7 @@ export class CvFlipService {
               name: true,
               slug: true,
               logoUrl: true,
+              isGood: true,
               website: true,
             },
           },

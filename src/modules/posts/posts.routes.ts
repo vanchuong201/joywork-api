@@ -128,6 +128,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         name: { type: 'string' },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
+                        isGood: { type: 'boolean' },
                       },
                     },
                     likes: {
@@ -250,6 +251,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         name: { type: 'string' },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
+                        isGood: { type: 'boolean' },
                       },
                     },
                     likes: {
@@ -419,6 +421,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           name: { type: 'string' },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
+                          isGood: { type: 'boolean' },
                         },
                       },
                       likes: {
@@ -589,6 +592,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           name: { type: 'string' },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
+                          isGood: { type: 'boolean' },
                         },
                       },
                       likes: {
@@ -787,6 +791,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         name: { type: 'string' },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
+                        isGood: { type: 'boolean' },
                       },
                     },
                     likes: {
@@ -1086,6 +1091,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                               name: { type: 'string' },
                               slug: { type: 'string' },
                               logoUrl: { type: 'string', nullable: true },
+                              isGood: { type: 'boolean' },
                             },
                           },
                           images: {
