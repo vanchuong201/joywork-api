@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthMiddleware, type AuthenticatedRequest } from './auth.middleware';
-import { registerSchema } from './auth.schema';
 import { AppError } from '@/shared/errors/errorHandler';
 
 /** Giới hạn gửi lại email xác minh: số lần tối đa trong mỗi cửa sổ thời gian (theo userId). */
@@ -13,50 +12,6 @@ export async function authRoutes(fastify: FastifyInstance) {
   const authService = new AuthService();
   const authController = new AuthController(authService);
   const authMiddleware = new AuthMiddleware(authService);
-
-  // Test route
-  fastify.get('/test', async () => {
-    return { message: 'Auth routes working' };
-  });
-
-  // Test register route
-  fastify.post('/test-register', async (request, reply) => {
-    try {
-      const data = registerSchema.parse(request.body);
-      const result = await authService.register(data);
-      return reply.send({ success: true, user: result.user });
-    } catch (error) {
-      console.error('Test register error:', error);
-      return reply.status(400).send({ error: (error as Error).message });
-    }
-  });
-
-  // Simple register route
-  fastify.post('/register-simple', async (request, reply) => {
-    try {
-      const data = registerSchema.parse(request.body);
-      const result = await authService.register(data);
-      
-      // Set refresh token as HTTP-only cookie
-      reply.setCookie('refreshToken', result.tokens.refreshToken, {
-        httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        path: '/',
-      });
-
-      return reply.status(201).send({
-        data: {
-          user: result.user,
-          accessToken: result.tokens.accessToken,
-        },
-      });
-    } catch (error) {
-      console.error('Simple register error:', error);
-      return reply.status(400).send({ error: (error as Error).message });
-    }
-  });
 
   // Register routes
   fastify.post('/register', {

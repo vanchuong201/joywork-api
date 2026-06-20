@@ -8,6 +8,7 @@ import { getEsClient } from '@/shared/elasticsearch/client';
 import { JOBS_INDEX } from '@/shared/elasticsearch/indices';
 import { syncJobToEs, deleteJobFromEs } from '@/shared/elasticsearch/sync';
 import { emailService } from '@/shared/services/email.service';
+import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
 import { slugifyVietnamese } from '@/shared/job-slug';
@@ -1240,25 +1241,26 @@ export class JobsService {
         .catch(() => {});
 
       const verifiedEmails = await getVerifiedEmailsForUsers(companyAdminIds);
-      await Promise.all(
-        companyAdmins.map((member) => {
-          const verifiedEmail = verifiedEmails.get(member.userId);
-          if (!verifiedEmail) {
-            return Promise.resolve();
-          }
+      // Gửi nền — không chặn phản hồi ứng tuyển bằng độ trễ SES (fan-out theo số admin).
+      for (const member of companyAdmins) {
+        const verifiedEmail = verifiedEmails.get(member.userId);
+        if (!verifiedEmail) {
+          continue;
+        }
 
-          return emailService
-            .sendNewApplicationEmail(verifiedEmail, {
+        sendEmailInBackground(
+          () =>
+            emailService.sendNewApplicationEmail(verifiedEmail, {
               recipientName: member.user.name,
               applicantName,
               jobTitle: job.title,
               companyName: job.company.name,
               appliedAt: appliedAtLabel,
               applicationUrl: manageApplicationsUrl,
-            })
-            .catch(() => {});
-        }),
-      );
+            }),
+          `new-application email to=${verifiedEmail} applicantId=${userId}`,
+        );
+      }
     }
   }
 

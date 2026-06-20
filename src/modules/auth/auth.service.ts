@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { UserAccountStatus } from '@prisma/client';
@@ -6,6 +5,8 @@ import { prisma } from '@/shared/database/prisma';
 import { config } from '@/config/env';
 import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
+import { hashPassword, verifyPassword } from '@/shared/security/password-hash';
+import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { generateSlug, ensureUniqueSlug } from '../users/user-profile.service';
 import {
   RegisterInput,
@@ -52,7 +53,7 @@ export class AuthService {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await hashPassword(password);
 
     // Generate slug from name or email, fallback to a unique identifier
     let slug: string;
@@ -100,14 +101,12 @@ export class AuthService {
       },
     });
 
-    // Send verification email
+    // Send verification email ở chế độ nền — không chặn phản hồi đăng ký bằng độ trễ SES.
     const verificationUrl = `${config.FRONTEND_ORIGIN}/verify-email?token=${verificationToken}`;
-    try {
-      await emailService.sendVerificationEmail(email, name || null, verificationUrl);
-    } catch (error) {
-      // Log error but don't fail registration
-      console.error('Failed to send verification email:', error);
-    }
+    sendEmailInBackground(
+      () => emailService.sendVerificationEmail(email, name || null, verificationUrl),
+      `verification email userId=${user.id}`,
+    );
 
     // Generate tokens
     const tokens = this.generateTokens(user.id);
@@ -137,7 +136,7 @@ export class AuthService {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await verifyPassword(password, user.password);
     if (!isPasswordValid) {
       throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
     }
@@ -205,13 +204,13 @@ export class AuthService {
     }
 
     // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       throw new AppError('Mật khẩu hiện tại không đúng', 400, 'INVALID_CURRENT_PASSWORD');
     }
 
     // Hash new password
-    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    const hashedNewPassword = await hashPassword(newPassword);
 
     // Update password
     await prisma.user.update({
@@ -449,7 +448,7 @@ export class AuthService {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await hashPassword(newPassword);
 
     // Update user password
     await prisma.user.update({
@@ -540,7 +539,7 @@ export class AuthService {
       } else {
         // Tạo user mới
         const randomPassword = randomUUID();
-        const hashedPassword = await bcrypt.hash(randomPassword, 12);
+        const hashedPassword = await hashPassword(randomPassword);
 
         user = await prisma.user.create({
           data: {

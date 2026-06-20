@@ -5,6 +5,13 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
+# Build toolchain for native modules (bcrypt) — source-build fallback when a
+# prebuilt binary can't be fetched. Builder stage is discarded; prod only copies
+# the resulting node_modules (compiled .node binary).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 # Resilient installs when registry or network is flaky (e.g. CI Docker builds)
 RUN npm config set fetch-retries 5 \
   && npm config set fetch-retry-mintimeout 20000 \
@@ -37,6 +44,11 @@ WORKDIR /app
 ENV NODE_ENV=development
 ENV PORT=4000
 
+# Build toolchain for native modules (bcrypt) source-build fallback.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN npm config set fetch-retries 5 \
   && npm config set fetch-retry-mintimeout 20000 \
   && npm config set fetch-retry-maxtimeout 120000 \
@@ -64,6 +76,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=4000
+# libuv threadpool size — native bcrypt hashing runs on this pool. Raise above the
+# default (4) so concurrent password hashes don't queue behind each other.
+ENV UV_THREADPOOL_SIZE=8
 
 # Install wget for health checks and openssl for Prisma
 RUN apt-get update && apt-get install -y wget openssl && rm -rf /var/lib/apt/lists/*
