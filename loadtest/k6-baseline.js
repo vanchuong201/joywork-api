@@ -32,6 +32,10 @@ import { randomString } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
 const REGISTER_RATIO = Number(__ENV.REGISTER_RATIO || 0.25); // % user đăng ký mật khẩu
 
+// Header bí mật để bỏ qua rate-limit per-IP khi test từ 1 nguồn (server phải set RATE_LIMIT_BYPASS_KEY).
+const LOADTEST_KEY = __ENV.LOADTEST_KEY || '';
+const COMMON_HEADERS = LOADTEST_KEY ? { 'x-loadtest-key': LOADTEST_KEY } : {};
+
 // Arrival-rate target (user/giây). 167 = 10k/phút.
 const TARGET_RPS = Number(__ENV.TARGET_RPS || 167);
 
@@ -79,6 +83,7 @@ const SEARCH_TERMS = ['developer', 'kế toán', 'marketing', 'nhân viên', 'sa
 function browse() {
   const q = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)];
   const res = http.get(`${BASE_URL}/api/jobs/?q=${encodeURIComponent(q)}&page=1&limit=20`, {
+    headers: COMMON_HEADERS,
     tags: { name: 'browse_list' },
   });
   browseDuration.add(res.timings.duration);
@@ -97,17 +102,19 @@ function browse() {
     /* ignore parse */
   }
   if (jobId) {
-    const detail = http.get(`${BASE_URL}/api/jobs/${jobId}`, { tags: { name: 'browse_detail' } });
+    const detail = http.get(`${BASE_URL}/api/jobs/${jobId}`, { headers: COMMON_HEADERS, tags: { name: 'browse_detail' } });
     browseDuration.add(detail.timings.duration);
     errorRate.add(!check(detail, { 'detail 200': (r) => r.status === 200 }));
   }
 }
 
 function register() {
-  const email = `loadtest+${__VU}_${__ITER}_${randomString(6)}@example.com`;
+  // AWS SES mailbox simulator — gửi thành công, KHÔNG bounce, KHÔNG ảnh hưởng reputation
+  // (an toàn với SES production). Label sau dấu '+' giữ email unique để thực sự chạy bcrypt.
+  const email = `success+lt_${__VU}_${__ITER}_${randomString(6)}@simulator.amazonses.com`;
   const payload = JSON.stringify({ email, password: 'LoadTest123!', name: `LT ${randomString(4)}` });
   const res = http.post(`${BASE_URL}/api/auth/register`, payload, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...COMMON_HEADERS },
     tags: { name: 'register' },
   });
   registerDuration.add(res.timings.duration);

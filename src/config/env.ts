@@ -51,6 +51,15 @@ const envSchema = z.object({
   // Logging
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
+  // Rate limiting (global). Configurable để tinh chỉnh theo môi trường / cho load test.
+  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(100),
+  RATE_LIMIT_WINDOW: z.string().default('1 minute'),
+  /**
+   * Secret cho phép bỏ qua rate-limit khi request mang header `x-loadtest-key` khớp.
+   * Để TRỐNG ở production (không ai bypass được). Chỉ set ở môi trường load test.
+   */
+  RATE_LIMIT_BYPASS_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+
   // OAuth - Google
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

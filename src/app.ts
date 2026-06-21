@@ -97,8 +97,14 @@ export async function createApp(): Promise<FastifyInstance> {
   });
 
   await app.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
+    max: config.RATE_LIMIT_MAX,
+    timeWindow: config.RATE_LIMIT_WINDOW,
+    // Cho phép bỏ qua giới hạn khi request mang header bí mật khớp RATE_LIMIT_BYPASS_KEY.
+    // Dùng cho load test từ 1 nguồn (per-IP limit sẽ chặn). Trống ở prod => không ai bypass.
+    allowList: (req) => {
+      const key = config.RATE_LIMIT_BYPASS_KEY;
+      return Boolean(key) && req.headers['x-loadtest-key'] === key;
+    },
   });
 
   // Swagger documentation
