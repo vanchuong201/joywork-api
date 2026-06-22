@@ -19,8 +19,12 @@ import {
 /**
  * Cache danh sách jobs cho request ẩn danh (TTL ngắn). Request có đăng nhập KHÔNG
  * cache vì response chứa `hasApplied` riêng theo user. Cache theo worker (an toàn cluster).
+ *
+ * Lưu **chuỗi JSON đã serialize** (không phải object) — cache HIT gửi thẳng bytes,
+ * bỏ qua hẳn chi phí serialize lại payload lớn (~80KB) trên event loop. Đây là phần
+ * tốn CPU chính dưới tải đọc cao.
  */
-const jobsListCache = new TtlCache<unknown>(config.JOBS_LIST_CACHE_TTL_MS);
+const jobsListCache = new TtlCache<string>(config.JOBS_LIST_CACHE_TTL_MS);
 
 export class JobsController {
   constructor(private jobsService: JobsService) {}
@@ -114,19 +118,25 @@ export class JobsController {
 
     // Chỉ cache cho người dùng ẩn danh (response authed chứa hasApplied riêng).
     if (!userId) {
+      const maxAge = Math.floor(config.JOBS_LIST_CACHE_TTL_MS / 1000);
       const cacheKey = JSON.stringify(data, Object.keys(data).sort());
       const cached = jobsListCache.get(cacheKey);
       if (cached !== undefined) {
-        reply.header('X-Cache', 'HIT');
-        reply.header('Cache-Control', `public, max-age=${Math.floor(config.JOBS_LIST_CACHE_TTL_MS / 1000)}`);
-        return reply.send({ data: cached });
+        return reply
+          .header('X-Cache', 'HIT')
+          .header('Cache-Control', `public, max-age=${maxAge}`)
+          .type('application/json')
+          .send(cached); // chuỗi đã serialize — không serialize lại
       }
 
       const result = await this.jobsService.searchJobs(data, undefined);
-      jobsListCache.set(cacheKey, result);
-      reply.header('X-Cache', 'MISS');
-      reply.header('Cache-Control', `public, max-age=${Math.floor(config.JOBS_LIST_CACHE_TTL_MS / 1000)}`);
-      return reply.send({ data: result });
+      const payload = JSON.stringify({ data: result });
+      jobsListCache.set(cacheKey, payload);
+      return reply
+        .header('X-Cache', 'MISS')
+        .header('Cache-Control', `public, max-age=${maxAge}`)
+        .type('application/json')
+        .send(payload);
     }
 
     // Người dùng đã đăng nhập: không cache.
