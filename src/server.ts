@@ -1,5 +1,7 @@
 import './instrument';
 
+import cluster from 'node:cluster';
+import { cpus } from 'node:os';
 import * as Sentry from '@sentry/node';
 import { createApp } from './app';
 import { config } from '@/config/env';
@@ -62,4 +64,23 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-start();
+/**
+ * Số worker: env CLUSTER_WORKERS, mặc định = số CPU (tối thiểu 1). Node là đơn luồng
+ * cho JS — không cluster thì chỉ dùng 1 core. Cluster cho phép tận dụng hết core
+ * cho các request đọc nặng serialize (vd danh sách jobs).
+ */
+const workerCount = Math.max(1, config.CLUSTER_WORKERS ?? cpus().length);
+
+if (workerCount > 1 && cluster.isPrimary) {
+  console.log(`🧩 Cluster primary ${process.pid}: fork ${workerCount} workers`);
+  for (let i = 0; i < workerCount; i++) {
+    cluster.fork();
+  }
+  // Tự hồi sinh worker chết để không mất capacity giữa campaign.
+  cluster.on('exit', (worker, code, signal) => {
+    console.warn(`⚠️  Worker ${worker.process.pid} thoát (code=${code} signal=${signal}) — fork lại`);
+    cluster.fork();
+  });
+} else {
+  start();
+}

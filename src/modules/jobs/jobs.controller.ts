@@ -1,5 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { JobsService } from './jobs.service';
+import { config } from '@/config/env';
+import { TtlCache } from '@/shared/cache/ttl-cache';
 import {
   createJobSchema,
   updateJobSchema,
@@ -13,6 +15,12 @@ import {
   getMyFavoritesSchema,
   jobIdParamsSchema,
 } from './jobs.schema';
+
+/**
+ * Cache danh sách jobs cho request ẩn danh (TTL ngắn). Request có đăng nhập KHÔNG
+ * cache vì response chứa `hasApplied` riêng theo user. Cache theo worker (an toàn cluster).
+ */
+const jobsListCache = new TtlCache<unknown>(config.JOBS_LIST_CACHE_TTL_MS);
 
 export class JobsController {
   constructor(private jobsService: JobsService) {}
@@ -103,12 +111,28 @@ export class JobsController {
   async searchJobs(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const data = searchJobsSchema.parse(request.query);
-    
+
+    // Chỉ cache cho người dùng ẩn danh (response authed chứa hasApplied riêng).
+    if (!userId) {
+      const cacheKey = JSON.stringify(data, Object.keys(data).sort());
+      const cached = jobsListCache.get(cacheKey);
+      if (cached !== undefined) {
+        reply.header('X-Cache', 'HIT');
+        reply.header('Cache-Control', `public, max-age=${Math.floor(config.JOBS_LIST_CACHE_TTL_MS / 1000)}`);
+        return reply.send({ data: cached });
+      }
+
+      const result = await this.jobsService.searchJobs(data, undefined);
+      jobsListCache.set(cacheKey, result);
+      reply.header('X-Cache', 'MISS');
+      reply.header('Cache-Control', `public, max-age=${Math.floor(config.JOBS_LIST_CACHE_TTL_MS / 1000)}`);
+      return reply.send({ data: result });
+    }
+
+    // Người dùng đã đăng nhập: không cache.
     const result = await this.jobsService.searchJobs(data, userId);
-    
-    return reply.send({
-      data: result,
-    });
+    reply.header('Cache-Control', 'private, no-store');
+    return reply.send({ data: result });
   }
 
   // Apply for job

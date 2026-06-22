@@ -51,6 +51,12 @@ const envSchema = z.object({
   // Logging
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
+  // Cluster: số worker process (tận dụng nhiều core). Bỏ trống = auto theo số CPU. 1 = single process.
+  CLUSTER_WORKERS: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).optional()),
+
+  // Cache TTL (ms) cho response danh sách jobs ẩn danh. 0 = tắt cache.
+  JOBS_LIST_CACHE_TTL_MS: z.coerce.number().int().min(0).default(30_000),
+
   // Rate limiting (global). Configurable để tinh chỉnh theo môi trường / cho load test.
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(100),
   RATE_LIMIT_WINDOW: z.string().default('1 minute'),
