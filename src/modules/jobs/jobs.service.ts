@@ -861,9 +861,9 @@ export class JobsService {
     // Try Elasticsearch first for text/skills queries
     if (data.q || data.skills) {
       try {
-        const ids = await this.searchJobsInEs(data);
-        if (ids !== null) {
-          return await this.fetchJobsByIds(ids, data.page, data.limit, userId);
+        const esResult = await this.searchJobsInEs(data);
+        if (esResult !== null) {
+          return await this.fetchJobsByIds(esResult.ids, data.page, data.limit, userId, esResult.total);
         }
       } catch (err) {
         console.warn('[ES] Job search failed, falling back to Prisma:', err);
@@ -1764,7 +1764,7 @@ export class JobsService {
 
   // ─── Elasticsearch search helpers ─────────────────────────────────────────
 
-  private async searchJobsInEs(data: SearchJobsInput): Promise<string[] | null> {
+  private async searchJobsInEs(data: SearchJobsInput): Promise<{ ids: string[]; total: number } | null> {
     const client = getEsClient();
     if (!client) return null;
 
@@ -1844,12 +1844,17 @@ export class JobsService {
       _source: ['id'],
       size: data.limit,
       from: (data.page - 1) * data.limit,
+      // Đếm chính xác tổng số match để tính phân trang (mặc định ES chỉ đếm tới 10k)
+      track_total_hits: true,
       sort: must.length > 0
         ? [{ _score: { order: 'desc' } }, { createdAt: { order: 'desc' } }]
         : [{ createdAt: { order: 'desc' } }],
     });
 
-    return (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
+    const ids = (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
+    const totalHits = response.hits.total;
+    const total = typeof totalHits === 'number' ? totalHits : (totalHits?.value ?? 0);
+    return { ids, total };
   }
 
   private async fetchJobsByIds(
@@ -1857,9 +1862,10 @@ export class JobsService {
     page: number,
     limit: number,
     userId?: string,
+    total = ids.length,
   ): Promise<{ jobs: JobWithApplication[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     if (ids.length === 0) {
-      return { jobs: [], pagination: { page, limit, total: 0, totalPages: 0 } };
+      return { jobs: [], pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
     }
 
     const jobs = await prisma.job.findMany({
@@ -1923,7 +1929,7 @@ export class JobsService {
 
     return {
       jobs: jobsWithApplications,
-      pagination: { page, limit, total: ids.length, totalPages: Math.ceil(ids.length / limit) },
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
 
