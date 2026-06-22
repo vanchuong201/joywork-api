@@ -29,6 +29,9 @@ import { cvImportsRoutes } from '@/modules/cv-imports/cv-imports.routes';
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: 16 * 1024 * 1024, // allow up to 16MB payloads (base64 uploads)
+    // App chạy sau reverse proxy (traefik, + Cloudflare khi bật). Tin proxy để
+    // request.ip / protocol phản ánh client thật thay vì IP của proxy.
+    trustProxy: true,
     logger: config.NODE_ENV === 'development' ? {
       level: config.LOG_LEVEL,
       transport: {
@@ -99,6 +102,16 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(rateLimit, {
     max: config.RATE_LIMIT_MAX,
     timeWindow: config.RATE_LIMIT_WINDOW,
+    // Key theo IP CLIENT thật, không phải IP proxy (traefik/Cloudflare). Ưu tiên
+    // CF-Connecting-IP (Cloudflare set, client không giả mạo được), rồi X-Forwarded-For
+    // đầu tiên, cuối cùng request.ip. Tránh việc mọi user chung 1 bucket = 429 hàng loạt.
+    keyGenerator: (req) => {
+      const cfIp = req.headers['cf-connecting-ip'];
+      if (typeof cfIp === 'string' && cfIp) return cfIp;
+      const xff = req.headers['x-forwarded-for'];
+      if (typeof xff === 'string' && xff) return xff.split(',')[0]!.trim();
+      return req.ip;
+    },
     // Cho phép bỏ qua giới hạn khi request mang header bí mật khớp RATE_LIMIT_BYPASS_KEY.
     // Dùng cho load test từ 1 nguồn (per-IP limit sẽ chặn). Trống ở prod => không ai bypass.
     allowList: (req) => {
