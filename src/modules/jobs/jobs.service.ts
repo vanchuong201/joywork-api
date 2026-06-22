@@ -1460,7 +1460,7 @@ export class JobsService {
     const companyName = application.job.company.name;
     const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/applications`;
 
-    let notifTitle = 'Đơn ứng tuyển đã được cập nhật';
+    const notifTitle = 'Đơn ứng tuyển đã được cập nhật';
     let notifContent = '';
     if (statusChanged && notesChanged) {
       notifContent = `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel} và có cập nhật thông tin kèm theo.`;
