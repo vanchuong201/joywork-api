@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sanitizeUserText } from '@/shared/text/sanitize-user-text';
 
 const postImageInputSchema = z.object({
   key: z.string().min(1, 'Image key is required'),
@@ -11,9 +12,9 @@ const postImageInputSchema = z.object({
 
 // Create post schema
 export const createPostSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
-  content: z.string().min(1, 'Content is required').max(10000, 'Content must be less than 10000 characters'),
-  excerpt: z.string().max(500, 'Excerpt must be less than 500 characters').optional(),
+  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters').transform(sanitizeUserText),
+  content: z.string().min(1, 'Content is required').max(10000, 'Content must be less than 10000 characters').transform(sanitizeUserText),
+  excerpt: z.string().max(500, 'Excerpt must be less than 500 characters').transform(sanitizeUserText).optional(),
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).default('STORY'),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
   publishedAt: z.string().datetime().optional(),
@@ -35,9 +36,9 @@ export const createPostSchema = z.object({
 
 // Update post schema
 export const updatePostSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters').optional(),
-  content: z.string().min(1, 'Content is required').max(10000, 'Content must be less than 10000 characters').optional(),
-  excerpt: z.string().max(500, 'Excerpt must be less than 500 characters').optional(),
+  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters').transform(sanitizeUserText).optional(),
+  content: z.string().min(1, 'Content is required').max(10000, 'Content must be less than 10000 characters').transform(sanitizeUserText).optional(),
+  excerpt: z.string().max(500, 'Excerpt must be less than 500 characters').transform(sanitizeUserText).optional(),
   type: z.enum(['STORY', 'ANNOUNCEMENT', 'EVENT']).optional(),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   publishedAt: z.string().datetime().optional(),
