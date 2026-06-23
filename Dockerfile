@@ -93,6 +93,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # Copy src directory for tsx to run with path aliases
 COPY --from=builder /app/src ./src
+# Operational scripts (migrations backfill, reindex, etc.)
+COPY scripts ./scripts
 
 # Prisma client is already generated in builder stage and included in node_modules
 # No need to regenerate to save disk space

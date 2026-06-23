@@ -1,82 +1,52 @@
 import { PrismaClient } from '@prisma/client';
-import { slugify } from '../src/shared/slug';
+import { resolveUniqueUserSlug } from '../src/modules/users/user-profile.service';
 
 const prisma = new PrismaClient();
 
-// Helper: Ensure unique slug for users
-async function ensureUniqueSlug(baseSlug: string, excludeUserId?: string): Promise<string> {
-  let slug = baseSlug;
-  let counter = 1;
-
-  while (true) {
-    const existing = await prisma.user.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
-
-    if (!existing || (excludeUserId && existing.id === excludeUserId)) {
-      return slug;
-    }
-
-    slug = `${baseSlug}-${counter}`;
-    counter++;
-  }
-}
-
 async function main() {
-  console.log('🚀 Starting slug generation for users...\n');
+  console.log('Starting slug backfill for users without slug...\n');
 
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, slug: true },
+    where: { slug: null },
+    select: { id: true, name: true, email: true },
   });
 
   console.log(`Found ${users.length} users to process\n`);
 
   if (users.length === 0) {
-    console.log('No users found!');
+    console.log('No users missing slug.');
     return;
   }
 
   let successCount = 0;
-  let unchangedCount = 0;
   let errorCount = 0;
 
   for (const user of users) {
     try {
-      const baseName = user.name?.trim() || user.email.split('@')[0];
-      const baseSlug = slugify(baseName);
-
-      if (!baseSlug) {
-        console.log(`⚠️  Skipping user ${user.id} - cannot generate slug from name/email`);
-        errorCount++;
-        continue;
-      }
-
-      const uniqueSlug = await ensureUniqueSlug(baseSlug, user.id);
-
-      if (user.slug === uniqueSlug) {
-        unchangedCount++;
-        continue;
-      }
+      const slug = await resolveUniqueUserSlug({
+        name: user.name,
+        email: user.email,
+        userId: user.id,
+      });
 
       await prisma.user.update({
         where: { id: user.id },
-        data: { slug: uniqueSlug },
+        data: { slug },
       });
 
-      console.log(`✅ Generated slug "${uniqueSlug}" for user: ${user.name || user.email}`);
+      console.log(`Generated slug "${slug}" for user: ${user.name || user.email}`);
       successCount++;
-    } catch (error: any) {
-      console.error(`❌ Error processing user ${user.id}:`, error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Error processing user ${user.id}:`, message);
       errorCount++;
     }
   }
 
-  console.log(`\n📊 Summary:`);
-  console.log(`   ✅ Updated: ${successCount}`);
-  console.log(`   ➖ Unchanged: ${unchangedCount}`);
-  console.log(`   ❌ Errors: ${errorCount}`);
-  console.log(`   📝 Total: ${users.length}`);
+  console.log('\nSummary:');
+  console.log(`   Updated: ${successCount}`);
+  console.log(`   Errors: ${errorCount}`);
+  console.log(`   Total: ${users.length}`);
 }
 
 main()

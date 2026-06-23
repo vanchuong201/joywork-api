@@ -7,7 +7,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
 import { hashPassword, verifyPassword } from '@/shared/security/password-hash';
 import { sendEmailInBackground } from '@/shared/services/send-email-async';
-import { generateSlug, ensureUniqueSlug } from '../users/user-profile.service';
+import { resolveUniqueUserSlug } from '../users/user-profile.service';
 import {
   RegisterInput,
   LoginInput,
@@ -55,17 +55,7 @@ export class AuthService {
     // Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Generate slug from name or email, fallback to a unique identifier
-    let slug: string;
-    if (name) {
-      const baseSlug = generateSlug(name);
-      slug = baseSlug ? await ensureUniqueSlug(baseSlug) : await ensureUniqueSlug(`user-${randomUUID().substring(0, 8)}`);
-    } else {
-      // Use email prefix or generate from email
-      const emailPrefix = email.split('@')[0] || email;
-      const baseSlug = generateSlug(emailPrefix);
-      slug = baseSlug ? await ensureUniqueSlug(baseSlug) : await ensureUniqueSlug(`user-${randomUUID().substring(0, 8)}`);
-    }
+    const slug = await resolveUniqueUserSlug({ name, email });
 
     // Create user
     const user = await prisma.user.create({
@@ -541,12 +531,15 @@ export class AuthService {
         const randomPassword = randomUUID();
         const hashedPassword = await hashPassword(randomPassword);
 
+        const slug = await resolveUniqueUserSlug({ name, email });
+
         user = await prisma.user.create({
           data: {
             email,
             password: hashedPassword,
             name: name || null,
             emailVerified: emailVerified,
+            slug,
           },
         });
       }
@@ -579,6 +572,18 @@ export class AuthService {
           data: { emailVerified: true },
         });
       }
+    }
+
+    if (!user.slug) {
+      const slug = await resolveUniqueUserSlug({
+        name: user.name,
+        email: user.email,
+        userId: user.id,
+      });
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { slug },
+      });
     }
 
     const tokens = this.generateTokens(user.id);

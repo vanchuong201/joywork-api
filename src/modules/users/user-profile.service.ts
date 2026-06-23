@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
@@ -12,6 +13,27 @@ const TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
 // Helper: Generate slug from name — uses slugify package with Vietnamese locale
 export function generateSlug(name: string): string {
   return slugify(name);
+}
+
+export async function resolveUniqueUserSlug(params: {
+  name?: string | null | undefined;
+  email: string;
+  userId?: string;
+}): Promise<string> {
+  const { name, email, userId } = params;
+
+  if (name) {
+    const baseSlug = generateSlug(name);
+    return baseSlug
+      ? await ensureUniqueSlug(baseSlug, userId)
+      : await ensureUniqueSlug(`user-${randomUUID().substring(0, 8)}`, userId);
+  }
+
+  const emailPrefix = email.split('@')[0] || email;
+  const baseSlug = generateSlug(emailPrefix);
+  return baseSlug
+    ? await ensureUniqueSlug(baseSlug, userId)
+    : await ensureUniqueSlug(`user-${randomUUID().substring(0, 8)}`, userId);
 }
 
 // Helper: Ensure unique slug

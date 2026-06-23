@@ -22,6 +22,7 @@
     "seed:candidates": "tsx scripts/seed-candidate-users.ts",
     "migrate:location-codes": "tsx scripts/migrate-location-codes.ts",
     "embed:backfill": "tsx scripts/backfill-embeddings.ts",
+    "backfill:user-slugs": "tsx scripts/generate-user-slugs.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "lint": "eslint src --ext .ts",
