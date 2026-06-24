@@ -136,12 +136,27 @@ export class JobsService {
     return (items ?? []).some((item) => item.trim().length > 0);
   }
 
+  private isFilledText(value?: string | null): boolean {
+    return Boolean(value?.trim());
+  }
+
   private async assertApplicantCvReady(userId: string): Promise<void> {
     const userCvData = await prisma.user.findUnique({
       where: { id: userId },
       select: {
+        name: true,
+        email: true,
+        phone: true,
+        avatar: true,
         profile: {
           select: {
+            avatar: true,
+            fullName: true,
+            title: true,
+            bio: true,
+            contactEmail: true,
+            contactPhone: true,
+            locations: true,
             knowledge: true,
             skills: true,
             attitude: true,
@@ -159,17 +174,27 @@ export class JobsService {
       throw new AppError('Không tìm thấy ứng viên', 404, 'USER_NOT_FOUND');
     }
 
+    const profile = userCvData.profile;
+    const hasBasicInfo =
+      Boolean(profile?.avatar || userCvData.avatar) &&
+      this.isFilledText(profile?.fullName || userCvData.name) &&
+      this.isFilledText(profile?.title) &&
+      this.isFilledText(profile?.bio) &&
+      this.isFilledText(profile?.contactEmail || userCvData.email) &&
+      this.isFilledText(profile?.contactPhone || userCvData.phone) &&
+      (this.hasNonEmptyTextItem(profile?.locations));
     const hasKsa =
-      this.hasNonEmptyTextItem(userCvData.profile?.knowledge) ||
-      this.hasNonEmptyTextItem(userCvData.profile?.skills) ||
-      this.hasNonEmptyTextItem(userCvData.profile?.attitude);
+      this.hasNonEmptyTextItem(profile?.knowledge) ||
+      this.hasNonEmptyTextItem(profile?.skills) ||
+      this.hasNonEmptyTextItem(profile?.attitude);
     const hasExperiences = userCvData._count.experiences > 0;
 
-    if (hasKsa && hasExperiences) {
+    if (hasBasicInfo && hasKsa && hasExperiences) {
       return;
     }
 
     const missingItems: string[] = [];
+    if (!hasBasicInfo) missingItems.push('Thông tin cơ bản');
     if (!hasKsa) missingItems.push('Năng lực (KSA)');
     if (!hasExperiences) missingItems.push('Kinh nghiệm làm việc');
 
