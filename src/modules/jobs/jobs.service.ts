@@ -132,6 +132,54 @@ export interface JobFavorite {
 }
 
 export class JobsService {
+  private hasNonEmptyTextItem(items?: string[] | null): boolean {
+    return (items ?? []).some((item) => item.trim().length > 0);
+  }
+
+  private async assertApplicantCvReady(userId: string): Promise<void> {
+    const userCvData = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        profile: {
+          select: {
+            knowledge: true,
+            skills: true,
+            attitude: true,
+          },
+        },
+        _count: {
+          select: {
+            experiences: true,
+          },
+        },
+      },
+    });
+
+    if (!userCvData) {
+      throw new AppError('Không tìm thấy ứng viên', 404, 'USER_NOT_FOUND');
+    }
+
+    const hasKsa =
+      this.hasNonEmptyTextItem(userCvData.profile?.knowledge) ||
+      this.hasNonEmptyTextItem(userCvData.profile?.skills) ||
+      this.hasNonEmptyTextItem(userCvData.profile?.attitude);
+    const hasExperiences = userCvData._count.experiences > 0;
+
+    if (hasKsa && hasExperiences) {
+      return;
+    }
+
+    const missingItems: string[] = [];
+    if (!hasKsa) missingItems.push('Năng lực (KSA)');
+    if (!hasExperiences) missingItems.push('Kinh nghiệm làm việc');
+
+    throw new AppError(
+      `Bạn cần cập nhật ${missingItems.join(', ')} trước khi ứng tuyển`,
+      400,
+      'CV_PROFILE_INCOMPLETE'
+    );
+  }
+
   // Create job
   async createJob(companyId: string, userId: string, data: CreateJobInput): Promise<Job> {
     // Check if user is member of company
@@ -1172,6 +1220,8 @@ export class JobsService {
     if (existingApplication) {
       throw new AppError('Lỗi: Bạn đã từng ứng tuyển cho vị trí này rồi', 409, 'ALREADY_APPLIED');
     }
+
+    await this.assertApplicantCvReady(userId);
 
     const applicant = await prisma.user.findUnique({
       where: { id: userId },
