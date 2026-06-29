@@ -58,16 +58,40 @@ export async function createPresignedDownloadUrl(params: {
   return getSignedUrl(s3Client, command, { expiresIn: params.expiresIn ?? 300 });
 }
 
-/** Lấy object key từ URL public kiểu https://{bucket}.s3.{region}.amazonaws.com/{key} */
+function pathnameToObjectKey(pathname: string, basePathPrefix = ''): string | null {
+  let normalizedPath = pathname;
+  if (basePathPrefix) {
+    if (!normalizedPath.startsWith(basePathPrefix)) {
+      return null;
+    }
+    normalizedPath = normalizedPath.slice(basePathPrefix.length);
+  }
+  const key = normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath;
+  return key || null;
+}
+
+/** Lấy object key từ URL public S3 hoặc CDN (khi CDN_BASE_URL được cấu hình). */
 export function extractS3KeyFromPublicObjectUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    const bucketHost = `${bucketName}.s3.${config.AWS_REGION}.amazonaws.com`;
-    if (parsed.host !== bucketHost) {
-      return null;
+
+    if (normalizedCdnBaseUrl) {
+      const cdn = new URL(normalizedCdnBaseUrl);
+      if (parsed.protocol === cdn.protocol && parsed.host === cdn.host) {
+        const cdnPathPrefix = cdn.pathname.replace(/\/+$/, '');
+        const key = pathnameToObjectKey(parsed.pathname, cdnPathPrefix || undefined);
+        if (key) {
+          return key;
+        }
+      }
     }
-    const key = parsed.pathname.startsWith('/') ? parsed.pathname.slice(1) : parsed.pathname;
-    return key || null;
+
+    const bucketHost = `${bucketName}.s3.${config.AWS_REGION}.amazonaws.com`;
+    if (parsed.host === bucketHost) {
+      return pathnameToObjectKey(parsed.pathname);
+    }
+
+    return null;
   } catch {
     return null;
   }
