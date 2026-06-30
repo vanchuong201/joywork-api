@@ -1,0 +1,37 @@
+---
+description: JoyWork Git workflow — develop/main, ff-only release, deploy checklist for solo dev
+alwaysApply: true
+---
+
+# JoyWork Git Workflow (solo dev)
+
+Đọc đầy đủ: `deploy/GIT_WORKFLOW.md` (repo deploy trong workspace).
+
+## Nhánh
+
+- `develop` = làm việc hàng ngày → **push** → auto deploy **staging**
+- `main` = production → **không commit trực tiếp** → deploy prod qua workflow `Deploy Production` (repo `deploy`)
+
+## Promote develop → main
+
+- **Ưu tiên fast-forward:** `git checkout main && git merge --ff-only develop && git push`
+- PR qua GitHub: **`gh pr merge --rebase`**, không dùng `--merge` (no-ff) cho release thường xuyên
+- Điểm release đánh dấu bằng `release_version` / tag, không cần merge commit no-ff
+
+## Deploy prod (sau khi main đã cập nhật)
+
+```bash
+gh workflow run "Deploy Production" -f command=<api|web|admin|app|all> \
+  -f api_ref=main -f web_ref=main -f admin_ref=main \
+  -f release_version=YYYY.MM.DD.N -f backup_db=true
+```
+
+Chạy trong repo `deploy`. `backup_db=false` chỉ khi hotfix không đụng DB/migration.
+
+## Hotfix
+
+Branch từ `main` → fix → ff vào `main` → deploy → **đồng bộ ngược `develop`** (merge ff hoặc cherry-pick).
+
+## Commit
+
+Conventional commits (`feat:`, `fix:`, …). Không commit secrets.

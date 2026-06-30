@@ -15,6 +15,14 @@ Follow `.cursor/rules/*.mdc` first. Use this file as the short default guide:
 - Make database changes through Prisma schema plus migrations, never by manual production schema edits.
 - Before finishing meaningful backend work, run the most relevant checks available, typically `npm run lint`, `npm run type-check`, and targeted tests when they exist.
 
+## Git & release
+
+Tuân thủ `deploy/GIT_WORKFLOW.md` (repo deploy) và `.cursor/rules/git-workflow.mdc`:
+
+- Làm việc trên `develop`; push → auto deploy staging.
+- Release prod: promote `main` bằng **`git merge --ff-only develop`** hoặc **`gh pr merge --rebase`** (không `--merge` thường xuyên).
+- Deploy prod từ repo `deploy` (`Deploy Production` workflow).
+
 ## Admin / vận hành (`/api/system`)
 
 - Toàn bộ endpoint vận hành nền tảng (overview, users, companies, reports, xác minh công ty, khóa tài khoản) nằm trong module **`src/modules/system`**, prefix **`/api/system`**, bảo vệ bằng `verifyToken` + `requireAdmin`.
