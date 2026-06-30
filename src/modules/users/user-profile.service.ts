@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '@/shared/database/prisma';
+import { hasUserAppliedToCompany } from '@/shared/applications/has-applied-to-company';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
@@ -92,13 +93,9 @@ export class UserProfileService {
       return true;
     }
 
-    const hasAppliedToCompany = await prisma.application.findFirst({
-      where: {
-        userId: profileUserId,
-        status: { not: 'NOT_SUITABLE' },
-        job: { companyId: cid },
-      },
-      select: { id: true },
+    const hasAppliedToCompany = await hasUserAppliedToCompany({
+      userId: profileUserId,
+      companyId: cid,
     });
     if (hasAppliedToCompany) {
       return false;
@@ -115,6 +112,38 @@ export class UserProfileService {
     });
 
     return !connection;
+  }
+
+  /**
+   * Cho phép DN (OWNER/ADMIN) xem shell hồ sơ ứng viên đã apply vào công ty dù `isPublic === false`.
+   */
+  private async canViewerSeePrivateProfileViaApplication(params: {
+    viewerUserId: string | null | undefined;
+    profileUserId: string;
+    companyId: string | null | undefined;
+  }): Promise<boolean> {
+    const { viewerUserId, profileUserId, companyId } = params;
+    if (!viewerUserId || viewerUserId === profileUserId) {
+      return false;
+    }
+    const cid = typeof companyId === 'string' ? companyId.trim() : '';
+    if (!cid) {
+      return false;
+    }
+
+    const membership = await prisma.companyMember.findFirst({
+      where: {
+        userId: viewerUserId,
+        companyId: cid,
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: { id: true },
+    });
+    if (!membership) {
+      return false;
+    }
+
+    return hasUserAppliedToCompany({ userId: profileUserId, companyId: cid });
   }
 
   /**
@@ -246,7 +275,12 @@ export class UserProfileService {
           profileUserId: user.id,
           companyId: options?.companyId ?? null,
         });
-        if (!allowTalentPoolEmployer) {
+        const allowApplicationEmployer = await this.canViewerSeePrivateProfileViaApplication({
+          viewerUserId,
+          profileUserId: user.id,
+          companyId: options?.companyId ?? null,
+        });
+        if (!allowTalentPoolEmployer && !allowApplicationEmployer) {
           return null;
         }
       }

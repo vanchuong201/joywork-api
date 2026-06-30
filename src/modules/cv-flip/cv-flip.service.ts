@@ -1,5 +1,6 @@
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
+import { hasUserAppliedToCompany } from '@/shared/applications/has-applied-to-company';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
@@ -621,18 +622,13 @@ export class CvFlipService {
     if (!isOwner) {
       if (normalizedCompanyId) {
         await this.assertCanManageCompany(viewerUserId, normalizedCompanyId);
-        const application = await prisma.application.findFirst({
-          where: {
-            userId: candidate.id,
-            status: { not: 'NOT_SUITABLE' },
-            job: { companyId: normalizedCompanyId },
-          },
-          select: { id: true },
+        hasAppliedToCompany = await hasUserAppliedToCompany({
+          userId: candidate.id,
+          companyId: normalizedCompanyId,
         });
-        hasAppliedToCompany = Boolean(application);
       }
 
-      if (!candidate.profile.isPublic) {
+      if (!candidate.profile.isPublic && !hasAppliedToCompany) {
         throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
       }
       if (normalizedCompanyId && !candidate.profile.isSearchingJob && !hasAppliedToCompany) {
@@ -705,6 +701,7 @@ export class CvFlipService {
           flippedAt: null,
           isOwnerView: isOwner,
           companyContext: false,
+          hasAppliedToCompany: false,
         },
       };
     }
@@ -760,6 +757,7 @@ export class CvFlipService {
         flippedAt: connection?.flippedAt ?? null,
         isOwnerView: isOwner,
         companyContext: true,
+        hasAppliedToCompany,
       },
     };
   }
