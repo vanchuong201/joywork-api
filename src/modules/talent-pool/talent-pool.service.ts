@@ -17,7 +17,7 @@ const TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
 
 function profileUrl(slug: string | null): string {
   const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
-  return slug ? `${base}/profile/${slug}` : `${base}/account?tab=profile`;
+  return slug ? `${base}/candidates/${slug}` : `${base}/account/profile`;
 }
 
 // ── Candidate ──
@@ -185,7 +185,7 @@ export class TalentPoolService {
         metadata: {
           requestId,
           status: 'APPROVED',
-          targetUrl: '/account?tab=profile',
+          targetUrl: '/account/profile',
         },
         relatedEntityType: 'TALENT_POOL_REQUEST',
         relatedEntityId: requestId,
@@ -244,7 +244,7 @@ export class TalentPoolService {
           requestId,
           status: 'REJECTED',
           reason,
-          targetUrl: '/account?tab=profile',
+          targetUrl: '/account/profile',
         },
         relatedEntityType: 'TALENT_POOL_REQUEST',
         relatedEntityId: requestId,
@@ -411,7 +411,7 @@ export class TalentPoolService {
           memberId,
           status: 'REMOVED',
           reason,
-          targetUrl: '/account?tab=profile',
+          targetUrl: '/account/profile',
         },
         relatedEntityType: 'TALENT_POOL_MEMBER',
         relatedEntityId: memberId,

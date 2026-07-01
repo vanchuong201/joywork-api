@@ -60,12 +60,12 @@ const addDays = (date: Date, days: number): Date => {
 
 const profileUrl = (slug: string | null): string => {
   const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
-  return slug ? `${base}/profile/${slug}` : `${base}/account?tab=profile`;
+  return slug ? `${base}/candidates/${slug}` : `${base}/account/profile`;
 };
 
 const cvFlipRequestsUrl = (): string => {
   const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
-  return `${base}/account?tab=profile`;
+  return `${base}/account/profile`;
 };
 
 export class CvFlipService {
@@ -955,7 +955,7 @@ export class CvFlipService {
         requestId: request.id,
         companyId,
         candidateUserId,
-        targetUrl: '/account?tab=profile',
+        targetUrl: '/account/profile',
       },
       relatedEntityType: 'CV_FLIP_REQUEST',
       relatedEntityId: request.id,
