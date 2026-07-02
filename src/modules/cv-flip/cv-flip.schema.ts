@@ -35,9 +35,13 @@ export const candidatesQuerySchema = z.object({
 
 export type CandidatesQuery = z.infer<typeof candidatesQuerySchema>;
 
-export const candidateDetailQuerySchema = z.object({
-  companyId: z.string().cuid().optional(),
-});
+export const candidateDetailQuerySchema = z
+  .object({
+    companyId: z.string().optional(),
+  })
+  .transform((d) => ({
+    companyId: d.companyId?.trim() ? d.companyId.trim() : undefined,
+  }));
 
 export type CandidateDetailQuery = z.infer<typeof candidateDetailQuerySchema>;
 

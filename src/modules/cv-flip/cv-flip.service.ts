@@ -1,6 +1,11 @@
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
-import { hasUserAppliedToCompany } from '@/shared/applications/has-applied-to-company';
+import {
+  canEmployerViewCandidateShell,
+  canEmployerViewInCompanyCvFlipContext,
+  getLatestApplicationResumeUrl,
+  resolveEmployerCandidateVisibility,
+} from '@/shared/candidates/employer-candidate-visibility';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
@@ -595,12 +600,14 @@ export class CvFlipService {
     const candidate = await prisma.user.findFirst({
       where: {
         OR: [{ slug: slugOrId }, { id: slugOrId }],
-        accountStatus: 'ACTIVE',
       },
       select: {
         id: true,
         name: true,
         slug: true,
+        email: true,
+        phone: true,
+        avatar: true,
         profile: true,
         experiences: {
           orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
@@ -611,30 +618,61 @@ export class CvFlipService {
       },
     });
 
-    if (!candidate || !candidate.profile) {
+    if (!candidate) {
       throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
     }
 
     const isOwner = viewerUserId === candidate.id;
     const normalizedCompanyId = companyId?.trim() || null;
+    const profileVisibility = candidate.profile
+      ? {
+          isPublic: candidate.profile.isPublic,
+          isSearchingJob: candidate.profile.isSearchingJob,
+        }
+      : null;
+
     let hasAppliedToCompany = false;
+    let canViewViaTalentPool = false;
+
+    if (!isOwner && normalizedCompanyId) {
+      await this.assertCanManageCompany(viewerUserId, normalizedCompanyId);
+      const visibility = await resolveEmployerCandidateVisibility({
+        viewerUserId,
+        candidateUserId: candidate.id,
+        companyId: normalizedCompanyId,
+        isOwner,
+      });
+      hasAppliedToCompany = visibility.hasAppliedToCompany;
+      canViewViaTalentPool = visibility.canViewViaTalentPool;
+    }
+
+    const visibilityParams = {
+      isOwner,
+      profile: profileVisibility,
+      hasAppliedToCompany,
+      canViewViaTalentPool,
+    };
 
     if (!isOwner) {
-      if (normalizedCompanyId) {
-        await this.assertCanManageCompany(viewerUserId, normalizedCompanyId);
-        hasAppliedToCompany = await hasUserAppliedToCompany({
-          userId: candidate.id,
-          companyId: normalizedCompanyId,
-        });
-      }
-
-      if (!candidate.profile.isPublic && !hasAppliedToCompany) {
+      if (!canEmployerViewCandidateShell(visibilityParams)) {
         throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
       }
-      if (normalizedCompanyId && !candidate.profile.isSearchingJob && !hasAppliedToCompany) {
+      if (
+        normalizedCompanyId &&
+        !canEmployerViewInCompanyCvFlipContext({
+          ...visibilityParams,
+          hasCompanyContext: true,
+        })
+      ) {
         throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
       }
     }
+
+    const profile = candidate.profile;
+    const applicationResumeUrl =
+      !profile && normalizedCompanyId && hasAppliedToCompany
+        ? await getLatestApplicationResumeUrl(candidate.id, normalizedCompanyId)
+        : null;
 
     const buildCandidatePayload = (opts: {
       contactEmail: string | null;
@@ -647,35 +685,39 @@ export class CvFlipService {
       candidate: {
         userId: candidate.id,
         slug: candidate.slug,
-        name: candidate.profile!.fullName || candidate.name,
+        name: profile?.fullName || candidate.name,
         profile: {
-          avatar: candidate.profile!.avatar,
-          fullName: candidate.profile!.fullName,
-          title: candidate.profile!.title,
-          headline: candidate.profile!.headline,
-          bio: candidate.profile!.bio,
-          skills: candidate.profile!.skills,
-          locations: candidate.profile!.locations,
-          wardCodes: candidate.profile!.wardCodes,
-          specificAddress: candidate.profile!.specificAddress,
-          ...(candidate.profile!.locations.length > 0 ? { location: getProvinceNameByCode(candidate.profile!.locations[0]) ?? candidate.profile!.locations[0] } : {}),
+          avatar: profile?.avatar ?? candidate.avatar,
+          fullName: profile?.fullName ?? candidate.name,
+          title: profile?.title ?? null,
+          headline: profile?.headline ?? null,
+          bio: profile?.bio ?? null,
+          skills: profile?.skills ?? [],
+          locations: profile?.locations ?? [],
+          wardCodes: profile?.wardCodes ?? [],
+          specificAddress: profile?.specificAddress ?? null,
+          ...(profile && profile.locations.length > 0
+            ? { location: getProvinceNameByCode(profile.locations[0]) ?? profile.locations[0] }
+            : {}),
           website: opts.website,
           linkedin: opts.linkedin,
           github: opts.github,
-          status: candidate.profile!.status,
-          knowledge: candidate.profile!.knowledge,
-          attitude: candidate.profile!.attitude,
-          expectedSalaryMin: candidate.profile!.expectedSalaryMin != null ? Number(candidate.profile!.expectedSalaryMin) : null,
-          expectedSalaryMax: candidate.profile!.expectedSalaryMax != null ? Number(candidate.profile!.expectedSalaryMax) : null,
-          salaryCurrency: candidate.profile!.salaryCurrency,
-          workMode: candidate.profile!.workMode,
-          expectedCulture: candidate.profile!.expectedCulture,
-          careerGoals: candidate.profile!.careerGoals,
+          status: profile?.status ?? null,
+          knowledge: profile?.knowledge ?? [],
+          attitude: profile?.attitude ?? [],
+          expectedSalaryMin:
+            profile?.expectedSalaryMin != null ? Number(profile.expectedSalaryMin) : null,
+          expectedSalaryMax:
+            profile?.expectedSalaryMax != null ? Number(profile.expectedSalaryMax) : null,
+          salaryCurrency: profile?.salaryCurrency ?? null,
+          workMode: profile?.workMode ?? null,
+          expectedCulture: profile?.expectedCulture ?? null,
+          careerGoals: profile?.careerGoals ?? [],
           contactEmail: opts.contactEmail,
           contactPhone: opts.contactPhone,
           cvUrl: opts.cvUrl,
-          isSearchingJob: candidate.profile!.isSearchingJob,
-          allowCvFlip: candidate.profile!.allowCvFlip,
+          isSearchingJob: profile?.isSearchingJob ?? false,
+          allowCvFlip: profile?.allowCvFlip ?? true,
         },
         experiences: candidate.experiences,
         educations: candidate.educations,
@@ -685,14 +727,17 @@ export class CvFlipService {
     // Không có companyId: chỉ chủ hồ sơ mới xem đủ thông tin liên hệ.
     if (!normalizedCompanyId) {
       const shouldMaskPublic = !isOwner;
+      const contactEmail = profile?.contactEmail ?? (isOwner ? candidate.email : null);
+      const contactPhone = profile?.contactPhone ?? (isOwner ? candidate.phone : null);
+      const cvUrl = profile?.cvUrl ?? null;
       return {
         ...buildCandidatePayload({
-          contactEmail: shouldMaskPublic ? null : candidate.profile.contactEmail,
-          contactPhone: shouldMaskPublic ? null : candidate.profile.contactPhone,
-          cvUrl: shouldMaskPublic ? null : candidate.profile.cvUrl,
-          website: shouldMaskPublic ? null : candidate.profile.website,
-          linkedin: shouldMaskPublic ? null : candidate.profile.linkedin,
-          github: shouldMaskPublic ? null : candidate.profile.github,
+          contactEmail: shouldMaskPublic ? null : contactEmail,
+          contactPhone: shouldMaskPublic ? null : contactPhone,
+          cvUrl: shouldMaskPublic ? null : cvUrl,
+          website: shouldMaskPublic ? null : (profile?.website ?? null),
+          linkedin: shouldMaskPublic ? null : (profile?.linkedin ?? null),
+          github: shouldMaskPublic ? null : (profile?.github ?? null),
         }),
         access: {
           isFlipped: isOwner,
@@ -740,15 +785,18 @@ export class CvFlipService {
 
     const isFlipped = Boolean(connection) || hasAppliedToCompany;
     const shouldMaskContact = !isOwner && !isFlipped;
+    const revealedEmail = profile?.contactEmail ?? candidate.email;
+    const revealedPhone = profile?.contactPhone ?? candidate.phone;
+    const revealedCvUrl = profile?.cvUrl ?? applicationResumeUrl;
 
     return {
       ...buildCandidatePayload({
-        contactEmail: shouldMaskContact ? null : candidate.profile.contactEmail,
-        contactPhone: shouldMaskContact ? null : candidate.profile.contactPhone,
-        cvUrl: shouldMaskContact ? null : candidate.profile.cvUrl,
-        website: shouldMaskContact ? null : candidate.profile.website,
-        linkedin: shouldMaskContact ? null : candidate.profile.linkedin,
-        github: shouldMaskContact ? null : candidate.profile.github,
+        contactEmail: shouldMaskContact ? null : revealedEmail,
+        contactPhone: shouldMaskContact ? null : revealedPhone,
+        cvUrl: shouldMaskContact ? null : revealedCvUrl,
+        website: shouldMaskContact ? null : (profile?.website ?? null),
+        linkedin: shouldMaskContact ? null : (profile?.linkedin ?? null),
+        github: shouldMaskContact ? null : (profile?.github ?? null),
       }),
       access: {
         isFlipped: isOwner || isFlipped,
