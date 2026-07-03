@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { AuthService } from './auth.service';
 import { AppError } from '@/shared/errors/errorHandler';
+import { config } from '@/config/env';
 
 export interface AuthenticatedRequest extends FastifyRequest {
   user?: {
@@ -47,6 +48,23 @@ export class AuthMiddleware {
     } catch (error) {
       // Ignore errors for optional auth
     }
+  }
+
+  // Validate X-Internal-Secret header for server-to-server calls (e.g. joywork-admin)
+  async internalSecretAuth(request: FastifyRequest, _reply: FastifyReply) {
+    const secret = request.headers['x-internal-secret'];
+    if (!secret || secret !== config.INTERNAL_API_SECRET) {
+      throw new AppError('Unauthorized', 401, 'INTERNAL_SECRET_REQUIRED');
+    }
+  }
+
+  // Accept either X-Internal-Secret (system call) or JWT+admin (admin UI)
+  async internalOrAdminAuth(request: AuthenticatedRequest, reply: FastifyReply) {
+    if (request.headers['x-internal-secret'] === config.INTERNAL_API_SECRET) {
+      return;
+    }
+    await this.verifyToken(request, reply);
+    await this.requireAdmin(request, reply);
   }
 
   // Check if user is admin

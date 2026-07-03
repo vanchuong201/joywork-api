@@ -52,6 +52,7 @@ model User {
   cvFlipRequestsReceived  CvFlipRequest[]          @relation("CvFlipRequestTarget")
   cvFlipRequestsSent      CvFlipRequest[]          @relation("CvFlipRequester")
   cvImportJobs            CvImportJob[]
+  apiTokens               ApiToken[]
 
   // Talent Pool
   talentPoolMember          TalentPoolMember?        @relation("TalentPoolMemberUser")
@@ -96,6 +97,28 @@ model PasswordResetToken {
   @@index([token])
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// API Token — long-lived tokens for external system access to admin data
+model ApiToken {
+  id          String    @id @default(cuid())
+  name        String                          // tên mô tả do admin đặt
+  tokenHash   String    @unique               // SHA-256(raw_token) — raw value không lưu DB
+  tokenPrefix String                          // 8 ký tự đầu của raw token để nhận dạng trong UI
+  scopes      String[]  @default([])          // ["read:overview", "read:users", ...]
+  expiresAt   DateTime?                       // null = không hết hạn
+  lastUsedAt  DateTime?
+  enabled     Boolean   @default(true)
+  createdById String?                         // nullable: token tồn tại kể cả khi admin bị xóa
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // SetNull: xóa admin không xóa tokens (tránh break external integrations)
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tokenHash])
+  @@index([createdById])
+  @@map("api_tokens")
 }
 
 enum UserRole {
