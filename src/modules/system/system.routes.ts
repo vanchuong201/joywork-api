@@ -3,6 +3,8 @@ import { SystemService } from './system.service';
 import { SystemController } from './system.controller';
 import { SystemImportController } from './system-import.controller';
 import { SystemTalentPoolController } from './system-talent-pool.controller';
+import { ApiTokenService } from './api-token.service';
+import { ApiTokenController } from './api-token.controller';
 import { TalentPoolService } from '@/modules/talent-pool/talent-pool.service';
 import { AuthMiddleware } from '@/modules/auth/auth.middleware';
 import { AuthService } from '@/modules/auth/auth.service';
@@ -19,7 +21,11 @@ export async function systemRoutes(fastify: FastifyInstance) {
   const tpController = new SystemTalentPoolController(talentPoolService);
   const courseAdminService = new CourseAdminService();
   const courseAdminController = new CourseAdminController(courseAdminService);
+  const apiTokenService = new ApiTokenService();
+  const apiTokenController = new ApiTokenController(apiTokenService);
   const adminPre = [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)];
+  const internalPre = [authMiddleware.internalSecretAuth.bind(authMiddleware)];
+  const internalOrAdminPre = [authMiddleware.internalOrAdminAuth.bind(authMiddleware)];
   const adminCompanyParamsSchema = {
     type: 'object',
     required: ['companyId'],
@@ -234,7 +240,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
   };
 
   fastify.get('/overview', {
-    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    preHandler: internalOrAdminPre,
     schema: {
       description: 'Get system overview stats',
       tags: ['System'],
@@ -317,7 +323,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
   }, systemController.listProvinces.bind(systemController));
 
   fastify.get('/users', {
-    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    preHandler: internalOrAdminPre,
     schema: {
       description: 'Danh sách người dùng (admin, có phân trang)',
       tags: ['System'],
@@ -416,7 +422,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
   }, systemController.patchUserAccountStatus.bind(systemController));
 
   fastify.get('/companies', {
-    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    preHandler: internalOrAdminPre,
     schema: {
       description: 'Danh sách công ty (admin, có phân trang và đếm thành viên/tin tuyển)',
       tags: ['System'],
@@ -785,7 +791,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
   }, systemController.patchCompanyCvFlipStatus.bind(systemController));
 
   fastify.get('/jobs', {
-    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    preHandler: internalOrAdminPre,
     schema: {
       description: 'Danh sách job cho admin theo trạng thái sắp hết hạn / quá hạn',
       tags: ['System'],
@@ -1832,4 +1838,86 @@ export async function systemRoutes(fastify: FastifyInstance) {
       body: { type: 'object', required: ['enabled'], properties: { enabled: { type: 'boolean' } } },
     },
   }, tpController.toggleEntitlement.bind(tpController));
+
+  // ── API Tokens ──
+
+  fastify.get('/api-tokens', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Danh sách API tokens',
+      tags: ['System - API Tokens'],
+      security: [{ bearerAuth: [] }],
+    },
+  }, apiTokenController.list.bind(apiTokenController));
+
+  fastify.post('/api-tokens', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Tạo API token mới. rawToken chỉ trả về một lần, không thể xem lại.',
+      tags: ['System - API Tokens'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['name', 'scopes'],
+        properties: {
+          name: { type: 'string', minLength: 2, maxLength: 100 },
+          scopes: {
+            type: 'array',
+            items: { type: 'string', enum: ['read:overview', 'read:users', 'read:companies', 'read:jobs'] },
+            minItems: 1,
+          },
+          expiresAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  }, apiTokenController.create.bind(apiTokenController));
+
+  fastify.patch('/api-tokens/:id', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Cập nhật API token (tên, scopes, enabled, ngày hết hạn)',
+      tags: ['System - API Tokens'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 2, maxLength: 100 },
+          scopes: {
+            type: 'array',
+            items: { type: 'string', enum: ['read:overview', 'read:users', 'read:companies', 'read:jobs'] },
+            minItems: 1,
+          },
+          enabled: { type: 'boolean' },
+          expiresAt: { type: ['string', 'null'], format: 'date-time' },
+        },
+      },
+    },
+  }, apiTokenController.update.bind(apiTokenController));
+
+  fastify.delete('/api-tokens/:id', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Xóa vĩnh viễn API token',
+      tags: ['System - API Tokens'],
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+    },
+  }, apiTokenController.remove.bind(apiTokenController));
+
+  // Internal endpoint — called by joywork-admin server, protected by X-Internal-Secret
+  fastify.post('/api-tokens/validate', {
+    preHandler: internalPre,
+    schema: {
+      description: 'Validate API token (server-to-server, requires X-Internal-Secret header)',
+      tags: ['System - API Tokens'],
+      body: {
+        type: 'object',
+        required: ['token'],
+        properties: {
+          token: { type: 'string' },
+        },
+      },
+    },
+  }, apiTokenController.validate.bind(apiTokenController));
 }
