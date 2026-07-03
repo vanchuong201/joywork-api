@@ -7,6 +7,7 @@ import {
   resolveEmployerCandidateVisibility,
 } from '@/shared/candidates/employer-candidate-visibility';
 import { AppError } from '@/shared/errors/errorHandler';
+import { maskNameToInitials } from '@/shared/mask';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
 import { emailService } from '@/shared/services/email.service';
@@ -512,6 +513,8 @@ export class CvFlipService {
           title: true,
           skills: true,
           locations: true,
+          wardCodes: true,
+          specificAddress: true,
           expectedSalaryMin: true,
           expectedSalaryMax: true,
           salaryCurrency: true,
@@ -549,22 +552,26 @@ export class CvFlipService {
 
     return {
       candidates: orderedUsers.map((user) => ({
+        maskedInitials: maskNameToInitials(user.profile?.fullName || user.name),
+        identityMasked: true,
         userId: user.id,
         slug: user.slug,
-        name: user.profile?.fullName || user.name,
-        avatar: user.profile?.avatar ?? null,
+        name: maskNameToInitials(user.profile?.fullName || user.name),
+        avatar: null,
         headline: user.profile?.headline ?? null,
         title: user.profile?.title ?? null,
         skills: user.profile?.skills ?? [],
         locations: user.profile?.locations ?? [],
+        wardCodes: [],
+        specificAddress: null,
         expectedSalaryMin: user.profile?.expectedSalaryMin != null ? Number(user.profile.expectedSalaryMin) : null,
         expectedSalaryMax: user.profile?.expectedSalaryMax != null ? Number(user.profile.expectedSalaryMax) : null,
         salaryCurrency: user.profile?.salaryCurrency ?? null,
         workMode: user.profile?.workMode ?? null,
         gender: user.profile?.gender ?? null,
-        dayOfBirth: user.profile?.dayOfBirth ?? null,
-        monthOfBirth: user.profile?.monthOfBirth ?? null,
-        yearOfBirth: user.profile?.yearOfBirth ?? null,
+        dayOfBirth: null,
+        monthOfBirth: null,
+        yearOfBirth: null,
         educationLevel: user.profile?.educationLevel ?? null,
         experiences: user.experiences.map((e) => ({
           id: e.id,
@@ -681,21 +688,24 @@ export class CvFlipService {
       website: string | null;
       linkedin: string | null;
       github: string | null;
+      maskIdentity: boolean;
     }) => ({
       candidate: {
         userId: candidate.id,
         slug: candidate.slug,
-        name: profile?.fullName || candidate.name,
+        name: opts.maskIdentity ? null : profile?.fullName || candidate.name,
+        maskedInitials: maskNameToInitials(profile?.fullName || candidate.name),
+        identityMasked: opts.maskIdentity,
         profile: {
-          avatar: profile?.avatar ?? candidate.avatar,
-          fullName: profile?.fullName ?? candidate.name,
+          avatar: opts.maskIdentity ? null : profile?.avatar ?? candidate.avatar,
+          fullName: opts.maskIdentity ? null : profile?.fullName ?? candidate.name,
           title: profile?.title ?? null,
           headline: profile?.headline ?? null,
           bio: profile?.bio ?? null,
           skills: profile?.skills ?? [],
           locations: profile?.locations ?? [],
-          wardCodes: profile?.wardCodes ?? [],
-          specificAddress: profile?.specificAddress ?? null,
+          wardCodes: opts.maskIdentity ? [] : profile?.wardCodes ?? [],
+          specificAddress: opts.maskIdentity ? null : profile?.specificAddress ?? null,
           ...(profile && profile.locations.length > 0
             ? { location: getProvinceNameByCode(profile.locations[0]) ?? profile.locations[0] }
             : {}),
@@ -716,6 +726,9 @@ export class CvFlipService {
           contactEmail: opts.contactEmail,
           contactPhone: opts.contactPhone,
           cvUrl: opts.cvUrl,
+          dayOfBirth: opts.maskIdentity ? null : profile?.dayOfBirth ?? null,
+          monthOfBirth: opts.maskIdentity ? null : profile?.monthOfBirth ?? null,
+          yearOfBirth: opts.maskIdentity ? null : profile?.yearOfBirth ?? null,
           isSearchingJob: profile?.isSearchingJob ?? false,
           allowCvFlip: profile?.allowCvFlip ?? true,
         },
@@ -738,6 +751,7 @@ export class CvFlipService {
           website: shouldMaskPublic ? null : (profile?.website ?? null),
           linkedin: shouldMaskPublic ? null : (profile?.linkedin ?? null),
           github: shouldMaskPublic ? null : (profile?.github ?? null),
+          maskIdentity: shouldMaskPublic,
         }),
         access: {
           isFlipped: isOwner,
@@ -797,6 +811,7 @@ export class CvFlipService {
         website: shouldMaskContact ? null : (profile?.website ?? null),
         linkedin: shouldMaskContact ? null : (profile?.linkedin ?? null),
         github: shouldMaskContact ? null : (profile?.github ?? null),
+        maskIdentity: shouldMaskContact,
       }),
       access: {
         isFlipped: isOwner || isFlipped,

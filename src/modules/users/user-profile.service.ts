@@ -5,6 +5,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
 import { slugify } from '@/shared/slug';
+import { maskNameToInitials } from '@/shared/mask';
 import {
   UpdateProfileInput,
 } from './users.schema';
@@ -397,6 +398,8 @@ export class UserProfileService {
       viewerUserId: viewerUserId ?? null,
       companyId: options?.companyId ?? null,
     });
+    const identityMasked = redactContacts;
+
     if (redactContacts && result.profile) {
       result.profile.contactEmail = null;
       result.profile.contactPhone = null;
@@ -405,6 +408,23 @@ export class UserProfileService {
       result.profile.linkedin = null;
       result.profile.github = null;
     }
+
+    if (identityMasked) {
+      result.name = null;
+      result.maskedInitials = maskNameToInitials(user.profile?.fullName || user.name);
+      if (result.profile) {
+        result.profile.avatar = null;
+        result.profile.fullName = null;
+        result.profile.specificAddress = null;
+        result.profile.wardCodes = [];
+        result.profile.dayOfBirth = null;
+        result.profile.monthOfBirth = null;
+        result.profile.yearOfBirth = null;
+      }
+    } else {
+      result.maskedInitials = null;
+    }
+    result.identityMasked = identityMasked;
 
     return result;
   }
