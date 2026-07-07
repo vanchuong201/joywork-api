@@ -665,6 +665,7 @@ export class TalentPoolService {
                   isPublic: true, visibility: true,
                   title: true, fullName: true,
                   gender: true, dayOfBirth: true, monthOfBirth: true, yearOfBirth: true, educationLevel: true,
+                  status: true,
                 },
               },
               experiences: {
@@ -736,6 +737,7 @@ export class TalentPoolService {
           monthOfBirth: p.monthOfBirth,
           yearOfBirth: p.yearOfBirth,
           educationLevel: p.educationLevel,
+          status: p.status ?? null,
         },
         experiences: vis['experience'] !== false ? u.experiences : [],
         educations: vis['education'] !== false ? u.educations : [],

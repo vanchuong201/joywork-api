@@ -59,8 +59,25 @@ export async function usersRoutes(fastify: FastifyInstance) {
                   properties: {
                     id: { type: 'string' },
                     name: { type: 'string', nullable: true },
+                    maskedInitials: { type: 'string', nullable: true },
+                    identityMasked: { type: 'boolean' },
                     slug: { type: 'string', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
+                    maskedFields: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        avatar: { type: 'boolean' },
+                        contactEmail: { type: 'boolean' },
+                        contactPhone: { type: 'boolean' },
+                        cvUrl: { type: 'boolean' },
+                        website: { type: 'boolean' },
+                        linkedin: { type: 'boolean' },
+                        github: { type: 'boolean' },
+                        address: { type: 'boolean' },
+                        dateOfBirth: { type: 'boolean' },
+                      },
+                    },
                     profile: {
                       type: 'object',
                       nullable: true,

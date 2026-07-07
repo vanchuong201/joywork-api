@@ -5,7 +5,7 @@ import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
 import { slugify } from '@/shared/slug';
-import { maskNameToInitials } from '@/shared/mask';
+import { buildMaskedFieldPresence, maskNameToInitials } from '@/shared/mask';
 import {
   UpdateProfileInput,
 } from './users.schema';
@@ -410,8 +410,9 @@ export class UserProfileService {
     }
 
     if (identityMasked) {
-      result.name = null;
+      result.name = maskNameToInitials(user.profile?.fullName || user.name);
       result.maskedInitials = maskNameToInitials(user.profile?.fullName || user.name);
+      result.maskedFields = buildMaskedFieldPresence(user.profile);
       if (result.profile) {
         result.profile.avatar = null;
         result.profile.fullName = null;

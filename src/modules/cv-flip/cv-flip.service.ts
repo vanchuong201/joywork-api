@@ -7,7 +7,7 @@ import {
   resolveEmployerCandidateVisibility,
 } from '@/shared/candidates/employer-candidate-visibility';
 import { AppError } from '@/shared/errors/errorHandler';
-import { maskNameToInitials } from '@/shared/mask';
+import { buildMaskedFieldPresence, maskNameToInitials } from '@/shared/mask';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
 import { emailService } from '@/shared/services/email.service';
@@ -524,6 +524,7 @@ export class CvFlipService {
           monthOfBirth: true,
           yearOfBirth: true,
           educationLevel: true,
+          status: true,
         },
       },
     };
@@ -573,6 +574,7 @@ export class CvFlipService {
         monthOfBirth: null,
         yearOfBirth: null,
         educationLevel: user.profile?.educationLevel ?? null,
+        status: user.profile?.status ?? null,
         experiences: user.experiences.map((e) => ({
           id: e.id,
           role: e.role,
@@ -693,9 +695,12 @@ export class CvFlipService {
       candidate: {
         userId: candidate.id,
         slug: candidate.slug,
-        name: opts.maskIdentity ? null : profile?.fullName || candidate.name,
+        name: opts.maskIdentity
+          ? maskNameToInitials(profile?.fullName || candidate.name)
+          : profile?.fullName || candidate.name,
         maskedInitials: maskNameToInitials(profile?.fullName || candidate.name),
         identityMasked: opts.maskIdentity,
+        maskedFields: buildMaskedFieldPresence(profile),
         profile: {
           avatar: opts.maskIdentity ? null : profile?.avatar ?? candidate.avatar,
           fullName: opts.maskIdentity ? null : profile?.fullName ?? candidate.name,
