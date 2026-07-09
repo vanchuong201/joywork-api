@@ -168,7 +168,7 @@ model UserProfile {
   // Profile-specific fields
   fullName   String? // Full name for CV/applications (separate from User.name)
   title      String?
-  status     UserStatus?
+  status     UserStatus? @default(OPEN_TO_WORK)
   isPublic   Boolean     @default(true)
   isSearchingJob Boolean @default(true)
   allowCvFlip    Boolean @default(true)
