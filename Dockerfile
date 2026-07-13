@@ -46,7 +46,14 @@ ENV PORT=4000
 
 # Build toolchain for native modules (bcrypt) source-build fallback.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+  && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-vie \
+    tesseract-ocr-eng \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm config set fetch-retries 5 \
@@ -80,8 +87,16 @@ ENV PORT=4000
 # default (4) so concurrent password hashes don't queue behind each other.
 ENV UV_THREADPOOL_SIZE=8
 
-# Install wget for health checks and openssl for Prisma
-RUN apt-get update && apt-get install -y wget openssl && rm -rf /var/lib/apt/lists/*
+# Install runtime utilities for health checks, Prisma, and OCR fallback
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    wget \
+    openssl \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-vie \
+    tesseract-ocr-eng \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy app artifacts from builder
 COPY --from=builder /app/package*.json ./

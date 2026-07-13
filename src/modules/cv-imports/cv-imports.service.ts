@@ -102,7 +102,7 @@ export class CvImportsService {
       const parsedResult = await this.getParser().parse({ text: extracted.text, localeHint: 'auto' });
       const sanitized = this.sanitizeParsedCv(parsedResult.parsed);
 
-      const warnings = [...(sanitized.warnings ?? [])];
+      const warnings = [...(sanitized.warnings ?? []), ...(extracted.warnings ?? [])];
       if (extracted.truncated) {
         warnings.push('CV bị cắt do quá dài, một số phần ở cuối có thể bị thiếu.');
       }
