@@ -172,6 +172,29 @@ function normalizeWhitespace(text: string): string {
     .trim();
 }
 
+/**
+ * Canva (và một số designer export) thường tách heading bằng letter-spacing,
+ * khiến extract ra kiểu "H Ọ C V Ấ N". Ghép các chuỗi 1-ký-tự cách nhau bởi space.
+ * Chỉ dùng space/tab (không dùng \\s) để không gộp các dòng heading liền nhau.
+ * Giữ nguyên số điện thoại kiểu "0966 805 348" và câu thường.
+ */
+export function collapseSpacedLetters(text: string): string {
+  return text.replace(
+    /(?<![\p{L}\p{N}])((?:[\p{L}\p{N}][ \t]){2,}[\p{L}\p{N}])(?![\p{L}\p{N}])/gu,
+    (match) => {
+      const parts = match.trim().split(/[ \t]+/);
+      if (parts.length < 3) return match;
+      if (!parts.every((part) => part.length === 1)) return match;
+
+      const digitCount = parts.filter((part) => /^\d$/u.test(part)).length;
+      // Giữ nhóm số kiểu SĐT/năm có khoảng cách.
+      if (digitCount >= Math.ceil(parts.length * 0.6)) return match;
+
+      return parts.join('');
+    }
+  );
+}
+
 export async function extractCvText(params: {
   buffer: Buffer;
   mime: SupportedCvMime;
@@ -188,7 +211,7 @@ export async function extractCvText(params: {
     raw = await extractDocxText(buffer);
   }
 
-  const normalized = normalizeWhitespace(raw);
+  const normalized = collapseSpacedLetters(normalizeWhitespace(raw));
   if (normalized.length < MIN_USEFUL_TEXT_LENGTH) {
     throw new AppError(
       'CV không đọc được nội dung văn bản. Vui lòng dùng file PDF/DOCX không phải ảnh scan.',
