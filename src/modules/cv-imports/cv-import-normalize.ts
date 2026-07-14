@@ -20,20 +20,28 @@ function coerceString(value: unknown): string | null {
   return null;
 }
 
-function coerceStringArray(value: unknown, maxItems: number): string[] {
+function truncateString(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return value.slice(0, max).trimEnd();
+}
+
+function coerceStringArray(value: unknown, maxItems: number, maxItemLength?: number): string[] {
   if (!value) return [];
   const rawItems = Array.isArray(value) ? value : [value];
   const out: string[] = [];
   for (const item of rawItems) {
+    let candidate: string | null = null;
     if (typeof item === 'string') {
       const trimmed = item.trim();
-      if (trimmed) out.push(trimmed);
+      if (trimmed) candidate = trimmed;
     } else if (item && typeof item === 'object' && !Array.isArray(item)) {
       const obj = item as Record<string, unknown>;
-      const candidate = coerceString(
+      candidate = coerceString(
         obj['name'] ?? obj['title'] ?? obj['label'] ?? obj['value'] ?? obj['text']
       );
-      if (candidate) out.push(candidate);
+    }
+    if (candidate) {
+      out.push(typeof maxItemLength === 'number' ? truncateString(candidate, maxItemLength) : candidate);
     }
     if (out.length >= maxItems) break;
   }
@@ -108,13 +116,25 @@ function normalizeExperienceItem(value: unknown): Record<string, unknown> | null
   const obj = asRecord(value);
   if (!obj) return null;
   return {
-    role: coerceString(obj['role'] ?? obj['position'] ?? obj['title']),
-    company: coerceString(obj['company'] ?? obj['organization'] ?? obj['employer']),
+    role: (() => {
+      const value = coerceString(obj['role'] ?? obj['position'] ?? obj['title']);
+      return value ? truncateString(value, 200) : null;
+    })(),
+    company: (() => {
+      const value = coerceString(obj['company'] ?? obj['organization'] ?? obj['employer']);
+      return value ? truncateString(value, 200) : null;
+    })(),
     startDate: coerceString(obj['startDate'] ?? obj['start']),
     endDate: coerceString(obj['endDate'] ?? obj['end']),
-    period: coerceString(obj['period']),
-    desc: coerceString(obj['desc'] ?? obj['description'] ?? obj['summary']),
-    achievements: coerceStringArray(obj['achievements'] ?? obj['highlights'], 20),
+    period: (() => {
+      const value = coerceString(obj['period']);
+      return value ? truncateString(value, 60) : null;
+    })(),
+    desc: (() => {
+      const value = coerceString(obj['desc'] ?? obj['description'] ?? obj['summary']);
+      return value ? truncateString(value, 2000) : null;
+    })(),
+    achievements: coerceStringArray(obj['achievements'] ?? obj['highlights'], 20, 500),
   };
 }
 
@@ -122,13 +142,28 @@ function normalizeEducationItem(value: unknown): Record<string, unknown> | null 
   const obj = asRecord(value);
   if (!obj) return null;
   return {
-    school: coerceString(obj['school'] ?? obj['university'] ?? obj['institution']),
-    degree: coerceString(obj['degree'] ?? obj['major'] ?? obj['field']),
+    school: (() => {
+      const value = coerceString(obj['school'] ?? obj['university'] ?? obj['institution']);
+      return value ? truncateString(value, 200) : null;
+    })(),
+    degree: (() => {
+      const value = coerceString(obj['degree'] ?? obj['major'] ?? obj['field']);
+      return value ? truncateString(value, 200) : null;
+    })(),
     startDate: coerceString(obj['startDate'] ?? obj['start']),
     endDate: coerceString(obj['endDate'] ?? obj['end']),
-    period: coerceString(obj['period']),
-    gpa: coerceString(obj['gpa'] ?? obj['grade']),
-    honors: coerceString(obj['honors'] ?? obj['awards']),
+    period: (() => {
+      const value = coerceString(obj['period']);
+      return value ? truncateString(value, 60) : null;
+    })(),
+    gpa: (() => {
+      const value = coerceString(obj['gpa'] ?? obj['grade']);
+      return value ? truncateString(value, 40) : null;
+    })(),
+    honors: (() => {
+      const value = coerceString(obj['honors'] ?? obj['awards']);
+      return value ? truncateString(value, 200) : null;
+    })(),
   };
 }
 
@@ -139,11 +174,16 @@ function normalizeBasicInfo(value: unknown): Record<string, unknown> {
   const yearOfBirth =
     year !== null && year >= 1900 && year <= currentYear ? year : null;
 
+  const fullName = coerceString(obj['fullName'] ?? obj['name']);
+  const title = coerceString(obj['title'] ?? obj['position']);
+  const headline = coerceString(obj['headline'] ?? obj['tagline']);
+  const bio = coerceString(obj['bio'] ?? obj['summary'] ?? obj['about']);
+
   return {
-    fullName: coerceString(obj['fullName'] ?? obj['name']),
-    title: coerceString(obj['title'] ?? obj['position']),
-    headline: coerceString(obj['headline'] ?? obj['tagline']),
-    bio: coerceString(obj['bio'] ?? obj['summary'] ?? obj['about']),
+    fullName: fullName ? truncateString(fullName, 200) : null,
+    title: title ? truncateString(title, 150) : null,
+    headline: headline ? truncateString(headline, 150) : null,
+    bio: bio ? truncateString(bio, 2000) : null,
     gender: normalizeGender(obj['gender']),
     yearOfBirth,
   };
@@ -197,14 +237,15 @@ export function normalizeAiParsedCvPayload(raw: unknown): Record<string, unknown
   return {
     basicInfo: normalizeBasicInfo(root['basicInfo']),
     contact: normalizeContact(root['contact']),
-    skills: coerceStringArray(root['skills'], 40),
-    knowledge: coerceStringArray(root['knowledge'], 40),
-    attitude: coerceStringArray(root['attitude'], 40),
-    careerGoals: coerceStringArray(root['careerGoals'] ?? root['goals'], 20),
+    // Truncate theo giới hạn parsedCvSchema để tránh job FAIL vì string dài từ Canva/OCR.
+    skills: coerceStringArray(root['skills'], 40, 80),
+    knowledge: coerceStringArray(root['knowledge'], 40, 200),
+    attitude: coerceStringArray(root['attitude'], 40, 200),
+    careerGoals: coerceStringArray(root['careerGoals'] ?? root['goals'], 20, 500),
     expectations: normalizeExpectations(root['expectations']),
     experiences,
     educations,
-    warnings: coerceStringArray(root['warnings'], 20),
+    warnings: coerceStringArray(root['warnings'], 20, 500),
     confidence: coerceFloat01(root['confidence']),
   };
 }

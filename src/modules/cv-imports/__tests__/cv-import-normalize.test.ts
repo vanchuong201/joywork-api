@@ -58,4 +58,25 @@ describe('normalizeAiParsedCvPayload', () => {
     expect(result.data.contact.contactEmail).toBeNull();
     expect(result.data.contact.website).toBeNull();
   });
+
+  it('cắt ngắn skill quá dài để không fail schema Zod', () => {
+    const longSkill =
+      'Kỹ năng sử dụng các phần mềm tin học văn phòng như: Word, Excel, Powerpoint, Canva...';
+    expect(longSkill.length).toBeGreaterThan(80);
+
+    const normalized = normalizeAiParsedCvPayload({
+      basicInfo: {
+        headline: 'H'.repeat(200),
+      },
+      skills: [longSkill, 'Sourcing'],
+    });
+
+    const result = parsedCvSchema.safeParse(normalized);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.skills[0]?.length).toBeLessThanOrEqual(80);
+    expect(result.data.skills).toContain('Sourcing');
+    expect((result.data.basicInfo.headline ?? '').length).toBeLessThanOrEqual(150);
+  });
 });
