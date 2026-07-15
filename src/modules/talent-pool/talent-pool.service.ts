@@ -1,4 +1,5 @@
 import { prisma } from '@/shared/database/prisma';
+import { buildCvReadyUserWhere } from '@/shared/candidates/cv-readiness';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { emailService } from '@/shared/services/email.service';
@@ -562,7 +563,7 @@ export class TalentPoolService {
       status: 'ACTIVE',
     };
 
-    const conditions: Prisma.UserWhereInput[] = [];
+    const conditions: Prisma.UserWhereInput[] = [buildCvReadyUserWhere()];
 
     if (q) {
       conditions.push({

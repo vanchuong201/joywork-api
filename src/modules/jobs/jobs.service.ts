@@ -14,6 +14,7 @@ import { notificationService } from '@/shared/services/notification.service';
 import { slugifyVietnamese } from '@/shared/job-slug';
 import { computeWorksOnSaturday, type WorkingTimeRange } from '@/shared/working-time';
 import { generateAndStoreJobEmbedding, generateEmbedding } from '@/shared/services/embedding.service';
+import { evaluateCandidateCvReadiness } from '@/shared/candidates/cv-readiness';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -132,14 +133,6 @@ export interface JobFavorite {
 }
 
 export class JobsService {
-  private hasNonEmptyTextItem(items?: string[] | null): boolean {
-    return (items ?? []).some((item) => item.trim().length > 0);
-  }
-
-  private isFilledText(value?: string | null): boolean {
-    return Boolean(value?.trim());
-  }
-
   private async assertApplicantCvReady(userId: string): Promise<void> {
     const userCvData = await prisma.user.findUnique({
       where: { id: userId },
@@ -174,32 +167,21 @@ export class JobsService {
       throw new AppError('Không tìm thấy ứng viên', 404, 'USER_NOT_FOUND');
     }
 
-    const profile = userCvData.profile;
-    const hasBasicInfo =
-      Boolean(profile?.avatar || userCvData.avatar) &&
-      this.isFilledText(profile?.fullName || userCvData.name) &&
-      this.isFilledText(profile?.title) &&
-      this.isFilledText(profile?.bio) &&
-      this.isFilledText(profile?.contactEmail || userCvData.email) &&
-      this.isFilledText(profile?.contactPhone || userCvData.phone) &&
-      (this.hasNonEmptyTextItem(profile?.locations));
-    const hasKsa =
-      this.hasNonEmptyTextItem(profile?.knowledge) ||
-      this.hasNonEmptyTextItem(profile?.skills) ||
-      this.hasNonEmptyTextItem(profile?.attitude);
-    const hasExperiences = userCvData._count.experiences > 0;
+    const readiness = evaluateCandidateCvReadiness({
+      name: userCvData.name,
+      email: userCvData.email,
+      phone: userCvData.phone,
+      avatar: userCvData.avatar,
+      profile: userCvData.profile,
+      experiencesCount: userCvData._count.experiences,
+    });
 
-    if (hasBasicInfo && hasKsa && hasExperiences) {
+    if (readiness.isReady) {
       return;
     }
 
-    const missingItems: string[] = [];
-    if (!hasBasicInfo) missingItems.push('Thông tin cơ bản');
-    if (!hasKsa) missingItems.push('Năng lực (KSA)');
-    if (!hasExperiences) missingItems.push('Kinh nghiệm làm việc');
-
     throw new AppError(
-      `Bạn cần cập nhật ${missingItems.join(', ')} trước khi ứng tuyển`,
+      `Bạn cần cập nhật ${readiness.missingSections.join(', ')} trước khi ứng tuyển`,
       400,
       'CV_PROFILE_INCOMPLETE'
     );

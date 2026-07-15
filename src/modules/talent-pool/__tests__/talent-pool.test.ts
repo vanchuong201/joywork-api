@@ -323,4 +323,70 @@ describe('TalentPoolService', () => {
       await expect(service.toggleEntitlement('nope', true)).rejects.toThrow('Không tìm thấy công ty');
     });
   });
+
+  describe('listCandidates', () => {
+    it('áp dụng điều kiện CV đủ chuẩn trong where trước khi phân trang', async () => {
+      vi.mocked(prisma.talentPoolMember.findMany).mockResolvedValue([
+        {
+          id: 'member-1',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          user: {
+            id: 'user-1',
+            name: 'Candidate One',
+            slug: 'candidate-one',
+            profile: {
+              avatar: 'https://cdn/avatar.jpg',
+              headline: 'Backend',
+              bio: 'Ready for work',
+              skills: ['Node.js'],
+              locations: ['ha-noi'],
+              wardCodes: [],
+              knowledge: ['API'],
+              attitude: [],
+              expectedSalaryMin: 10_000_000n,
+              expectedSalaryMax: 20_000_000n,
+              salaryCurrency: 'VND',
+              workMode: 'ONSITE',
+              expectedCulture: null,
+              isPublic: true,
+              visibility: null,
+              title: 'Backend Engineer',
+              fullName: 'Candidate One',
+              gender: 'MALE',
+              dayOfBirth: 1,
+              monthOfBirth: 1,
+              yearOfBirth: 1995,
+              educationLevel: 'BACHELOR',
+              status: 'OPEN_TO_WORK',
+            },
+            experiences: [
+              {
+                id: 'exp-1',
+                role: 'Developer',
+                company: 'JoyWork',
+                period: '2022-2024',
+                desc: 'Build APIs',
+                achievements: [],
+                order: 1,
+              },
+            ],
+            educations: [],
+          },
+        },
+      ] as never);
+      vi.mocked(prisma.talentPoolMember.count).mockResolvedValue(1 as never);
+
+      const result = await service.listCandidates({ page: 1, limit: 10 });
+
+      expect(result.pagination.total).toBe(1);
+      expect(result.candidates).toHaveLength(1);
+
+      const findManyWhere = vi.mocked(prisma.talentPoolMember.findMany).mock.calls[0][0]?.where as {
+        user?: { AND?: Array<Record<string, unknown>> };
+      };
+      const readinessCondition = (findManyWhere.user?.AND ?? []).find((condition) => Array.isArray(condition.AND));
+      expect(readinessCondition).toBeTruthy();
+      expect(readinessCondition?.AND).toContainEqual({ experiences: { some: {} } });
+    });
+  });
 });

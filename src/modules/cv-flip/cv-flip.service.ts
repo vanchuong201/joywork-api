@@ -6,6 +6,7 @@ import {
   getLatestApplicationResumeUrl,
   resolveEmployerCandidateVisibility,
 } from '@/shared/candidates/employer-candidate-visibility';
+import { buildCvReadyUserWhere, cvReadyRawSqlCondition } from '@/shared/candidates/cv-readiness';
 import { AppError } from '@/shared/errors/errorHandler';
 import { buildMaskedFieldPresence, maskNameToInitials } from '@/shared/mask';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
@@ -310,7 +311,7 @@ export class CvFlipService {
       },
     };
 
-    const andConditions: Prisma.UserWhereInput[] = [];
+    const andConditions: Prisma.UserWhereInput[] = [buildCvReadyUserWhere()];
 
     if (keyword) {
       andConditions.push({
@@ -431,7 +432,17 @@ export class CvFlipService {
 
       // Only use relevance ordering if there are no additional complex filters
       // that would cause mismatch between raw query results and actual filtered results
-      const hasComplexFilters = Boolean(skills?.length) || ward || education || workMode || salaryFilter;
+      const hasComplexFilters =
+        Boolean(skills?.length) ||
+        Boolean(locations?.length) ||
+        Boolean(ward) ||
+        Boolean(education) ||
+        Boolean(workMode) ||
+        Boolean(salaryFilter) ||
+        Boolean(gender) ||
+        yearOfBirthMin !== undefined ||
+        yearOfBirthMax !== undefined ||
+        Boolean(educationLevels?.length);
 
       if (!hasComplexFilters) {
         // Include keyword filter in WHERE clause to ensure total matches actual results
@@ -442,6 +453,7 @@ export class CvFlipService {
           WHERE u."accountStatus" = 'ACTIVE'
             AND p."isPublic" = true
             AND p."isSearchingJob" = true
+            AND ${cvReadyRawSqlCondition}
             AND (
               p.title ILIKE ${`%${escapedKeyword}%`}
               OR p.headline ILIKE ${`%${escapedKeyword}%`}
