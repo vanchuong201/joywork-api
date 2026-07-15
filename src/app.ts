@@ -25,6 +25,7 @@ import { locationsRoutes } from '@/modules/locations/locations.routes';
 import { coursesRoutes } from '@/modules/courses/courses.routes';
 import { cvFlipRoutes } from '@/modules/cv-flip/cv-flip.routes';
 import { cvImportsRoutes } from '@/modules/cv-imports/cv-imports.routes';
+import { cvExportsRoutes } from '@/modules/cv-exports/cv-exports.routes';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -32,19 +33,22 @@ export async function createApp(): Promise<FastifyInstance> {
     // App chạy sau reverse proxy (traefik, + Cloudflare khi bật). Tin proxy để
     // request.ip / protocol phản ánh client thật thay vì IP của proxy.
     trustProxy: true,
-    logger: config.NODE_ENV === 'development' ? {
-      level: config.LOG_LEVEL,
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
-        },
-      },
-    } : {
-      level: config.LOG_LEVEL,
-    },
+    logger:
+      config.NODE_ENV === 'development'
+        ? {
+            level: config.LOG_LEVEL,
+            transport: {
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                translateTime: 'HH:MM:ss Z',
+                ignore: 'pid,hostname',
+              },
+            },
+          }
+        : {
+            level: config.LOG_LEVEL,
+          },
   });
 
   // Register plugins
@@ -58,41 +62,56 @@ export async function createApp(): Promise<FastifyInstance> {
   }
 
   const isDevelopmentLocalOrigin = (origin: string): boolean => {
-    if (config.NODE_ENV !== 'development') return false;
+    if (config.NODE_ENV !== 'development') {
+      return false;
+    }
 
     try {
       const parsed = new URL(origin);
-      if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return false;
+      }
 
       const hostname = parsed.hostname;
       const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(hostname);
       const is192Range = /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname);
       const is10Range = /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
-      const is172Range = /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname);
+      const is172Range = /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(
+        hostname
+      );
 
       return isLoopback || is192Range || is10Range || is172Range;
     } catch {
       return false;
     }
   };
-  
+
   await app.register(cors, {
     origin: (origin, cb) => {
       // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return cb(null, true);
-      
+      if (!origin) {
+        return cb(null, true);
+      }
+
       // Allow configured frontend origin and local/LAN origins in development.
       if (allowedOrigins.has(origin) || isDevelopmentLocalOrigin(origin)) {
         return cb(null, true);
       }
-      
+
       // Reject other origins
       return cb(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With', 'Accept', 'Origin'],
-    exposedHeaders: ['Authorization'],
+    allowedHeaders: [
+      'Authorization',
+      'Content-Type',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+    ],
+    // Content-Disposition phải được expose để browser đọc tên file khi tải PDF
+    exposedHeaders: ['Authorization', 'Content-Disposition'],
   });
 
   await app.register(helmet, {
@@ -105,16 +124,20 @@ export async function createApp(): Promise<FastifyInstance> {
     // Key theo IP CLIENT thật, không phải IP proxy (traefik/Cloudflare). Ưu tiên
     // CF-Connecting-IP (Cloudflare set, client không giả mạo được), rồi X-Forwarded-For
     // đầu tiên, cuối cùng request.ip. Tránh việc mọi user chung 1 bucket = 429 hàng loạt.
-    keyGenerator: (req) => {
+    keyGenerator: req => {
       const cfIp = req.headers['cf-connecting-ip'];
-      if (typeof cfIp === 'string' && cfIp) return cfIp;
+      if (typeof cfIp === 'string' && cfIp) {
+        return cfIp;
+      }
       const xff = req.headers['x-forwarded-for'];
-      if (typeof xff === 'string' && xff) return xff.split(',')[0]!.trim();
+      if (typeof xff === 'string' && xff) {
+        return xff.split(',')[0]!.trim();
+      }
       return req.ip;
     },
     // Cho phép bỏ qua giới hạn khi request mang header bí mật khớp RATE_LIMIT_BYPASS_KEY.
     // Dùng cho load test từ 1 nguồn (per-IP limit sẽ chặn). Trống ở prod => không ai bypass.
-    allowList: (req) => {
+    allowList: req => {
       const key = config.RATE_LIMIT_BYPASS_KEY;
       return Boolean(key) && req.headers['x-loadtest-key'] === key;
     },
@@ -161,7 +184,7 @@ export async function createApp(): Promise<FastifyInstance> {
       },
     },
     staticCSP: true,
-    transformStaticCSP: (header) => header,
+    transformStaticCSP: header => header,
     transformSpecification: (swaggerObject, _request, _reply) => {
       return swaggerObject;
     },
@@ -203,6 +226,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(coursesRoutes, { prefix: '/api/courses' });
   await app.register(cvFlipRoutes, { prefix: '/api/cv-flip' });
   await app.register(cvImportsRoutes, { prefix: '/api/cv-imports' });
+  await app.register(cvExportsRoutes, { prefix: '/api/cv-exports' });
 
   return app;
 }

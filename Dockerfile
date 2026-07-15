@@ -50,6 +50,7 @@ RUN apt-get update \
     python3 \
     make \
     g++ \
+    fonts-noto-core \
     poppler-utils \
     tesseract-ocr \
     tesseract-ocr-vie \
@@ -70,6 +71,8 @@ RUN npm run db:generate
 
 COPY tsconfig.json ./
 COPY src ./src
+# Bundled fonts for CV PDF export (Vietnamese glyph support)
+COPY assets ./assets
 
 EXPOSE 4000
 
@@ -92,6 +95,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     wget \
     openssl \
+    fonts-noto-core \
     poppler-utils \
     tesseract-ocr \
     tesseract-ocr-vie \
@@ -110,6 +114,8 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/src ./src
 # Operational scripts (migrations backfill, reindex, etc.)
 COPY scripts ./scripts
+# Bundled fonts for CV PDF export (Vietnamese glyph support)
+COPY assets ./assets
 
 # Prisma client is already generated in builder stage and included in node_modules
 # No need to regenerate to save disk space
