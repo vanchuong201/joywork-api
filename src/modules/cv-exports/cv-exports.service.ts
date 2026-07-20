@@ -1,4 +1,6 @@
 import { AppError } from '@/shared/errors/errorHandler';
+import { getProvinceNameByCode } from '@/shared/provinces';
+import { WARD_BY_CODE } from '@/shared/wards';
 import { CvFlipService } from '@/modules/cv-flip/cv-flip.service';
 import { UserProfileService } from '@/modules/users/user-profile.service';
 import {
@@ -48,6 +50,7 @@ interface LooseRecord {
   github?: unknown;
   cvUrl?: unknown;
   specificAddress?: unknown;
+  location?: unknown;
   locations?: unknown;
   wardCodes?: unknown;
   dayOfBirth?: unknown;
@@ -240,6 +243,50 @@ function formatSalaryExpectation(profile: LooseRecord | null): string | null {
   return `Đến ${formatNumber(max ?? 0)} ${currency}`;
 }
 
+/**
+ * Địa chỉ đầy đủ khớp web: `Địa chỉ cụ thể - Phường/Xã - Tỉnh/Thành`.
+ * Phường/xã resolve từ `wardCodes`, tỉnh/thành ưu tiên `location` (đã resolve),
+ * fallback resolve từ mã trong `locations`. Khi bị ẩn danh tính thì
+ * `wardCodes`/`specificAddress` rỗng nên chỉ còn tỉnh/thành.
+ */
+function buildAddressValue(profile: LooseRecord | null): string | null {
+  if (!profile) {
+    return null;
+  }
+
+  const parts: string[] = [];
+
+  const specific = toOptionalSanitized(profile.specificAddress);
+  if (specific) {
+    parts.push(specific);
+  }
+
+  const firstWardCode = asStringArray(profile.wardCodes).find(code =>
+    code.includes('/')
+  );
+  if (firstWardCode) {
+    const ward = WARD_BY_CODE.get(firstWardCode);
+    if (ward) {
+      const wardName = sanitizeText(ward.fullName ?? ward.name);
+      if (wardName) {
+        parts.push(wardName);
+      }
+    }
+  }
+
+  const provinceName = toOptionalSanitized(profile.location);
+  if (provinceName) {
+    parts.push(provinceName);
+  } else {
+    const firstProvinceCode = asStringArray(profile.locations)[0];
+    if (firstProvinceCode) {
+      parts.push(getProvinceNameByCode(firstProvinceCode) ?? firstProvinceCode);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(' - ') : null;
+}
+
 function isLikelyHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -372,7 +419,7 @@ export class CvExportsService {
 
     const website = toOptionalSanitized(profile?.website);
     if (website && isLikelyHttpUrl(website)) {
-      contactItems.push({ label: 'Website', value: website });
+      contactItems.push({ label: 'Website/Portfolio', value: website });
     }
 
     const linkedin = toOptionalSanitized(profile?.linkedin);
@@ -390,12 +437,9 @@ export class CvExportsService {
       contactItems.push({ label: 'File CV', value: cvUrl });
     }
 
-    const addressBits = [
-      toOptionalSanitized(profile?.specificAddress),
-      ...asStringArray(profile?.locations),
-    ].filter((value): value is string => Boolean(value));
-    if (addressBits.length > 0) {
-      contactItems.push({ label: 'Khu vực', value: addressBits.join(', ') });
+    const addressValue = buildAddressValue(profile);
+    if (addressValue) {
+      contactItems.push({ label: 'Khu vực', value: addressValue });
     }
 
     const birthDate = formatBirthDate(profile);
@@ -511,7 +555,7 @@ export class CvExportsService {
 
     const website = toOptionalSanitized(candidateProfile?.website);
     pushContact(
-      'Website',
+      'Website/Portfolio',
       website && isLikelyHttpUrl(website) ? website : null,
       'website'
     );
@@ -537,14 +581,11 @@ export class CvExportsService {
       'cvUrl'
     );
 
-    const addressBits = [
-      toOptionalSanitized(candidateProfile?.specificAddress),
-      ...asStringArray(candidateProfile?.locations),
-    ].filter((value): value is string => Boolean(value));
-    if (addressBits.length > 0) {
+    const addressValue = buildAddressValue(candidateProfile);
+    if (addressValue) {
       contactItems.push({
         label: 'Khu vực',
-        value: addressBits.join(', '),
+        value: addressValue,
         masked: identityMasked,
       });
     } else if (identityMasked && asBoolean(maskedFields?.address)) {
