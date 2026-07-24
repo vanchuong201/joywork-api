@@ -270,6 +270,77 @@ Trân trọng,
     });
   }
 
+  async sendCandidateOnboardingEmail(
+    to: string,
+    name: string | null,
+    activationUrl: string,
+  ): Promise<void> {
+    const userName = name || 'bạn';
+    const subject = 'JOYWORK - Kích hoạt tài khoản ứng viên của bạn';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kích hoạt tài khoản ứng viên - JOYWORK</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #eee;">
+    <h2 style="color: #295892; margin-bottom: 20px;">Kích hoạt tài khoản ứng viên</h2>
+    <p>Chào ${userName},</p>
+    <p>
+      JOYWORK đã tạo sẵn tài khoản ứng viên cho bạn từ dữ liệu tuyển dụng đã được chia sẻ.
+      Vui lòng kích hoạt tài khoản để đặt mật khẩu lần đầu và hoàn tất hồ sơ.
+    </p>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${activationUrl}" style="display: inline-block; background-color: #295892; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        Kích hoạt tài khoản
+      </a>
+    </div>
+
+    <p style="font-size: 14px; color: #666;">
+      Nếu nút trên không hoạt động, bạn có thể sao chép đường dẫn này vào trình duyệt:<br/>
+      <a href="${activationUrl}" style="color: #295892; word-break: break-all;">${activationUrl}</a>
+    </p>
+
+    <p style="font-size: 13px; color: #666;">
+      Lưu ý: Link kích hoạt chỉ dùng một lần và sẽ hết hạn theo chính sách bảo mật của hệ thống.
+    </p>
+
+    <p style="margin-top: 20px;">
+      Trân trọng,<br>
+      <strong>Đội ngũ JOYWORK</strong>
+    </p>
+  </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Chào ${userName},
+
+JOYWORK đã tạo sẵn tài khoản ứng viên cho bạn từ dữ liệu tuyển dụng đã được chia sẻ.
+Vui lòng kích hoạt tài khoản để đặt mật khẩu lần đầu và hoàn tất hồ sơ.
+
+Link kích hoạt: ${activationUrl}
+
+Lưu ý: Link kích hoạt chỉ dùng một lần và sẽ hết hạn theo chính sách bảo mật của hệ thống.
+
+Trân trọng,
+Đội ngũ JOYWORK
+    `;
+
+    await this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
   async sendCompanyTicketOwnerEmail(
     to: string,
     payload: {

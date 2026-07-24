@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { SystemService } from './system.service';
 import { SystemController } from './system.controller';
 import { SystemImportController } from './system-import.controller';
+import { SystemCandidateImportController } from './system-candidate-import.controller';
+import { SystemCandidateImportService } from './system-candidate-import.service';
 import { SystemTalentPoolController } from './system-talent-pool.controller';
 import { ApiTokenService } from './api-token.service';
 import { ApiTokenController } from './api-token.controller';
@@ -17,6 +19,8 @@ export async function systemRoutes(fastify: FastifyInstance) {
   const systemService = new SystemService();
   const systemController = new SystemController(systemService);
   const importController = new SystemImportController();
+  const candidateImportService = new SystemCandidateImportService();
+  const candidateImportController = new SystemCandidateImportController(candidateImportService);
   const talentPoolService = new TalentPoolService();
   const tpController = new SystemTalentPoolController(talentPoolService);
   const courseAdminService = new CourseAdminService();
@@ -1395,6 +1399,134 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, importController.importCompaniesJobs.bind(importController));
+
+  fastify.post('/import/candidates/dry-run', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Dry-run import ứng viên từ CSV/Excel, không ghi DB.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      consumes: ['multipart/form-data'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                report: {
+                  type: 'object',
+                  properties: {
+                    fileName: { type: 'string' },
+                    totalRows: { type: 'number' },
+                    validRows: { type: 'number' },
+                    existingRows: { type: 'number' },
+                    duplicateRows: { type: 'number' },
+                    invalidRows: { type: 'number' },
+                    linkSummary: {
+                      type: 'object',
+                      properties: {
+                        autoFetchable: { type: 'number' },
+                        manualUpload: { type: 'number' },
+                        empty: { type: 'number' },
+                      },
+                    },
+                    rows: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          rowNumber: { type: 'number' },
+                          email: { type: ['string', 'null'] },
+                          status: {
+                            type: 'string',
+                            enum: ['VALID', 'EXISTING_EMAIL', 'DUPLICATE_EMAIL_IN_FILE', 'INVALID'],
+                          },
+                          issues: { type: 'array', items: { type: 'string' } },
+                          cvLinkType: { type: 'string' },
+                          linkAction: { type: 'string', enum: ['AUTO_FETCHABLE', 'MANUAL_UPLOAD', 'EMPTY'] },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, candidateImportController.dryRun.bind(candidateImportController));
+
+  fastify.post('/import/candidates/commit', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Commit import ứng viên: tạo tài khoản, lưu record và gửi email kích hoạt.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      consumes: ['multipart/form-data'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                batchId: { type: 'string' },
+                totalRows: { type: 'number' },
+                created: { type: 'number' },
+                skipped: { type: 'number' },
+                failed: { type: 'number' },
+                records: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      rowNumber: { type: 'number' },
+                      email: { type: ['string', 'null'] },
+                      status: { type: 'string', enum: ['CREATED', 'SKIPPED_EXISTING', 'FAILED'] },
+                      error: { type: ['string', 'null'] },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, candidateImportController.commit.bind(candidateImportController));
+
+  fastify.post('/import/candidates/resend', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Admin gửi lại email kích hoạt cho một bản ghi import ứng viên.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['recordId'],
+        properties: {
+          recordId: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' },
+                expiresAt: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, candidateImportController.resend.bind(candidateImportController));
 
   // ── Courses (admin) ──
 

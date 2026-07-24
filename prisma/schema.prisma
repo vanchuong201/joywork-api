@@ -53,6 +53,9 @@ model User {
   cvFlipRequestsSent      CvFlipRequest[]          @relation("CvFlipRequester")
   cvImportJobs            CvImportJob[]
   apiTokens               ApiToken[]
+  onboardingTokens        OnboardingToken[]
+  candidateImportRecords  CandidateImportRecord[]
+  candidateImportBatchesCreated CandidateImportBatch[] @relation("CandidateImportBatchCreatedBy")
 
   // Talent Pool
   talentPoolMember          TalentPoolMember?        @relation("TalentPoolMemberUser")
@@ -121,6 +124,73 @@ model ApiToken {
   @@map("api_tokens")
 }
 
+model CandidateImportBatch {
+  id               String   @id @default(cuid())
+  createdByAdminId String
+  fileName         String
+  totalRows        Int
+  created          Int
+  skipped          Int
+  failed           Int
+  createdAt        DateTime @default(now())
+
+  createdByAdmin  User                    @relation("CandidateImportBatchCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Cascade)
+  records         CandidateImportRecord[]
+  onboardingTokens OnboardingToken[]
+
+  @@index([createdByAdminId])
+  @@map("candidate_import_batches")
+}
+
+model CandidateImportRecord {
+  id               String                      @id @default(cuid())
+  batchId          String
+  userId           String?
+  email            String
+  rawName          String?
+  rawPhone         String?
+  rawProvince      String?
+  rawDistrict      String?
+  rawPosition      String?
+  rawSalary        String?
+  rawExperience    String?
+  rawSocialLink    String?
+  rawCvLink        String?
+  rawPortfolioLink String?
+  cvLinkType       CandidateCvLinkType         @default(EMPTY)
+  status           CandidateImportRecordStatus
+  error            String?
+  activatedAt      DateTime?
+  createdAt        DateTime                    @default(now())
+
+  batch CandidateImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  user  User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
+  @@index([email])
+  @@index([userId])
+  @@index([status])
+  @@map("candidate_import_records")
+}
+
+model OnboardingToken {
+  id        String   @id @default(cuid())
+  userId    String
+  batchId   String?
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batch CandidateImportBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([batchId])
+  @@index([expiresAt])
+  @@map("onboarding_tokens")
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -129,6 +199,22 @@ enum UserRole {
 enum UserAccountStatus {
   ACTIVE
   SUSPENDED
+}
+
+enum CandidateImportRecordStatus {
+  CREATED
+  SKIPPED_EXISTING
+  FAILED
+}
+
+enum CandidateCvLinkType {
+  DRIVE_FILE
+  DRIVE_DOC
+  CANVA
+  LINKEDIN
+  FOLDER
+  OTHER
+  EMPTY
 }
 
 enum UserStatus {
