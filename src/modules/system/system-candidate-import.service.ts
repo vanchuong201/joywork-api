@@ -19,7 +19,7 @@ import {
   type CandidateImportRow,
 } from './system-candidate-import.schema';
 
-const ONBOARDING_TOKEN_TTL_MS = 10 * 24 * 60 * 60 * 1000;
+const ONBOARDING_TOKEN_TTL_MS = config.ONBOARDING_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 const ADMIN_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
 const EMAIL_BATCH_SIZE = 20;
 const EMAIL_BATCH_DELAY_MS = 5_000;
@@ -47,6 +47,9 @@ interface CommitResultSummary {
 
 interface CandidateRowWithMeta extends CandidateImportDryRunRow {
   normalizedEmail: string | null;
+  safeSocialLink: string | null;
+  safeCvLink: string | null;
+  safePortfolioLink: string | null;
 }
 
 interface ScheduledEmailPayload {
@@ -117,6 +120,20 @@ function normalizeEmail(raw: string | null): string | null {
   if (!raw) return null;
   const normalized = raw.trim().toLowerCase();
   return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeExternalUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (!parsed.hostname) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 function classifyCvLink(link: string | null | undefined): CandidateCvLinkType {
@@ -417,9 +434,9 @@ export class SystemCandidateImportService {
             rawPosition: row.position,
             rawSalary: row.salary,
             rawExperience: row.experience,
-            rawSocialLink: row.socialLink,
-            rawCvLink: row.cvLink,
-            rawPortfolioLink: row.portfolioLink,
+            rawSocialLink: row.safeSocialLink,
+            rawCvLink: row.safeCvLink,
+            rawPortfolioLink: row.safePortfolioLink,
             cvLinkType: row.cvLinkType,
             status: 'FAILED',
             error: row.issues.join('; '),
@@ -459,9 +476,9 @@ export class SystemCandidateImportService {
             rawPosition: row.position,
             rawSalary: row.salary,
             rawExperience: row.experience,
-            rawSocialLink: row.socialLink,
-            rawCvLink: row.cvLink,
-            rawPortfolioLink: row.portfolioLink,
+            rawSocialLink: row.safeSocialLink,
+            rawCvLink: row.safeCvLink,
+            rawPortfolioLink: row.safePortfolioLink,
             cvLinkType: row.cvLinkType,
             status: 'SKIPPED_EXISTING',
           },
@@ -513,7 +530,7 @@ export class SystemCandidateImportService {
               contactPhone: normalizedPhone,
               locations: provinceCode ? [provinceCode] : [],
               wardCodes,
-              linkedin: row.socialLink?.toLowerCase().includes('linkedin.com') ? row.socialLink : null,
+              linkedin: row.safeSocialLink?.toLowerCase().includes('linkedin.com') ? row.safeSocialLink : null,
             },
           });
 
@@ -540,9 +557,9 @@ export class SystemCandidateImportService {
               rawPosition: row.position,
               rawSalary: row.salary,
               rawExperience: row.experience,
-              rawSocialLink: row.socialLink,
-              rawCvLink: row.cvLink,
-              rawPortfolioLink: row.portfolioLink,
+              rawSocialLink: row.safeSocialLink,
+              rawCvLink: row.safeCvLink,
+              rawPortfolioLink: row.safePortfolioLink,
               cvLinkType: row.cvLinkType,
               status: 'CREATED',
             },
@@ -589,9 +606,9 @@ export class SystemCandidateImportService {
             rawPosition: row.position,
             rawSalary: row.salary,
             rawExperience: row.experience,
-            rawSocialLink: row.socialLink,
-            rawCvLink: row.cvLink,
-            rawPortfolioLink: row.portfolioLink,
+            rawSocialLink: row.safeSocialLink,
+            rawCvLink: row.safeCvLink,
+            rawPortfolioLink: row.safePortfolioLink,
             cvLinkType: row.cvLinkType,
             status: 'FAILED',
             error: message,
@@ -718,6 +735,9 @@ export class SystemCandidateImportService {
       const normalizedEmail = normalizeEmail(row.email);
       const issues: string[] = [];
       let status: CandidateRowWithMeta['status'] = 'VALID';
+      const safeCvLink = normalizeExternalUrl(row.cvLink);
+      const safePortfolioLink = normalizeExternalUrl(row.portfolioLink);
+      const safeSocialLink = normalizeExternalUrl(row.socialLink);
 
       if (!normalizedEmail) {
         issues.push('Thiếu email');
@@ -736,12 +756,29 @@ export class SystemCandidateImportService {
         }
       }
 
-      const preferredLink = extractPreferredLink(row);
+      if (row.cvLink && !safeCvLink) {
+        issues.push('Link CV không hợp lệ (chỉ chấp nhận URL http/https)');
+      }
+      if (row.portfolioLink && !safePortfolioLink) {
+        issues.push('Link Portfolio không hợp lệ (chỉ chấp nhận URL http/https)');
+      }
+      if (row.socialLink && !safeSocialLink) {
+        issues.push('Link Social không hợp lệ (chỉ chấp nhận URL http/https)');
+      }
+
+      const preferredLink = extractPreferredLink({
+        ...row,
+        cvLink: safeCvLink,
+        portfolioLink: safePortfolioLink,
+      });
       const cvLinkType = classifyCvLink(preferredLink);
 
       return {
         ...row,
         normalizedEmail,
+        safeSocialLink,
+        safeCvLink,
+        safePortfolioLink,
         status,
         issues,
         cvLinkType,
@@ -804,9 +841,9 @@ export class SystemCandidateImportService {
         position: row.position,
         salary: row.salary,
         experience: row.experience,
-        socialLink: row.socialLink,
-        cvLink: row.cvLink,
-        portfolioLink: row.portfolioLink,
+        socialLink: row.safeSocialLink,
+        cvLink: row.safeCvLink,
+        portfolioLink: row.safePortfolioLink,
         status: row.status,
         issues: row.issues,
         cvLinkType: row.cvLinkType,

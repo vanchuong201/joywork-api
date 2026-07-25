@@ -96,6 +96,9 @@ const envSchema = z.object({
   CV_IMPORT_MODEL: z.string().default('gpt-4o-mini'),
   CV_IMPORT_MAX_TEXT_CHARS: z.coerce.number().int().min(1000).max(200_000).default(60_000),
 
+  // Candidate onboarding: thời hạn (ngày) của link kích hoạt gửi qua email
+  ONBOARDING_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(90),
+
   // Internal API secret — shared with joywork-admin for server-to-server calls
   // Required: app will refuse to start if missing or < 32 chars
   INTERNAL_API_SECRET: z.string().min(32, 'INTERNAL_API_SECRET must be at least 32 characters'),

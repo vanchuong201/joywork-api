@@ -71,4 +71,25 @@ describe('SystemCandidateImportService.dryRun', () => {
     expect(report.rows[4]?.status).toBe('INVALID');
     expect(report.rows[4]?.issues).toContain('Thiếu email');
   });
+
+  it('loại bỏ link CV/Portfolio không hợp lệ và ghi cảnh báo', async () => {
+    const csv = [
+      'Email,Họ tên,Link CV,Link Portfolio,Link Social',
+      'candidate@example.com,Nguyen F,Oki,Vang,https://linkedin.com/in/nguyenf',
+    ].join('\n');
+
+    const report = await service.dryRun(Buffer.from(csv), 'invalid-links.csv', 'text/csv');
+
+    expect(report.totalRows).toBe(1);
+    expect(report.validRows).toBe(1);
+    expect(report.linkSummary.empty).toBe(1);
+    expect(report.linkSummary.manualUpload).toBe(0);
+
+    expect(report.rows[0]?.status).toBe('VALID');
+    expect(report.rows[0]?.cvLink).toBeNull();
+    expect(report.rows[0]?.portfolioLink).toBeNull();
+    expect(report.rows[0]?.socialLink).toBe('https://linkedin.com/in/nguyenf');
+    expect(report.rows[0]?.issues).toContain('Link CV không hợp lệ (chỉ chấp nhận URL http/https)');
+    expect(report.rows[0]?.issues).toContain('Link Portfolio không hợp lệ (chỉ chấp nhận URL http/https)');
+  });
 });

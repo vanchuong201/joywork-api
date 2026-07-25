@@ -9,7 +9,7 @@ import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { hashPassword } from '@/shared/security/password-hash';
 import type { OnboardingActivateInput, OnboardingResendInput } from './onboarding.schema';
 
-const ONBOARDING_TOKEN_TTL_MS = 10 * 24 * 60 * 60 * 1000;
+const ONBOARDING_TOKEN_TTL_MS = config.ONBOARDING_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 const ONBOARDING_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
 
 type OnboardingTokenStatus = 'VALID' | 'EXPIRED' | 'USED' | 'INVALID';
