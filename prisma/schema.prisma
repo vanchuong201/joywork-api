@@ -160,7 +160,9 @@ model CandidateImportRecord {
   cvLinkType       CandidateCvLinkType         @default(EMPTY)
   status           CandidateImportRecordStatus
   error            String?
+  emailSentAt      DateTime?
   activatedAt      DateTime?
+  cvImportJobId    String?
   createdAt        DateTime                    @default(now())
 
   batch CandidateImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
@@ -170,6 +172,7 @@ model CandidateImportRecord {
   @@index([email])
   @@index([userId])
   @@index([status])
+  @@index([cvImportJobId])
   @@map("candidate_import_records")
 }
 
@@ -210,6 +213,7 @@ enum CandidateImportRecordStatus {
 enum CandidateCvLinkType {
   DRIVE_FILE
   DRIVE_DOC
+  DIRECT_FILE
   CANVA
   LINKEDIN
   FOLDER

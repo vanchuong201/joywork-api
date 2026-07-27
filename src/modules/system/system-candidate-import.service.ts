@@ -11,6 +11,7 @@ import { hashPassword } from '@/shared/security/password-hash';
 import { resolveUniqueUserSlug } from '@/modules/users/user-profile.service';
 import { resolveProvinceCode } from '@/shared/provinces';
 import { getWardsByProvinceCode } from '@/shared/wards';
+import { CvImportsService } from '@/modules/cv-imports/cv-imports.service';
 import {
   CANDIDATE_IMPORT_MIME_TYPES,
   type CandidateImportDryRunReport,
@@ -24,6 +25,9 @@ const ADMIN_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
 const EMAIL_BATCH_SIZE = 20;
 const EMAIL_BATCH_DELAY_MS = 5_000;
 const EMAIL_INTRA_DELAY_MS = 300;
+/** Giới hạn song song fetch+parse+apply để tránh rate-limit OpenAI/Drive. */
+const CV_AUTO_CONCURRENCY = 3;
+const CV_AUTO_INTRA_DELAY_MS = 400;
 
 interface ParsedImportPayload {
   fileName: string;
@@ -56,9 +60,16 @@ interface ScheduledEmailPayload {
   email: string;
   name: string | null;
   rawToken: string;
+  recordId: string;
 }
 
-const AUTO_FETCHABLE_TYPES = new Set<CandidateCvLinkType>(['DRIVE_FILE', 'DRIVE_DOC']);
+interface ScheduledCvAutoPayload {
+  recordId: string;
+  userId: string;
+  preferredUrl: string;
+}
+
+const AUTO_FETCHABLE_TYPES = new Set<CandidateCvLinkType>(['DRIVE_FILE', 'DRIVE_DOC', 'DIRECT_FILE']);
 
 const WARD_PREFIXES = ['phuong', 'p', 'xa', 'x', 'thi-tran', 'tt'];
 
@@ -74,6 +85,51 @@ interface HeaderIndexes {
   socialLink: number | null;
   cvLink: number | null;
   portfolioLink: number | null;
+}
+
+export function classifyCvLink(link: string | null | undefined): CandidateCvLinkType {
+  if (!link) return 'EMPTY';
+  const normalized = link.toLowerCase();
+
+  if (normalized.includes('drive.google.com') && normalized.includes('/folders/')) return 'FOLDER';
+  if (normalized.includes('drive.google.com/file/')) return 'DRIVE_FILE';
+  if (normalized.includes('docs.google.com/document/')) return 'DRIVE_DOC';
+  if (normalized.includes('canva.com/') || normalized.includes('canva.link/') || normalized.includes('.canva.site')) {
+    return 'CANVA';
+  }
+  if (normalized.includes('linkedin.com/')) return 'LINKEDIN';
+
+  try {
+    const parsed = new URL(link);
+    const pathname = parsed.pathname.toLowerCase();
+    if (pathname.endsWith('.pdf') || pathname.endsWith('.docx') || pathname.endsWith('.doc')) {
+      return 'DIRECT_FILE';
+    }
+  } catch {
+    // ignore
+  }
+
+  return 'OTHER';
+}
+
+export function toLinkAction(type: CandidateCvLinkType): CandidateImportLinkAction {
+  if (type === 'EMPTY') return 'EMPTY';
+  if (AUTO_FETCHABLE_TYPES.has(type)) return 'AUTO_FETCHABLE';
+  return 'MANUAL_UPLOAD';
+}
+
+export function isAutoFetchableLink(link: string | null | undefined): boolean {
+  return AUTO_FETCHABLE_TYPES.has(classifyCvLink(link));
+}
+
+/** Ưu tiên link CV nếu auto được; không thì Portfolio nếu auto; fallback CV rồi Portfolio. */
+export function extractPreferredLink(
+  cvLink: string | null | undefined,
+  portfolioLink: string | null | undefined,
+): string | null {
+  if (isAutoFetchableLink(cvLink)) return cvLink ?? null;
+  if (isAutoFetchableLink(portfolioLink)) return portfolioLink ?? null;
+  return cvLink || portfolioLink || null;
 }
 
 function normalizeHeader(value: string): string {
@@ -134,28 +190,6 @@ function normalizeExternalUrl(raw: string | null): string | null {
   } catch {
     return null;
   }
-}
-
-function classifyCvLink(link: string | null | undefined): CandidateCvLinkType {
-  if (!link) return 'EMPTY';
-  const normalized = link.toLowerCase();
-
-  if (normalized.includes('drive.google.com/drive/folders/')) return 'FOLDER';
-  if (normalized.includes('drive.google.com/file/')) return 'DRIVE_FILE';
-  if (normalized.includes('docs.google.com/document/')) return 'DRIVE_DOC';
-  if (normalized.includes('canva.com/')) return 'CANVA';
-  if (normalized.includes('linkedin.com/')) return 'LINKEDIN';
-  return 'OTHER';
-}
-
-function toLinkAction(type: CandidateCvLinkType): CandidateImportLinkAction {
-  if (type === 'EMPTY') return 'EMPTY';
-  if (AUTO_FETCHABLE_TYPES.has(type)) return 'AUTO_FETCHABLE';
-  return 'MANUAL_UPLOAD';
-}
-
-function extractPreferredLink(row: CandidateImportRow): string | null {
-  return row.cvLink || row.portfolioLink || null;
 }
 
 function parseCsvRows(content: string): string[][] {
@@ -346,11 +380,75 @@ function buildActivationUrl(rawToken: string): string {
 
 function scheduleOnboardingEmail(payload: ScheduledEmailPayload, delayMs: number): void {
   setTimeout(() => {
-    sendEmailInBackground(
-      () => emailService.sendCandidateOnboardingEmail(payload.email, payload.name, buildActivationUrl(payload.rawToken)),
-      `candidate onboarding email ${payload.email}`,
-    );
+    sendEmailInBackground(async () => {
+      await emailService.sendCandidateOnboardingEmail(
+        payload.email,
+        payload.name,
+        buildActivationUrl(payload.rawToken),
+      );
+      await prisma.candidateImportRecord.update({
+        where: { id: payload.recordId },
+        data: { emailSentAt: new Date() },
+      });
+    }, `candidate onboarding email ${payload.email}`);
   }, delayMs);
+}
+
+const cvImportsServiceSingleton = new CvImportsService();
+
+/**
+ * Chạy nền sau commit: fetch+parse+apply+sync ES cho các record AUTO_FETCHABLE.
+ * Không block HTTP response. Lỗi từng row được nuốt (job FAILED / log).
+ */
+export function scheduleAutoCvImportsAfterCommit(payloads: ScheduledCvAutoPayload[]): void {
+  if (payloads.length === 0) return;
+
+  setImmediate(() => {
+    void runAutoCvImportPool(payloads).catch(() => {
+      // Pool-level failure không làm hỏng commit đã hoàn tất.
+    });
+  });
+}
+
+async function runAutoCvImportPool(payloads: ScheduledCvAutoPayload[]): Promise<void> {
+  let nextIndex = 0;
+
+  const worker = async (): Promise<void> => {
+    while (nextIndex < payloads.length) {
+      const current = payloads[nextIndex];
+      nextIndex += 1;
+      if (!current) continue;
+      await processOneAutoCvImport(current);
+      if (CV_AUTO_INTRA_DELAY_MS > 0) {
+        await new Promise((resolve) => setTimeout(resolve, CV_AUTO_INTRA_DELAY_MS));
+      }
+    }
+  };
+
+  const workers = Array.from({ length: Math.min(CV_AUTO_CONCURRENCY, payloads.length) }, () => worker());
+  await Promise.all(workers);
+}
+
+async function processOneAutoCvImport(payload: ScheduledCvAutoPayload): Promise<void> {
+  try {
+    const existing = await prisma.candidateImportRecord.findUnique({
+      where: { id: payload.recordId },
+      select: { cvImportJobId: true },
+    });
+    if (!existing || existing.cvImportJobId) return;
+
+    const job = await cvImportsServiceSingleton.importApplyAndSyncFromExternalLink(
+      payload.userId,
+      payload.preferredUrl,
+    );
+
+    await prisma.candidateImportRecord.updateMany({
+      where: { id: payload.recordId, cvImportJobId: null },
+      data: { cvImportJobId: job.id },
+    });
+  } catch {
+    // Không ném ra ngoài — một CV lỗi không dừng pool.
+  }
 }
 
 export class SystemCandidateImportService {
@@ -400,7 +498,14 @@ export class SystemCandidateImportService {
     return this.buildDryRunReport(parsed.fileName, rows);
   }
 
-  async commit(fileBuffer: Buffer, fileName: string, mime: string, adminUserId: string): Promise<CommitResultSummary> {
+  async commit(
+    fileBuffer: Buffer,
+    fileName: string,
+    mime: string,
+    adminUserId: string,
+    options: { sendEmail?: boolean } = {},
+  ): Promise<CommitResultSummary> {
+    const sendEmail = options.sendEmail === true;
     const parsed = await this.parseImportFile(fileBuffer, fileName, mime);
     const rows = await this.buildRowsWithStatus(parsed.rows);
 
@@ -420,6 +525,7 @@ export class SystemCandidateImportService {
     let failed = 0;
     const records: CommitResultSummary['records'] = [];
     const emailQueue: ScheduledEmailPayload[] = [];
+    const cvAutoQueue: ScheduledCvAutoPayload[] = [];
 
     for (const row of rows) {
       if (row.status === 'INVALID' || row.status === 'DUPLICATE_EMAIL_IN_FILE') {
@@ -586,7 +692,17 @@ export class SystemCandidateImportService {
           email: result.email,
           name: result.name,
           rawToken: result.tokenRaw,
+          recordId: result.record.id,
         });
+
+        const preferredUrl = extractPreferredLink(row.safeCvLink, row.safePortfolioLink);
+        if (preferredUrl && isAutoFetchableLink(preferredUrl) && result.record.userId) {
+          cvAutoQueue.push({
+            recordId: result.record.id,
+            userId: result.record.userId,
+            preferredUrl,
+          });
+        }
       } catch (error) {
         const message =
           error instanceof AppError
@@ -634,11 +750,15 @@ export class SystemCandidateImportService {
       },
     });
 
-    emailQueue.forEach((payload, index) => {
-      const batchOffset = Math.floor(index / EMAIL_BATCH_SIZE) * EMAIL_BATCH_DELAY_MS;
-      const withinBatchOffset = (index % EMAIL_BATCH_SIZE) * EMAIL_INTRA_DELAY_MS;
-      scheduleOnboardingEmail(payload, batchOffset + withinBatchOffset);
-    });
+    if (sendEmail) {
+      emailQueue.forEach((payload, index) => {
+        const batchOffset = Math.floor(index / EMAIL_BATCH_SIZE) * EMAIL_BATCH_DELAY_MS;
+        const withinBatchOffset = (index % EMAIL_BATCH_SIZE) * EMAIL_INTRA_DELAY_MS;
+        scheduleOnboardingEmail(payload, batchOffset + withinBatchOffset);
+      });
+    }
+
+    scheduleAutoCvImportsAfterCommit(cvAutoQueue);
 
     return {
       batchId: batch.id,
@@ -702,6 +822,7 @@ export class SystemCandidateImportService {
         email: record.user.email,
         name: record.user.name,
         rawToken: token.raw,
+        recordId: record.id,
       },
       0,
     );
@@ -710,6 +831,241 @@ export class SystemCandidateImportService {
       message: 'Đã lên lịch gửi lại email kích hoạt',
       expiresAt: token.expiresAt.toISOString(),
     };
+  }
+
+  /**
+   * Tạo link kích hoạt mới (không gửi email) — dùng khi test staging với sendEmail=false.
+   * Raw token không lưu DB; mỗi lần gọi sinh token mới.
+   */
+  async createActivationLink(recordId: string): Promise<{
+    recordId: string;
+    email: string;
+    activationUrl: string;
+    expiresAt: string;
+  }> {
+    const record = await prisma.candidateImportRecord.findUnique({
+      where: { id: recordId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            emailVerified: true,
+          },
+        },
+      },
+    });
+
+    if (!record || !record.userId || !record.user) {
+      throw new AppError('Không tìm thấy bản ghi import hợp lệ', 404, 'CANDIDATE_IMPORT_RECORD_NOT_FOUND');
+    }
+
+    if (record.status !== 'CREATED') {
+      throw new AppError('Chỉ tạo link cho bản ghi đã tạo tài khoản thành công', 400, 'CANDIDATE_IMPORT_RECORD_NOT_CREATED');
+    }
+
+    if (record.activatedAt || record.user.emailVerified) {
+      throw new AppError('Ứng viên đã kích hoạt tài khoản', 409, 'ONBOARDING_ALREADY_ACTIVATED');
+    }
+
+    const token = createOnboardingToken();
+    await prisma.onboardingToken.create({
+      data: {
+        userId: record.userId,
+        batchId: record.batchId,
+        tokenHash: token.hash,
+        expiresAt: token.expiresAt,
+      },
+    });
+
+    return {
+      recordId: record.id,
+      email: record.user.email,
+      activationUrl: buildActivationUrl(token.raw),
+      expiresAt: token.expiresAt.toISOString(),
+    };
+  }
+
+  async listBatches(limit = 20): Promise<
+    Array<{
+      id: string;
+      fileName: string;
+      totalRows: number;
+      created: number;
+      skipped: number;
+      failed: number;
+      createdAt: string;
+      activatedCount: number;
+      emailSentCount: number;
+    }>
+  > {
+    const batches = await prisma.candidateImportBatch.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 100),
+      include: {
+        _count: {
+          select: {
+            records: true,
+          },
+        },
+        records: {
+          select: {
+            activatedAt: true,
+            emailSentAt: true,
+          },
+        },
+      },
+    });
+
+    return batches.map((batch) => ({
+      id: batch.id,
+      fileName: batch.fileName,
+      totalRows: batch.totalRows,
+      created: batch.created,
+      skipped: batch.skipped,
+      failed: batch.failed,
+      createdAt: batch.createdAt.toISOString(),
+      activatedCount: batch.records.filter((r) => r.activatedAt).length,
+      emailSentCount: batch.records.filter((r) => r.emailSentAt).length,
+    }));
+  }
+
+  async getBatchDetail(batchId: string): Promise<{
+    batch: {
+      id: string;
+      fileName: string;
+      totalRows: number;
+      created: number;
+      skipped: number;
+      failed: number;
+      createdAt: string;
+    };
+    records: Array<{
+      id: string;
+      email: string;
+      rawName: string | null;
+      status: CandidateImportRecordStatus;
+      error: string | null;
+      cvLinkType: CandidateCvLinkType;
+      linkAction: CandidateImportLinkAction;
+      rawCvLink: string | null;
+      rawPortfolioLink: string | null;
+      emailSentAt: string | null;
+      activatedAt: string | null;
+      cvImportJobId: string | null;
+      cvStatus: string;
+      cvImportStatus: string | null;
+      cvImportError: string | null;
+      createdAt: string;
+    }>;
+  }> {
+    const batch = await prisma.candidateImportBatch.findUnique({
+      where: { id: batchId },
+      include: {
+        records: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!batch) {
+      throw new AppError('Không tìm thấy batch import', 404, 'CANDIDATE_IMPORT_BATCH_NOT_FOUND');
+    }
+
+    const jobIds = batch.records
+      .map((r) => r.cvImportJobId)
+      .filter((id): id is string => Boolean(id));
+
+    const jobs = jobIds.length
+      ? await prisma.cvImportJob.findMany({
+          where: { id: { in: jobIds } },
+          select: {
+            id: true,
+            status: true,
+            errorMessage: true,
+          },
+        })
+      : [];
+    const jobById = new Map(jobs.map((job) => [job.id, job]));
+
+    return {
+      batch: {
+        id: batch.id,
+        fileName: batch.fileName,
+        totalRows: batch.totalRows,
+        created: batch.created,
+        skipped: batch.skipped,
+        failed: batch.failed,
+        createdAt: batch.createdAt.toISOString(),
+      },
+      records: batch.records.map((record) => {
+        const job = record.cvImportJobId ? jobById.get(record.cvImportJobId) : null;
+        return {
+          id: record.id,
+          email: record.email,
+          rawName: record.rawName,
+          status: record.status,
+          error: record.error,
+          cvLinkType: record.cvLinkType,
+          linkAction: toLinkAction(record.cvLinkType),
+          rawCvLink: record.rawCvLink,
+          rawPortfolioLink: record.rawPortfolioLink,
+          emailSentAt: record.emailSentAt ? record.emailSentAt.toISOString() : null,
+          activatedAt: record.activatedAt ? record.activatedAt.toISOString() : null,
+          cvImportJobId: record.cvImportJobId,
+          cvStatus: deriveCvStatus(record.cvLinkType, record.activatedAt, job?.status ?? null),
+          cvImportStatus: job?.status ?? null,
+          cvImportError: job?.errorMessage ?? null,
+          createdAt: record.createdAt.toISOString(),
+        };
+      }),
+    };
+  }
+
+  async exportBatchCsv(batchId: string): Promise<string> {
+    const detail = await this.getBatchDetail(batchId);
+    const header = [
+      'email',
+      'name',
+      'accountStatus',
+      'error',
+      'cvLinkType',
+      'linkAction',
+      'rawCvLink',
+      'rawPortfolioLink',
+      'emailSent',
+      'emailSentAt',
+      'activated',
+      'activatedAt',
+      'cvStatus',
+      'cvImportStatus',
+      'cvImportError',
+    ];
+
+    const lines = detail.records.map((record) =>
+      [
+        record.email,
+        record.rawName ?? '',
+        record.status,
+        record.error ?? '',
+        record.cvLinkType,
+        record.linkAction,
+        record.rawCvLink ?? '',
+        record.rawPortfolioLink ?? '',
+        record.emailSentAt ? 'yes' : 'no',
+        record.emailSentAt ?? '',
+        record.activatedAt ? 'yes' : 'no',
+        record.activatedAt ?? '',
+        record.cvStatus,
+        record.cvImportStatus ?? '',
+        record.cvImportError ?? '',
+      ]
+        .map(csvEscape)
+        .join(','),
+    );
+
+    return [header.join(','), ...lines].join('\n');
   }
 
   private async buildRowsWithStatus(rows: CandidateImportRow[]): Promise<CandidateRowWithMeta[]> {
@@ -766,11 +1122,7 @@ export class SystemCandidateImportService {
         issues.push('Link Social không hợp lệ (chỉ chấp nhận URL http/https)');
       }
 
-      const preferredLink = extractPreferredLink({
-        ...row,
-        cvLink: safeCvLink,
-        portfolioLink: safePortfolioLink,
-      });
+      const preferredLink = extractPreferredLink(safeCvLink, safePortfolioLink);
       const cvLinkType = classifyCvLink(preferredLink);
 
       return {
@@ -799,6 +1151,7 @@ export class SystemCandidateImportService {
     const byType: Record<CandidateCvLinkType, number> = {
       DRIVE_FILE: 0,
       DRIVE_DOC: 0,
+      DIRECT_FILE: 0,
       CANVA: 0,
       LINKEDIN: 0,
       FOLDER: 0,
@@ -851,4 +1204,27 @@ export class SystemCandidateImportService {
       })),
     };
   }
+}
+
+export function deriveCvStatus(
+  cvLinkType: CandidateCvLinkType,
+  _activatedAt: Date | null,
+  jobStatus: string | null,
+): string {
+  const linkAction = toLinkAction(cvLinkType);
+  if (linkAction === 'EMPTY') return 'CV_EMPTY';
+  if (linkAction === 'MANUAL_UPLOAD') return 'CV_MANUAL_PENDING';
+  if (jobStatus === 'APPLIED') return 'CV_APPLIED';
+  if (jobStatus === 'READY') return 'CV_AUTO_READY';
+  if (jobStatus === 'FAILED') return 'CV_AUTO_FAILED';
+  if (jobStatus === 'PROCESSING' || jobStatus === 'PENDING') return 'CV_AUTO_PROCESSING';
+  // AUTO_FETCHABLE chưa có job: đang chờ worker nền sau commit (không chờ activate).
+  return 'CV_AUTO_QUEUED';
+}
+
+function csvEscape(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }

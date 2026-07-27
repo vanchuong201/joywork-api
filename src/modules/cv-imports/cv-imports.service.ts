@@ -1,8 +1,9 @@
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { extractS3KeyFromPublicObjectUrl, getS3BucketName, s3Client } from '@/shared/storage/s3';
+import { buildS3ObjectUrl, extractS3KeyFromPublicObjectUrl, getS3BucketName, s3Client } from '@/shared/storage/s3';
 import {
   CV_IMPORT_DOCX_MIME,
   CV_IMPORT_PDF_MIME,
@@ -11,8 +12,11 @@ import {
   isSupportedCvMime,
   type SupportedCvMime,
 } from './cv-file-extractor';
+import { fetchCvFromExternalLink } from './cv-link-fetcher';
+import { syncUserToEs } from '@/shared/elasticsearch/sync';
 import {
   applyCvImportSchema,
+  CV_IMPORT_SECTIONS,
   type ApplyCvImportInput,
   type CreateCvImportInput,
   type CvImportSection,
@@ -138,6 +142,112 @@ export class CvImportsService {
         ? error
         : new AppError(errorMessage, 500, errorCode);
     }
+  }
+
+  /**
+   * Tải CV từ link ngoài (Drive/Docs/direct PDF|DOCX) → S3 → pipeline createImport.
+   * Luôn trả về job (READY hoặc FAILED), không throw ra ngoài — dùng cho background onboarding.
+   */
+  async createImportFromExternalLink(userId: string, url: string): Promise<ImportJobRecord> {
+    let fetched;
+    try {
+      fetched = await fetchCvFromExternalLink(url);
+    } catch (error) {
+      const errorCode = error instanceof AppError ? error.code : 'CV_LINK_FETCH_FAILED';
+      const errorMessage =
+        error instanceof AppError ? error.message : 'Không tải được CV từ link';
+      const failed = await prisma.cvImportJob.create({
+        data: {
+          userId,
+          sourceCvUrl: url,
+          status: 'FAILED',
+          errorCode,
+          errorMessage,
+        },
+      });
+      return failed as ImportJobRecord;
+    }
+
+    const key = `users/${userId}/cv/${randomUUID()}${fetched.extension}`;
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: getS3BucketName(),
+          Key: key,
+          Body: fetched.buffer,
+          ContentType: fetched.mime,
+          ContentLength: fetched.buffer.byteLength,
+        }),
+      );
+    } catch {
+      const failed = await prisma.cvImportJob.create({
+        data: {
+          userId,
+          sourceCvUrl: url,
+          fileName: fetched.fileName,
+          fileType: fetched.mime,
+          status: 'FAILED',
+          errorCode: 'CV_LINK_UPLOAD_FAILED',
+          errorMessage: 'Không thể lưu file CV vào kho lưu trữ',
+        },
+      });
+      return failed as ImportJobRecord;
+    }
+
+    const cvUrl = buildS3ObjectUrl(key);
+    try {
+      return await this.createImport(userId, { sourceKey: key, cvUrl });
+    } catch (error) {
+      // createImport already marked the latest job FAILED; find it
+      const latest = await prisma.cvImportJob.findFirst({
+        where: { userId, sourceKey: key },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (latest) return latest as ImportJobRecord;
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch + parse từ link ngoài, rồi auto-apply overwrite toàn bộ section và sync ES.
+   * Dùng cho import ứng viên hàng loạt (DN search ngay, không chờ user review).
+   */
+  async importApplyAndSyncFromExternalLink(userId: string, url: string): Promise<ImportJobRecord> {
+    const job = await this.createImportFromExternalLink(userId, url);
+    if (job.status !== 'READY') {
+      return job;
+    }
+
+    const applied = await this.applyImport(userId, job.id, {
+      mode: 'overwrite',
+      sections: [...CV_IMPORT_SECTIONS],
+    });
+
+    const userForEs = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        slug: true,
+        createdAt: true,
+        profile: {
+          select: {
+            headline: true,
+            bio: true,
+            skills: true,
+            locations: true,
+            isPublic: true,
+            isSearchingJob: true,
+          },
+        },
+      },
+    });
+    if (userForEs) {
+      await syncUserToEs(userForEs);
+    }
+
+    return applied;
   }
 
   async getImport(userId: string, jobId: string): Promise<ImportJobRecord> {

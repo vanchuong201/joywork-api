@@ -22,6 +22,11 @@ const {
     candidateImportRecord: {
       findFirst: vi.fn(),
       updateMany: vi.fn(),
+      update: vi.fn(),
+    },
+    cvImportJob: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -54,6 +59,7 @@ vi.mock('@/config/env', () => ({
     FRONTEND_ORIGIN: 'http://localhost:3000',
     JWT_SECRET: 'jwt-secret-very-long-for-tests',
     REFRESH_SECRET: 'refresh-secret-very-long-for-tests',
+    ONBOARDING_TOKEN_TTL_DAYS: 90,
   },
 }));
 
@@ -69,12 +75,20 @@ vi.mock('@/shared/security/password-hash', () => ({
   hashPassword: hashPasswordMock,
 }));
 
+vi.mock('@/modules/cv-imports/cv-imports.service', () => ({
+  CvImportsService: class {
+    createImportFromExternalLink = vi.fn();
+    importApplyAndSyncFromExternalLink = vi.fn();
+  },
+}));
+
 describe('OnboardingService', () => {
   const service = new OnboardingService();
 
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof txMock) => Promise<unknown>) => callback(txMock));
+    prismaMock.candidateImportRecord.findFirst.mockResolvedValue(null);
   });
 
   it('activate: set password, mark token used và auto-login', async () => {

@@ -1528,6 +1528,73 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, candidateImportController.resend.bind(candidateImportController));
 
+  fastify.post('/import/candidates/records/:recordId/activation-link', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Tạo link kích hoạt onboarding (không gửi email) — dùng để test staging.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['recordId'],
+        properties: { recordId: { type: 'string' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                recordId: { type: 'string' },
+                email: { type: 'string' },
+                activationUrl: { type: 'string' },
+                expiresAt: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, candidateImportController.createActivationLink.bind(candidateImportController));
+
+  fastify.get('/import/candidates/batches', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Danh sách batch import ứng viên gần đây.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+    },
+  }, candidateImportController.listBatches.bind(candidateImportController));
+
+  fastify.get('/import/candidates/batches/:batchId', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Chi tiết batch import ứng viên kèm trạng thái từng dòng.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['batchId'],
+        properties: { batchId: { type: 'string' } },
+      },
+    },
+  }, candidateImportController.getBatch.bind(candidateImportController));
+
+  fastify.get('/import/candidates/batches/:batchId/export', {
+    preHandler: adminPre,
+    schema: {
+      description: 'Export CSV báo cáo trạng thái batch import ứng viên.',
+      tags: ['System - Import'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['batchId'],
+        properties: { batchId: { type: 'string' } },
+      },
+    },
+  }, candidateImportController.exportBatch.bind(candidateImportController));
+
   // ── Courses (admin) ──
 
   fastify.get('/courses', {

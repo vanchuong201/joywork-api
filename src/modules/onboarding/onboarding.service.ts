@@ -7,6 +7,12 @@ import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
 import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { hashPassword } from '@/shared/security/password-hash';
+import { CvImportsService } from '@/modules/cv-imports/cv-imports.service';
+import {
+  extractPreferredLink,
+  isAutoFetchableLink,
+  toLinkAction,
+} from '@/modules/system/system-candidate-import.service';
 import type { OnboardingActivateInput, OnboardingResendInput } from './onboarding.schema';
 
 const ONBOARDING_TOKEN_TTL_MS = config.ONBOARDING_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
@@ -41,6 +47,8 @@ function generateTokens(userId: string): AuthTokens {
 }
 
 export class OnboardingService {
+  private readonly cvImportsService = new CvImportsService();
+
   async getTokenStatus(rawToken: string): Promise<{
     status: OnboardingTokenStatus;
     expiresAt?: string;
@@ -180,10 +188,44 @@ export class OnboardingService {
       return updatedUser;
     });
 
+    setImmediate(() => {
+      void this.triggerAutoCvImport(user.id).catch(() => {
+        // Activation đã thành công; lỗi auto CV không ảnh hưởng đăng nhập.
+      });
+    });
+
     return {
       user,
       tokens: generateTokens(user.id),
     };
+  }
+
+  private async triggerAutoCvImport(userId: string): Promise<void> {
+    const record = await prisma.candidateImportRecord.findFirst({
+      where: {
+        userId,
+        status: CandidateImportRecordStatus.CREATED,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        rawCvLink: true,
+        rawPortfolioLink: true,
+        cvImportJobId: true,
+      },
+    });
+
+    // Fallback cho record import trước khi ship generate-at-commit.
+    if (!record || record.cvImportJobId) return;
+
+    const preferred = extractPreferredLink(record.rawCvLink, record.rawPortfolioLink);
+    if (!preferred || !isAutoFetchableLink(preferred)) return;
+
+    const job = await this.cvImportsService.importApplyAndSyncFromExternalLink(userId, preferred);
+    await prisma.candidateImportRecord.updateMany({
+      where: { id: record.id, cvImportJobId: null },
+      data: { cvImportJobId: job.id },
+    });
   }
 
   async resend(data: OnboardingResendInput): Promise<{ message: string }> {
@@ -286,7 +328,13 @@ export class OnboardingService {
       rawCvLink: string | null;
       rawPortfolioLink: string | null;
       cvLinkType: string;
+      linkAction: string;
       activatedAt: string | null;
+    } | null;
+    cvImport: {
+      jobId: string;
+      status: string;
+      errorMessage: string | null;
     } | null;
   }> {
     const user = await prisma.user.findUnique({
@@ -334,8 +382,50 @@ export class OnboardingService {
         rawPortfolioLink: true,
         cvLinkType: true,
         activatedAt: true,
+        cvImportJobId: true,
       },
     });
+
+    let cvImport: {
+      jobId: string;
+      status: string;
+      errorMessage: string | null;
+    } | null = null;
+
+    if (importRecord?.cvImportJobId) {
+      const job = await prisma.cvImportJob.findUnique({
+        where: { id: importRecord.cvImportJobId },
+        select: {
+          id: true,
+          status: true,
+          errorMessage: true,
+        },
+      });
+      if (job) {
+        cvImport = {
+          jobId: job.id,
+          status: job.status,
+          errorMessage: job.errorMessage,
+        };
+      }
+    } else if (!cvImport) {
+      const latestJob = await prisma.cvImportJob.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          status: true,
+          errorMessage: true,
+        },
+      });
+      if (latestJob) {
+        cvImport = {
+          jobId: latestJob.id,
+          status: latestJob.status,
+          errorMessage: latestJob.errorMessage,
+        };
+      }
+    }
 
     return {
       user: {
@@ -369,9 +459,11 @@ export class OnboardingService {
             rawCvLink: importRecord.rawCvLink,
             rawPortfolioLink: importRecord.rawPortfolioLink,
             cvLinkType: importRecord.cvLinkType,
+            linkAction: toLinkAction(importRecord.cvLinkType),
             activatedAt: importRecord.activatedAt ? importRecord.activatedAt.toISOString() : null,
           }
         : null,
+      cvImport,
     };
   }
 }
