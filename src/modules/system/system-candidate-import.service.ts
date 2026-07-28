@@ -12,6 +12,7 @@ import { resolveUniqueUserSlug } from '@/modules/users/user-profile.service';
 import { resolveProvinceCode } from '@/shared/provinces';
 import { getWardsByProvinceCode } from '@/shared/wards';
 import { CvImportsService } from '@/modules/cv-imports/cv-imports.service';
+import { buildDefaultCandidateAvatarUrl } from '@/shared/candidates/default-avatar';
 import {
   CANDIDATE_IMPORT_MIME_TYPES,
   type CandidateImportDryRunReport,
@@ -615,6 +616,8 @@ export class SystemCandidateImportService {
             email: row.normalizedEmail!,
           });
 
+          const defaultAvatar = buildDefaultCandidateAvatarUrl(row.normalizedEmail!);
+
           const user = await tx.user.create({
             data: {
               email: row.normalizedEmail!,
@@ -624,6 +627,7 @@ export class SystemCandidateImportService {
               role: 'USER',
               slug,
               emailVerified: false,
+              avatar: defaultAvatar,
             },
           });
 
@@ -637,6 +641,7 @@ export class SystemCandidateImportService {
               locations: provinceCode ? [provinceCode] : [],
               wardCodes,
               linkedin: row.safeSocialLink?.toLowerCase().includes('linkedin.com') ? row.safeSocialLink : null,
+              avatar: defaultAvatar,
             },
           });
 

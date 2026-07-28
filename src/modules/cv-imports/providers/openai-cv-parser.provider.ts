@@ -17,7 +17,7 @@ Quy tắc tuyệt đối:
 
 Schema cần trả về (chỉ kèm field có trong CV):
 {
-  "basicInfo": { "fullName": string|null, "title": string|null, "headline": string|null, "bio": string|null, "gender": "MALE"|"FEMALE"|"OTHER"|null, "yearOfBirth": number|null },
+  "basicInfo": { "fullName": string|null, "title": string|null, "headline": string|null, "bio": string|null, "avatarUrl": string|null, "gender": "MALE"|"FEMALE"|"OTHER"|null, "yearOfBirth": number|null },
   "contact": { "contactEmail": string|null, "contactPhone": string|null, "website": string|null, "linkedin": string|null, "github": string|null },
   "skills": string[],
   "knowledge": string[],
@@ -34,6 +34,7 @@ Hướng dẫn bổ sung:
 - "title": vị trí ứng tuyển mong muốn nếu CV nêu, nếu không thì để null.
 - "headline": câu giới thiệu ngắn ở đầu CV.
 - "bio": phần giới thiệu/tóm tắt cá nhân (objective/summary), tối đa 1500 ký tự.
+- "avatarUrl": chỉ điền khi CV ghi rõ URL ảnh đại diện (http/https). Không suy đoán hay bịa URL.
 - "startDate"/"endDate": dạng YYYY hoặc YYYY-MM nếu có, nếu chỉ có chuỗi mô tả thì để null và đặt giá trị vào "period".
 - "warnings": liệt kê các điểm bạn không chắc chắn (ngày tháng, tên công ty mơ hồ, OCR kém...).
 - "confidence": từ 0 đến 1, ước lượng độ chắc chắn tổng thể.

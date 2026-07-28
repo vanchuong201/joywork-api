@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { buildCvReadyUserWhere, evaluateCandidateCvReadiness } from './cv-readiness';
 
 describe('cv-readiness', () => {
-  it('đánh dấu ready khi đủ 3 nhóm với fallback từ user', () => {
+  it('đánh dấu ready khi đủ 3 nhóm với fallback từ user (không cần avatar)', () => {
     const readiness = evaluateCandidateCvReadiness({
       name: 'Ứng viên A',
       email: 'candidate@example.com',
       phone: '0900000000',
-      avatar: 'https://cdn/avatar.jpg',
+      avatar: null,
       profile: {
+        avatar: null,
         fullName: null,
         contactEmail: null,
         contactPhone: null,
@@ -28,13 +29,14 @@ describe('cv-readiness', () => {
 
   it('báo thiếu đúng nhóm khi thiếu thông tin cơ bản và kinh nghiệm', () => {
     const readiness = evaluateCandidateCvReadiness({
-      name: 'Ứng viên B',
+      name: null,
       email: 'candidate@example.com',
       phone: '0900000000',
       avatar: null,
       profile: {
-        title: 'Frontend Developer',
-        bio: 'Có kỹ năng React',
+        fullName: null,
+        title: null,
+        bio: null,
         locations: ['ha-noi'],
         knowledge: ['React'],
         skills: [],
@@ -52,7 +54,7 @@ describe('cv-readiness', () => {
       name: 'Ứng viên C',
       email: 'candidate@example.com',
       phone: '0900000000',
-      avatar: 'https://cdn/avatar.jpg',
+      avatar: null,
       profile: {
         fullName: 'Ứng viên C',
         contactEmail: 'candidate@example.com',
@@ -71,7 +73,7 @@ describe('cv-readiness', () => {
     expect(readiness.missingSections).toEqual(['Năng lực (KSA)']);
   });
 
-  it('build where có điều kiện kinh nghiệm và KSA', () => {
+  it('build where có điều kiện kinh nghiệm và KSA, không bắt buộc avatar', () => {
     const where = buildCvReadyUserWhere();
     const readinessAndConditions = (where.AND ?? []) as Array<Record<string, unknown>>;
 
@@ -83,5 +85,8 @@ describe('cv-readiness', () => {
         { profile: { is: { attitude: { isEmpty: false } } } },
       ],
     });
+
+    const serialized = JSON.stringify(readinessAndConditions);
+    expect(serialized).not.toContain('"avatar"');
   });
 });

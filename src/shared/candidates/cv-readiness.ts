@@ -56,8 +56,8 @@ export const evaluateCandidateCvReadiness = (
   candidate: CandidateCvReadinessInput
 ): CandidateCvReadinessResult => {
   const profile = candidate.profile;
+  // Avatar không bắt buộc — DN vẫn tìm thấy hồ sơ import/generate khi đủ thông tin còn lại.
   const hasBasicInfo =
-    hasFilledText(profile?.avatar || candidate.avatar) &&
     hasFilledText(profile?.fullName || candidate.name) &&
     hasFilledText(profile?.title) &&
     hasFilledText(profile?.bio) &&
@@ -89,12 +89,6 @@ export const evaluateCandidateCvReadiness = (
 
 export const buildCvReadyUserWhere = (): Prisma.UserWhereInput => ({
   AND: [
-    {
-      OR: [
-        { avatar: NON_EMPTY_NULLABLE_TEXT },
-        { profile: { is: { avatar: NON_EMPTY_NULLABLE_TEXT } } },
-      ],
-    },
     {
       OR: [
         { name: NON_EMPTY_NULLABLE_TEXT },
@@ -130,8 +124,7 @@ export const buildCvReadyUserWhere = (): Prisma.UserWhereInput => ({
 export const cvReadyRawSqlCondition = Prisma.sql`
   (
     (
-      NULLIF(BTRIM(COALESCE(p.avatar, u.avatar)), '') IS NOT NULL
-      AND NULLIF(BTRIM(COALESCE(p."fullName", u.name)), '') IS NOT NULL
+      NULLIF(BTRIM(COALESCE(p."fullName", u.name)), '') IS NOT NULL
       AND NULLIF(BTRIM(p.title), '') IS NOT NULL
       AND NULLIF(BTRIM(p.bio), '') IS NOT NULL
       AND NULLIF(BTRIM(COALESCE(p."contactEmail", u.email)), '') IS NOT NULL

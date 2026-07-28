@@ -98,6 +98,8 @@ export const parsedBasicInfoSchema = z
     title: optionalString(150),
     headline: optionalString(150),
     bio: optionalString(2000),
+    /** URL ảnh đại diện nếu CV nêu rõ (http/https). Không extract ảnh nhúng từ PDF. */
+    avatarUrl: optionalUrl,
     gender: z
       .enum(['MALE', 'FEMALE', 'OTHER'])
       .nullable()

@@ -14,6 +14,7 @@ import {
 } from './cv-file-extractor';
 import { fetchCvFromExternalLink } from './cv-link-fetcher';
 import { syncUserToEs } from '@/shared/elasticsearch/sync';
+import { buildDefaultCandidateAvatarUrl } from '@/shared/candidates/default-avatar';
 import {
   applyCvImportSchema,
   CV_IMPORT_SECTIONS,
@@ -29,7 +30,7 @@ const MAX_CV_FILE_SIZE = 10 * 1024 * 1024;
 
 /** Section -> field hồ sơ chính tương ứng. Dùng cho fill_missing và snapshot. */
 const PROFILE_SECTION_FIELDS: Record<Exclude<CvImportSection, 'experiences' | 'educations'>, string[]> = {
-  basicInfo: ['fullName', 'title', 'headline', 'bio', 'gender', 'yearOfBirth'],
+  basicInfo: ['fullName', 'title', 'headline', 'bio', 'gender', 'yearOfBirth', 'avatar'],
   contact: ['contactEmail', 'contactPhone', 'website', 'linkedin', 'github'],
   skills: ['skills'],
   knowledge: ['knowledge'],
@@ -223,6 +224,8 @@ export class CvImportsService {
       sections: [...CV_IMPORT_SECTIONS],
     });
 
+    await this.ensureDefaultAvatarIfMissing(userId);
+
     const userForEs = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -248,6 +251,36 @@ export class CvImportsService {
     }
 
     return applied;
+  }
+
+  /** Nếu user/profile chưa có avatar sau apply CV → gắn avatar mặc định theo email. */
+  private async ensureDefaultAvatarIfMissing(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        avatar: true,
+        profile: { select: { avatar: true } },
+      },
+    });
+    if (!user) return;
+
+    const hasAvatar = Boolean(user.avatar?.trim() || user.profile?.avatar?.trim());
+    if (hasAvatar) return;
+
+    const defaultAvatar = buildDefaultCandidateAvatarUrl(user.email);
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { avatar: defaultAvatar },
+      }),
+      prisma.userProfile.upsert({
+        where: { userId },
+        update: { avatar: defaultAvatar },
+        create: { userId, avatar: defaultAvatar },
+      }),
+    ]);
   }
 
   async getImport(userId: string, jobId: string): Promise<ImportJobRecord> {
@@ -299,6 +332,15 @@ export class CvImportsService {
           update: profileData,
           create: { ...(profileData as Prisma.UserProfileUncheckedCreateInput), userId },
         });
+
+        // Đồng bộ User.avatar khi apply avatarUrl từ CV (UI ưu tiên User.avatar).
+        const nextAvatar = profileData.avatar;
+        if (typeof nextAvatar === 'string' && nextAvatar.trim().length > 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { avatar: nextAvatar },
+          });
+        }
       }
 
       const shouldReplaceExperiences = this.shouldReplaceList({
@@ -492,6 +534,7 @@ export class CvImportsService {
       bio: string | null;
       gender: string | null;
       yearOfBirth: number | null;
+      avatar: string | null;
       contactEmail: string | null;
       contactPhone: string | null;
       website: string | null;
@@ -527,6 +570,7 @@ export class CvImportsService {
       setIfApplicable('title', basic.title ?? undefined, !existingProfile?.title);
       setIfApplicable('headline', basic.headline ?? undefined, !existingProfile?.headline);
       setIfApplicable('bio', basic.bio ?? undefined, !existingProfile?.bio);
+      setIfApplicable('avatar', basic.avatarUrl ?? undefined, !existingProfile?.avatar);
       if (basic.gender) {
         setIfApplicable('gender', basic.gender, !existingProfile?.gender);
       }
