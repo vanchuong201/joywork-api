@@ -9,6 +9,7 @@ import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { hashPassword } from '@/shared/security/password-hash';
 import { CvImportsService } from '@/modules/cv-imports/cv-imports.service';
 import {
+  deriveCvStatus,
   extractPreferredLink,
   isAutoFetchableLink,
   toLinkAction,
@@ -336,6 +337,7 @@ export class OnboardingService {
       status: string;
       errorMessage: string | null;
     } | null;
+    cvStatus: string | null;
   }> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -408,7 +410,7 @@ export class OnboardingService {
           errorMessage: job.errorMessage,
         };
       }
-    } else if (!cvImport) {
+    } else if (!importRecord) {
       const latestJob = await prisma.cvImportJob.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
@@ -426,6 +428,10 @@ export class OnboardingService {
         };
       }
     }
+
+    const cvStatus = importRecord
+      ? deriveCvStatus(importRecord.cvLinkType, importRecord.activatedAt, cvImport?.status ?? null)
+      : null;
 
     return {
       user: {
@@ -464,6 +470,7 @@ export class OnboardingService {
           }
         : null,
       cvImport,
+      cvStatus,
     };
   }
 }

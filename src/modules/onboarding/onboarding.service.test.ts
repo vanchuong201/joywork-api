@@ -194,4 +194,42 @@ describe('OnboardingService', () => {
       expect.stringContaining('/onboarding?token='),
     );
   });
+
+  it('getMe: không mượn latest job khi record import manual chưa có cvImportJobId', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-3',
+      email: 'manual@example.com',
+      name: 'Manual User',
+      phone: null,
+      profile: null,
+    });
+    prismaMock.candidateImportRecord.findFirst.mockResolvedValue({
+      id: 'record-1',
+      rawName: 'Manual User',
+      rawPhone: '0900000000',
+      rawProvince: null,
+      rawDistrict: null,
+      rawPosition: null,
+      rawSalary: null,
+      rawExperience: null,
+      rawSocialLink: null,
+      rawCvLink: 'https://www.canva.com/design/mock-cv',
+      rawPortfolioLink: null,
+      cvLinkType: 'CANVA',
+      activatedAt: new Date('2026-07-31T00:00:00.000Z'),
+      cvImportJobId: null,
+    });
+    prismaMock.cvImportJob.findFirst.mockResolvedValue({
+      id: 'latest-job',
+      status: 'APPLIED',
+      errorMessage: null,
+    });
+
+    const result = await service.getMe('user-3');
+
+    expect(prismaMock.cvImportJob.findFirst).not.toHaveBeenCalled();
+    expect(result.cvImport).toBeNull();
+    expect(result.cvStatus).toBe('CV_MANUAL_PENDING');
+    expect(result.importRecord?.linkAction).toBe('MANUAL_UPLOAD');
+  });
 });
