@@ -7,6 +7,15 @@ loadEnv();
 const emptyToUndefined = (val: unknown) =>
   typeof val === 'string' && val.trim() === '' ? undefined : val;
 
+const stringToBoolean = (val: unknown): boolean | undefined => {
+  if (typeof val === 'boolean') return val;
+  if (typeof val !== 'string') return undefined;
+  const normalized = val.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+};
+
 const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -95,6 +104,7 @@ const envSchema = z.object({
   OPENAI_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   CV_IMPORT_MODEL: z.string().default('gpt-4o-mini'),
   CV_IMPORT_MAX_TEXT_CHARS: z.coerce.number().int().min(1000).max(200_000).default(60_000),
+  CV_AVATAR_DEBUG: z.preprocess(stringToBoolean, z.boolean().default(false)),
 
   // Candidate onboarding: thời hạn (ngày) của link kích hoạt gửi qua email
   ONBOARDING_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(90),

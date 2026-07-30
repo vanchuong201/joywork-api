@@ -14,7 +14,8 @@ import {
 } from './cv-file-extractor';
 import { fetchCvFromExternalLink } from './cv-link-fetcher';
 import { syncUserToEs } from '@/shared/elasticsearch/sync';
-import { buildDefaultCandidateAvatarUrl } from '@/shared/candidates/default-avatar';
+import { isPlaceholderCandidateAvatarUrl } from '@/shared/candidates/default-avatar';
+import { extractAvatar } from './avatar';
 import {
   applyCvImportSchema,
   CV_IMPORT_SECTIONS,
@@ -25,6 +26,8 @@ import {
 } from './cv-imports.schema';
 import type { CvParserProvider } from './providers/cv-parser.provider';
 import { OpenAiCvParserProvider } from './providers/openai-cv-parser.provider';
+import { sharedLogger } from '@/shared/logging/logger';
+import { config } from '@/config/env';
 
 const MAX_CV_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -58,6 +61,16 @@ interface ImportJobRecord {
   createdAt: Date;
   updatedAt: Date;
   appliedAt: Date | null;
+}
+
+interface AvatarUploadResult {
+  assetUrl: string | null;
+  status: 'found' | 'not_found' | 'unsupported_file';
+  code: string;
+  reason?: string;
+  confidence?: number;
+  isConfident?: boolean;
+  debug?: unknown;
 }
 
 export class CvImportsService {
@@ -110,6 +123,34 @@ export class CvImportsService {
       const warnings = [...(sanitized.warnings ?? []), ...(extracted.warnings ?? [])];
       if (extracted.truncated) {
         warnings.push('CV bị cắt do quá dài, một số phần ở cuối có thể bị thiếu.');
+      }
+
+      // Ưu tiên URL text từ model; nếu không có thì lấy ảnh nhúng từ PDF/DOCX.
+      if (!sanitized.basicInfo?.avatarUrl) {
+        const avatarUpload = await this.tryUploadEmbeddedCvAvatar(userId, buffer, resolved.mime);
+        this.logAvatarExtraction({
+          userId,
+          mime: resolved.mime,
+          status: avatarUpload.status,
+          code: avatarUpload.code,
+          ...(typeof avatarUpload.confidence === 'number'
+            ? { confidence: avatarUpload.confidence }
+            : {}),
+          ...(typeof avatarUpload.isConfident === 'boolean'
+            ? { isConfident: avatarUpload.isConfident }
+            : {}),
+          ...(avatarUpload.reason ? { reason: avatarUpload.reason } : {}),
+          ...(avatarUpload.debug ? { debug: avatarUpload.debug } : {}),
+        });
+
+        if (avatarUpload.assetUrl) {
+          sanitized.basicInfo = {
+            ...(sanitized.basicInfo ?? {}),
+            avatarUrl: avatarUpload.assetUrl,
+          };
+        } else {
+          warnings.push('Không tìm thấy ảnh đại diện phù hợp trong CV.');
+        }
       }
 
       const updated = await prisma.cvImportJob.update({
@@ -224,8 +265,6 @@ export class CvImportsService {
       sections: [...CV_IMPORT_SECTIONS],
     });
 
-    await this.ensureDefaultAvatarIfMissing(userId);
-
     const userForEs = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -253,33 +292,115 @@ export class CvImportsService {
     return applied;
   }
 
-  /** Nếu user/profile chưa có avatar sau apply CV → gắn avatar mặc định theo email. */
-  private async ensureDefaultAvatarIfMissing(userId: string): Promise<void> {
+  /** Upload ảnh nhúng từ CV lên S3 theo kết quả scorer. */
+  private async tryUploadEmbeddedCvAvatar(
+    userId: string,
+    buffer: Buffer,
+    mime: SupportedCvMime
+  ): Promise<AvatarUploadResult> {
+    const extraction = await extractAvatar({ buffer, mime });
+    if (extraction.status !== 'found') {
+      return {
+        assetUrl: null,
+        status: extraction.status,
+        code: extraction.code,
+        reason: extraction.reason,
+        debug: extraction.debug,
+      };
+    }
+
+    const key = `users/${userId}/avatar/profile/${randomUUID()}.webp`;
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: getS3BucketName(),
+          Key: key,
+          Body: extraction.avatar,
+          ContentType: 'image/webp',
+          ContentLength: extraction.avatar.byteLength,
+        })
+      );
+    } catch (error) {
+      return {
+        assetUrl: null,
+        status: 'not_found',
+        code: 'upload_failed',
+        reason: error instanceof Error ? error.message : 'Không thể upload avatar lên S3',
+      };
+    }
+
+    return {
+      assetUrl: buildS3ObjectUrl(key),
+      status: 'found',
+      code: extraction.isConfident ? 'found_confident' : 'found_low_margin',
+      confidence: extraction.confidence,
+      isConfident: extraction.isConfident,
+      debug: extraction.debug,
+    };
+  }
+
+  private logAvatarExtraction(params: {
+    userId: string;
+    mime: SupportedCvMime;
+    status: AvatarUploadResult['status'];
+    code: string;
+    confidence?: number;
+    isConfident?: boolean;
+    reason?: string;
+    debug?: unknown;
+  }) {
+    const payload: Record<string, unknown> = {
+      event: 'cv_avatar_extract',
+      userId: params.userId,
+      mime: params.mime,
+      status: params.status,
+      code: params.code,
+      ...(typeof params.confidence === 'number' ? { confidence: params.confidence } : {}),
+      ...(typeof params.isConfident === 'boolean' ? { isConfident: params.isConfident } : {}),
+      ...(params.reason ? { reason: params.reason } : {}),
+    };
+
+    if (config.CV_AVATAR_DEBUG && params.debug) {
+      payload['debug'] = params.debug;
+    }
+
+    sharedLogger.info(payload);
+  }
+
+  /** Xóa avatar pravatar giả nếu vẫn còn sau apply (để UI dùng initials). */
+  private async clearPlaceholderAvatars(userId: string): Promise<void> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
-        email: true,
         avatar: true,
         profile: { select: { avatar: true } },
       },
     });
     if (!user) return;
 
-    const hasAvatar = Boolean(user.avatar?.trim() || user.profile?.avatar?.trim());
-    if (hasAvatar) return;
+    const clearUser = isPlaceholderCandidateAvatarUrl(user.avatar);
+    const clearProfile = isPlaceholderCandidateAvatarUrl(user.profile?.avatar ?? null);
+    if (!clearUser && !clearProfile) return;
 
-    const defaultAvatar = buildDefaultCandidateAvatarUrl(user.email);
     await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: { avatar: defaultAvatar },
-      }),
-      prisma.userProfile.upsert({
-        where: { userId },
-        update: { avatar: defaultAvatar },
-        create: { userId, avatar: defaultAvatar },
-      }),
+      ...(clearUser
+        ? [
+            prisma.user.update({
+              where: { id: userId },
+              data: { avatar: null },
+            }),
+          ]
+        : []),
+      ...(clearProfile
+        ? [
+            prisma.userProfile.upsert({
+              where: { userId },
+              update: { avatar: null },
+              create: { userId, avatar: null },
+            }),
+          ]
+        : []),
     ]);
   }
 
@@ -390,6 +511,9 @@ export class CvImportsService {
         },
       });
     });
+
+    // Gỡ avatar giả (pravatar) nếu apply không gắn được ảnh thật từ CV.
+    await this.clearPlaceholderAvatars(userId);
 
     return updated as ImportJobRecord;
   }
@@ -570,7 +694,11 @@ export class CvImportsService {
       setIfApplicable('title', basic.title ?? undefined, !existingProfile?.title);
       setIfApplicable('headline', basic.headline ?? undefined, !existingProfile?.headline);
       setIfApplicable('bio', basic.bio ?? undefined, !existingProfile?.bio);
-      setIfApplicable('avatar', basic.avatarUrl ?? undefined, !existingProfile?.avatar);
+      setIfApplicable(
+        'avatar',
+        basic.avatarUrl ?? undefined,
+        !existingProfile?.avatar || isPlaceholderCandidateAvatarUrl(existingProfile.avatar)
+      );
       if (basic.gender) {
         setIfApplicable('gender', basic.gender, !existingProfile?.gender);
       }

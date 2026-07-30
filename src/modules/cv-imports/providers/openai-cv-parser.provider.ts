@@ -34,7 +34,7 @@ Hướng dẫn bổ sung:
 - "title": vị trí ứng tuyển mong muốn nếu CV nêu, nếu không thì để null.
 - "headline": câu giới thiệu ngắn ở đầu CV.
 - "bio": phần giới thiệu/tóm tắt cá nhân (objective/summary), tối đa 1500 ký tự.
-- "avatarUrl": chỉ điền khi CV ghi rõ URL ảnh đại diện (http/https). Không suy đoán hay bịa URL.
+- "avatarUrl": chỉ điền khi CV ghi rõ URL ảnh đại diện (http/https). Không suy đoán hay bịa URL. Ảnh chân dung nhúng trong file PDF/DOCX sẽ được hệ thống lấy riêng — không cần mô tả.
 - "startDate"/"endDate": dạng YYYY hoặc YYYY-MM nếu có, nếu chỉ có chuỗi mô tả thì để null và đặt giá trị vào "period".
 - "warnings": liệt kê các điểm bạn không chắc chắn (ngày tháng, tên công ty mơ hồ, OCR kém...).
 - "confidence": từ 0 đến 1, ước lượng độ chắc chắn tổng thể.
