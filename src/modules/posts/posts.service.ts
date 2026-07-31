@@ -1,6 +1,7 @@
 import { PostAuditAction } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { companyBadgesSelect } from '@/shared/company-badges';
 import { deleteS3Objects } from '@/shared/storage/s3';
 import {
   CreatePostInput,
@@ -258,7 +259,7 @@ export class PostsService {
             name: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         createdBy: {
@@ -531,7 +532,7 @@ export class PostsService {
             name: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         createdBy: {
@@ -601,7 +602,7 @@ export class PostsService {
             name: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         createdBy: {
@@ -750,7 +751,7 @@ export class PostsService {
               name: true,
               slug: true,
               logoUrl: true,
-              isGood: true,
+              badges: companyBadgesSelect,
             },
           },
           createdBy: {
@@ -939,7 +940,7 @@ export class PostsService {
               name: true,
               slug: true,
               logoUrl: true,
-              isGood: true,
+              badges: companyBadgesSelect,
             },
           },
           createdBy: {

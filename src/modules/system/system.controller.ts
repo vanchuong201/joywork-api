@@ -19,7 +19,7 @@ import {
   adminPostsQuerySchema,
   adminCompanyPremiumPatchSchema,
   adminCompanyCvFlipPatchSchema,
-  adminCompanyGoodPatchSchema,
+  adminCompanyBadgePatchSchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
   adminUsersQuerySchema,
@@ -205,13 +205,22 @@ export class SystemController {
     return reply.send({ data: { company } });
   }
 
-  async patchCompanyGoodStatus(request: AuthenticatedRequest, reply: FastifyReply) {
+  async patchCompanyBadge(request: AuthenticatedRequest, reply: FastifyReply) {
+    const adminId = request.user?.userId;
+    if (!adminId) {
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+    }
     const { companyId } = request.params as { companyId: string };
-    const parsed = adminCompanyGoodPatchSchema.safeParse(request.body);
+    const parsed = adminCompanyBadgePatchSchema.safeParse(request.body);
     if (!parsed.success) {
       throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
     }
-    const company = await this.systemService.setCompanyGoodStatus(companyId, parsed.data.isGood);
+    const company = await this.systemService.setCompanyBadge(
+      companyId,
+      parsed.data.type,
+      parsed.data.granted,
+      adminId
+    );
     return reply.send({ data: { company } });
   }
 

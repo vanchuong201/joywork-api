@@ -1,4 +1,4 @@
-import { UserAccountStatus } from '@prisma/client';
+import { CompanyBadgeType, UserAccountStatus } from '@prisma/client';
 import { z } from 'zod';
 
 const pageSchema = z.coerce.number().int().min(1).default(1);
@@ -57,11 +57,12 @@ export const adminCompanyCvFlipPatchSchema = z.object({
 
 export type AdminCompanyCvFlipPatch = z.infer<typeof adminCompanyCvFlipPatchSchema>;
 
-export const adminCompanyGoodPatchSchema = z.object({
-  isGood: z.boolean(),
+export const adminCompanyBadgePatchSchema = z.object({
+  type: z.nativeEnum(CompanyBadgeType),
+  granted: z.boolean(),
 });
 
-export type AdminCompanyGoodPatch = z.infer<typeof adminCompanyGoodPatchSchema>;
+export type AdminCompanyBadgePatch = z.infer<typeof adminCompanyBadgePatchSchema>;
 
 export const adminJobsQuerySchema = z.object({
   page: pageSchema,

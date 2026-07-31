@@ -128,7 +128,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         name: { type: 'string' },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
-                        isGood: { type: 'boolean' },
+                        badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                       },
                     },
                     likes: {
@@ -251,7 +251,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         name: { type: 'string' },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
-                        isGood: { type: 'boolean' },
+                        badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                       },
                     },
                     likes: {
@@ -421,7 +421,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           name: { type: 'string' },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
-                          isGood: { type: 'boolean' },
+                          badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                         },
                       },
                       likes: {
@@ -592,7 +592,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                           name: { type: 'string' },
                           slug: { type: 'string' },
                           logoUrl: { type: 'string', nullable: true },
-                          isGood: { type: 'boolean' },
+                          badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                         },
                       },
                       likes: {
@@ -791,7 +791,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                         name: { type: 'string' },
                         slug: { type: 'string' },
                         logoUrl: { type: 'string', nullable: true },
-                        isGood: { type: 'boolean' },
+                        badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                       },
                     },
                     likes: {
@@ -1091,7 +1091,7 @@ export async function postsRoutes(fastify: FastifyInstance) {
                               name: { type: 'string' },
                               slug: { type: 'string' },
                               logoUrl: { type: 'string', nullable: true },
-                              isGood: { type: 'boolean' },
+                              badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                             },
                           },
                           images: {

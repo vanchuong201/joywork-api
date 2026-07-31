@@ -1,6 +1,7 @@
 import { prisma } from '@/shared/database/prisma';
 import {
   Prisma,
+  CompanyBadgeType,
   CompanyShowcaseListType,
   CompanyVerificationStatus,
   UserAccountStatus,
@@ -36,6 +37,7 @@ import type {
   UpdateCompanyInput,
   UpdateCompanyProfileInput,
 } from '@/modules/companies/companies.schema';
+import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
 
 export interface SystemOverview {
   users: number;
@@ -72,7 +74,7 @@ export interface AdminCompanyListItem {
   legalName: string | null;
   verificationStatus: string;
   isVerified: boolean;
-  isGood: boolean;
+  badges: CompanyBadgeType[];
   isPremium: boolean;
   cvFlipEnabled: boolean;
   cvFlipMonthlyTotalLimit: number;
@@ -481,7 +483,7 @@ export class SystemService {
           legalName: true,
           verificationStatus: true,
           isVerified: true,
-          isGood: true,
+          badges: companyBadgesSelect,
           createdAt: true,
           _count: {
             select: { members: true, jobs: true },
@@ -510,7 +512,7 @@ export class SystemService {
         legalName: c.legalName ?? null,
         verificationStatus: c.verificationStatus,
         isVerified: c.isVerified,
-        isGood: c.isGood,
+        badges: toBadgeTypes(c.badges),
         isPremium: premiumEntitlement?.enabled ?? false,
         cvFlipEnabled: cvFlipEntitlement?.enabled ?? false,
         cvFlipMonthlyTotalLimit: cvFlipLimits.monthlyTotalLimit,
@@ -1544,10 +1546,12 @@ export class SystemService {
     };
   }
 
-  async setCompanyGoodStatus(
+  async setCompanyBadge(
     companyId: string,
-    isGood: boolean
-  ): Promise<{ id: string; isGood: boolean }> {
+    type: CompanyBadgeType,
+    granted: boolean,
+    grantedById?: string
+  ): Promise<{ id: string; badges: CompanyBadgeType[] }> {
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true },
@@ -1557,18 +1561,43 @@ export class SystemService {
       throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
     }
 
-    const updated = await prisma.company.update({
-      where: { id: companyId },
-      data: { isGood },
+    if (granted) {
+      await prisma.companyBadge.upsert({
+        where: {
+          companyId_type: {
+            companyId,
+            type,
+          },
+        },
+        create: {
+          companyId,
+          type,
+          ...(grantedById !== undefined ? { grantedById } : {}),
+        },
+        update: {
+          grantedAt: new Date(),
+          ...(grantedById !== undefined ? { grantedById } : {}),
+        },
+      });
+    } else {
+      await prisma.companyBadge.deleteMany({
+        where: {
+          companyId,
+          type,
+        },
+      });
+    }
+
+    const badges = await prisma.companyBadge.findMany({
+      where: { companyId },
       select: {
-        id: true,
-        isGood: true,
+        type: true,
       },
     });
 
     return {
-      id: updated.id,
-      isGood: updated.isGood,
+      id: company.id,
+      badges: toBadgeTypes(badges),
     };
   }
 

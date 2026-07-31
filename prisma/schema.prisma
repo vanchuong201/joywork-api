@@ -365,7 +365,6 @@ model Company {
   profileStory             Json?
   highlights               Json?
   isVerified               Boolean                   @default(false)
-  isGood                   Boolean                   @default(false)
   verificationStatus       CompanyVerificationStatus @default(UNVERIFIED)
   verificationFileKey      String?
   verificationFileUrl      String?
@@ -395,10 +394,31 @@ model Company {
   cvFlipConnections   CvFlipConnection[]
   cvFlipRequests      CvFlipRequest[]
   cvFlipUsages        CvFlipUsage[]
+  badges              CompanyBadge[]
 
   showcaseSlots CompanyShowcaseSlot[]
 
   @@map("companies")
+}
+
+enum CompanyBadgeType {
+  GOOD_COMPANY
+  BASIC_COMMITMENT
+}
+
+model CompanyBadge {
+  id          String           @id @default(cuid())
+  companyId   String
+  type        CompanyBadgeType
+  grantedAt   DateTime         @default(now())
+  grantedById String?
+  note        String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, type])
+  @@index([type])
+  @@map("company_badges")
 }
 
 /// Vị trí công ty trong danh sách nổi bật / hàng đầu (CMS homepage).

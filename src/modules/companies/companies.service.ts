@@ -1,4 +1,4 @@
-import { Prisma, CompanyShowcaseListType, CompanyStatementAnswer } from '@prisma/client';
+import { Prisma, CompanyBadgeType, CompanyShowcaseListType, CompanyStatementAnswer } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import {
@@ -30,6 +30,7 @@ import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { buildS3ObjectUrl, getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
+import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
 
 export interface Company {
   id: string;
@@ -155,7 +156,7 @@ export interface CompanyWithMembers {
   profileStory?: CompanyStoryBlock[];
   highlights?: CompanyHighlight[];
   isVerified: boolean;
-  isGood: boolean;
+  badges: CompanyBadgeType[];
   verificationStatus?: string;
   verificationFileKey?: string | null;
   verificationFileUrl?: string | null;
@@ -208,7 +209,7 @@ export interface CompanySummary {
   name: string;
   slug: string;
   logoUrl?: string;
-  isGood?: boolean;
+  badges?: CompanyBadgeType[];
   tagline?: string;
   location?: string;
   followersCount: number;
@@ -221,6 +222,7 @@ export interface HomepageCompanyShowcaseItem {
   name: string;
   slug: string;
   logoUrl: string | null;
+  badges: CompanyBadgeType[];
   tagline: string | null;
   coverUrl: string | null;
   order: number;
@@ -315,7 +317,7 @@ export class CompaniesService {
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
-      isGood: company.isGood,
+      badges: [],
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -583,7 +585,7 @@ export class CompaniesService {
       ...(company.tagline != null ? { tagline: company.tagline } : {}),
       ...(company.description != null ? { description: company.description } : {}),
       ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
-      isGood: company.isGood,
+      badges: [],
       ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
       ...(company.website != null ? { website: company.website } : {}),
       ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -650,6 +652,7 @@ export class CompaniesService {
             expiresAt: { gt: now },
           },
         },
+        badges: companyBadgesSelect,
         _count: {
           select: {
             posts: true,
@@ -735,7 +738,7 @@ export class CompaniesService {
       ...(company.profileStory != null ? { profileStory: company.profileStory as unknown as CompanyStoryBlock[] } : {}),
       ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
-      isGood: company.isGood,
+      badges: toBadgeTypes(company.badges),
       verificationStatus: company.verificationStatus,
       ...(company.verificationFileKey != null ? { verificationFileKey: company.verificationFileKey } : {}),
       ...(company.verificationFileUrl != null ? { verificationFileUrl: company.verificationFileUrl } : {}),
@@ -868,7 +871,12 @@ export class CompaniesService {
           if (ids.length === 0) {
             return { companies: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
           }
-          const companies = await prisma.company.findMany({ where: { id: { in: ids } } });
+          const companies = await prisma.company.findMany({
+            where: { id: { in: ids } },
+            include: {
+              badges: companyBadgesSelect,
+            },
+          });
           const companyMap = new Map(companies.map(c => [c.id, c]));
           const ordered = ids.map(id => companyMap.get(id)).filter(Boolean) as typeof companies;
           return {
@@ -877,7 +885,7 @@ export class CompaniesService {
               ...(company.tagline != null ? { tagline: company.tagline } : {}),
               ...(company.description != null ? { description: company.description } : {}),
               ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
-              isGood: company.isGood,
+              badges: toBadgeTypes(company.badges),
               ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
               ...(company.website != null ? { website: company.website } : {}),
               ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -934,6 +942,9 @@ export class CompaniesService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          badges: companyBadgesSelect,
+        },
       }),
       prisma.company.count({ where }),
     ]);
@@ -949,7 +960,7 @@ export class CompaniesService {
         ...(company.tagline != null ? { tagline: company.tagline } : {}),
         ...(company.description != null ? { description: company.description } : {}),
         ...(company.logoUrl != null ? { logoUrl: company.logoUrl } : {}),
-        isGood: company.isGood,
+        badges: toBadgeTypes(company.badges),
         ...(company.coverUrl != null ? { coverUrl: company.coverUrl } : {}),
         ...(company.website != null ? { website: company.website } : {}),
         ...(company.location != null ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
@@ -978,7 +989,11 @@ export class CompaniesService {
     const memberships = await prisma.companyMember.findMany({
       where: { userId },
       include: {
-        company: true,
+        company: {
+          include: {
+            badges: companyBadgesSelect,
+          },
+        },
       },
       orderBy: { joinedAt: 'desc' },
     });
@@ -994,7 +1009,7 @@ export class CompaniesService {
         ...(membership.company.tagline != null ? { tagline: membership.company.tagline } : {}),
         ...(membership.company.description != null ? { description: membership.company.description } : {}),
         ...(membership.company.logoUrl != null ? { logoUrl: membership.company.logoUrl } : {}),
-        isGood: membership.company.isGood,
+        badges: toBadgeTypes(membership.company.badges),
         ...(membership.company.coverUrl != null ? { coverUrl: membership.company.coverUrl } : {}),
         ...(membership.company.website != null ? { website: membership.company.website } : {}),
         ...(membership.company.location != null ? { location: membership.company.location, locationName: getProvinceNameByCode(membership.company.location) ?? membership.company.location } : {}),
@@ -1031,7 +1046,7 @@ export class CompaniesService {
             name: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
             tagline: true,
             coverUrl: true,
           },
@@ -1051,7 +1066,7 @@ export class CompaniesService {
           name: row.name,
           slug: row.slug,
           logoUrl: await resolveReadableS3ObjectUrl(row.logoUrl ?? null),
-          isGood: row.isGood,
+          badges: toBadgeTypes(row.badges),
           tagline: row.tagline ?? null,
           coverUrl: await resolveReadableS3ObjectUrl(rawCover),
           order: slot.sortOrder,
@@ -1067,7 +1082,11 @@ export class CompaniesService {
     const follows = await prisma.follow.findMany({
       where: { userId },
       include: {
-        company: true,
+        company: {
+          include: {
+            badges: companyBadgesSelect,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -1083,7 +1102,7 @@ export class CompaniesService {
         ...(follow.company.tagline != null ? { tagline: follow.company.tagline } : {}),
         ...(follow.company.description != null ? { description: follow.company.description } : {}),
         ...(follow.company.logoUrl != null ? { logoUrl: follow.company.logoUrl } : {}),
-        isGood: follow.company.isGood,
+        badges: toBadgeTypes(follow.company.badges),
         ...(follow.company.coverUrl != null ? { coverUrl: follow.company.coverUrl } : {}),
         ...(follow.company.website != null ? { website: follow.company.website } : {}),
         ...(follow.company.location != null ? { location: follow.company.location, locationName: getProvinceNameByCode(follow.company.location) ?? follow.company.location } : {}),
@@ -1465,7 +1484,7 @@ export class CompaniesService {
         name: true,
         slug: true,
         logoUrl: true,
-        isGood: true,
+        badges: companyBadgesSelect,
         tagline: true,
         location: true,
       },
@@ -1479,7 +1498,7 @@ export class CompaniesService {
           name: true,
           slug: true,
           logoUrl: true,
-          isGood: true,
+          badges: companyBadgesSelect,
           tagline: true,
           location: true,
         },
@@ -1506,7 +1525,7 @@ export class CompaniesService {
       name: company.name,
       slug: company.slug,
       ...(company.logoUrl ? { logoUrl: company.logoUrl } : {}),
-      isGood: company.isGood,
+      badges: toBadgeTypes(company.badges),
       ...(company.tagline ? { tagline: company.tagline } : {}),
       ...(company.location ? { location: company.location, locationName: getProvinceNameByCode(company.location) ?? company.location } : {}),
       followersCount,
@@ -2222,7 +2241,7 @@ export class CompaniesService {
             name: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         createdBy: {

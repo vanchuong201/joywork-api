@@ -469,7 +469,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       legalName: { type: ['string', 'null'] },
                       verificationStatus: { type: 'string' },
                       isVerified: { type: 'boolean' },
-                      isGood: { type: 'boolean' },
+                      badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                       isPremium: { type: 'boolean' },
                       cvFlipEnabled: { type: 'boolean' },
                       cvFlipMonthlyTotalLimit: { type: 'number' },
@@ -704,10 +704,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
     },
   }, systemController.patchCompanyPremiumStatus.bind(systemController));
 
-  fastify.patch('/companies/:companyId/good', {
+  fastify.patch('/companies/:companyId/badges', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {
-      description: 'Cập nhật trạng thái Good của doanh nghiệp',
+      description: 'Cập nhật trạng thái huy hiệu của doanh nghiệp',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
       params: {
@@ -721,9 +721,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['isGood'],
+        required: ['type', 'granted'],
         properties: {
-          isGood: { type: 'boolean' },
+          type: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] },
+          granted: { type: 'boolean' },
         },
       },
       response: {
@@ -737,7 +738,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
                   type: 'object',
                   properties: {
                     id: { type: 'string' },
-                    isGood: { type: 'boolean' },
+                    badges: {
+                      type: 'array',
+                      items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] },
+                    },
                   },
                 },
               },
@@ -746,7 +750,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
         },
       },
     },
-  }, systemController.patchCompanyGoodStatus.bind(systemController));
+  }, systemController.patchCompanyBadge.bind(systemController));
 
   fastify.patch('/companies/:companyId/cv-flip', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],

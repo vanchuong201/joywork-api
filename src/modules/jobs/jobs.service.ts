@@ -1,4 +1,4 @@
-import { NotificationType, Prisma } from '@prisma/client';
+import { NotificationType, Prisma, CompanyBadgeType } from '@prisma/client';
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
@@ -15,6 +15,7 @@ import { slugifyVietnamese } from '@/shared/job-slug';
 import { computeWorksOnSaturday, type WorkingTimeRange } from '@/shared/working-time';
 import { generateAndStoreJobEmbedding, generateEmbedding } from '@/shared/services/embedding.service';
 import { evaluateCandidateCvReadiness } from '@/shared/candidates/cv-readiness';
+import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -54,6 +55,7 @@ export interface Job {
     name: string;
     slug: string;
     logoUrl?: string;
+    badges?: CompanyBadgeType[];
   };
   _count: {
     applications: number;
@@ -92,6 +94,7 @@ export interface Application {
       name: string;
       slug: string;
       logoUrl?: string;
+      badges?: CompanyBadgeType[];
     };
   };
   user: {
@@ -128,6 +131,7 @@ export interface JobFavorite {
       name: string;
       slug: string;
       logoUrl?: string | null;
+      badges?: CompanyBadgeType[];
     };
   };
 }
@@ -270,7 +274,7 @@ export class JobsService {
             legalName: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         _count: {
@@ -330,7 +334,7 @@ export class JobsService {
     if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
     if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
-    result.company.isGood = job.company.isGood;
+    result.company.badges = toBadgeTypes(job.company.badges);
     if (job.workingTimeRanges) result.workingTimeRanges = job.workingTimeRanges;
     if (job.workingTimeNote) result.workingTimeNote = job.workingTimeNote;
     if (job.worksOnSaturday !== null) result.worksOnSaturday = job.worksOnSaturday;
@@ -479,7 +483,7 @@ export class JobsService {
             legalName: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         _count: {
@@ -539,7 +543,7 @@ export class JobsService {
     if (updatedJob.benefitsPerks) result.benefitsPerks = updatedJob.benefitsPerks;
     if (updatedJob.contact) result.contact = updatedJob.contact;
     if (updatedJob.company.logoUrl) result.company.logoUrl = updatedJob.company.logoUrl;
-    result.company.isGood = updatedJob.company.isGood;
+    result.company.badges = toBadgeTypes(updatedJob.company.badges);
     if (updatedJob.workingTimeRanges) result.workingTimeRanges = updatedJob.workingTimeRanges;
     if (updatedJob.workingTimeNote) result.workingTimeNote = updatedJob.workingTimeNote;
     if (updatedJob.worksOnSaturday !== null) result.worksOnSaturday = updatedJob.worksOnSaturday;
@@ -616,7 +620,7 @@ export class JobsService {
             legalName: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         _count: {
@@ -695,7 +699,7 @@ export class JobsService {
     if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
     if (job.contact) result.contact = job.contact;
     if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
-    result.company.isGood = job.company.isGood;
+    result.company.badges = toBadgeTypes(job.company.badges);
     if (job.workingTimeRanges) result.workingTimeRanges = job.workingTimeRanges;
     if (job.workingTimeNote) result.workingTimeNote = job.workingTimeNote;
     if (job.worksOnSaturday !== null) result.worksOnSaturday = job.worksOnSaturday;
@@ -760,7 +764,7 @@ export class JobsService {
             legalName: true,
             slug: true,
             logoUrl: true,
-            isGood: true,
+            badges: companyBadgesSelect,
           },
         },
         _count: {
@@ -814,7 +818,7 @@ export class JobsService {
               legalName: true,
               slug: true,
               logoUrl: true,
-              isGood: true,
+              badges: companyBadgesSelect,
             },
           },
           _count: {
@@ -894,7 +898,7 @@ export class JobsService {
       if (job.benefitsPerks) result.benefitsPerks = job.benefitsPerks;
       if (job.contact) result.contact = job.contact;
       if (job.company.logoUrl) result.company.logoUrl = job.company.logoUrl;
-      result.company.isGood = job.company.isGood;
+      result.company.badges = toBadgeTypes(job.company.badges);
       if (job.workingTimeRanges) result.workingTimeRanges = job.workingTimeRanges;
       if (job.workingTimeNote) result.workingTimeNote = job.workingTimeNote;
       if (job.worksOnSaturday !== null) result.worksOnSaturday = job.worksOnSaturday;
@@ -1085,7 +1089,7 @@ export class JobsService {
               legalName: true,
               slug: true,
               logoUrl: true,
-              isGood: true,
+              badges: companyBadgesSelect,
             },
           },
           _count: {
@@ -1167,7 +1171,7 @@ export class JobsService {
       if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
       if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
-      jobResult.company.isGood = job.company.isGood;
+      jobResult.company.badges = toBadgeTypes(job.company.badges);
       if (job.workingTimeRanges) jobResult.workingTimeRanges = job.workingTimeRanges;
       if (job.workingTimeNote) jobResult.workingTimeNote = job.workingTimeNote;
       if (job.worksOnSaturday !== null) jobResult.worksOnSaturday = job.worksOnSaturday;
@@ -1380,7 +1384,7 @@ export class JobsService {
                   name: true,
                   slug: true,
                   logoUrl: true,
-                  isGood: true,
+                  badges: companyBadgesSelect,
                 },
               },
             },
@@ -1424,7 +1428,7 @@ export class JobsService {
             name: app.job.company.name,
             slug: app.job.company.slug,
             ...(app.job.company.logoUrl ? { logoUrl: app.job.company.logoUrl } : {}),
-            isGood: app.job.company.isGood,
+            badges: toBadgeTypes(app.job.company.badges),
           },
         },
         user: {
@@ -1597,7 +1601,7 @@ export class JobsService {
                   name: true,
                   slug: true,
                   logoUrl: true,
-                  isGood: true,
+                  badges: companyBadgesSelect,
                 },
               },
             },
@@ -1641,7 +1645,7 @@ export class JobsService {
             name: app.job.company.name,
             slug: app.job.company.slug,
             ...(app.job.company.logoUrl ? { logoUrl: app.job.company.logoUrl } : {}),
-            isGood: app.job.company.isGood,
+            badges: toBadgeTypes(app.job.company.badges),
           },
         },
         user: {
@@ -1693,7 +1697,7 @@ export class JobsService {
                   name: true,
                   slug: true,
                   logoUrl: true,
-                  isGood: true,
+                  badges: companyBadgesSelect,
                 },
               },
             },
@@ -1729,7 +1733,7 @@ export class JobsService {
             name: fav.job.company.name,
             slug: fav.job.company.slug,
             ...(fav.job.company.logoUrl ? { logoUrl: fav.job.company.logoUrl } : {}),
-            isGood: fav.job.company.isGood,
+            badges: toBadgeTypes(fav.job.company.badges),
           },
         },
       })),
@@ -1929,7 +1933,7 @@ export class JobsService {
       where: { id: { in: ids } },
       include: {
         company: {
-          select: { id: true, name: true, legalName: true, slug: true, logoUrl: true, isGood: true },
+          select: { id: true, name: true, legalName: true, slug: true, logoUrl: true, badges: companyBadgesSelect },
         },
         _count: { select: { applications: true } },
       },
@@ -1979,7 +1983,7 @@ export class JobsService {
       if (job.benefitsPerks) jobResult.benefitsPerks = job.benefitsPerks;
       if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
-      jobResult.company.isGood = job.company.isGood;
+      jobResult.company.badges = toBadgeTypes(job.company.badges);
 
       jobsWithApplications.push(jobResult);
     }
@@ -2023,7 +2027,7 @@ export class JobsService {
       companyLegalName: string | null;
       companySlug: string;
       logoUrl: string | null;
-      isGood: boolean;
+      badges: string[];
       similarity: number;
     };
 
@@ -2054,7 +2058,10 @@ export class JobsService {
         c."legalName" AS "companyLegalName",
         c.slug AS "companySlug",
         c."logoUrl",
-        c."isGood",
+        COALESCE(
+          (SELECT array_agg(cb.type::text) FROM company_badges cb WHERE cb."companyId" = c.id),
+          ARRAY[]::text[]
+        ) AS "badges",
         1 - (j.embedding <=> $1::vector) AS similarity
       FROM jobs j
       JOIN companies c ON c.id = j."companyId"
@@ -2081,7 +2088,7 @@ export class JobsService {
       companyLegalName: row.companyLegalName ?? null,
       companySlug: row.companySlug,
       logoUrl: row.logoUrl ?? null,
-      isGood: row.isGood,
+      badges: row.badges as CompanyBadgeType[],
       locations: row.locations,
       remote: row.remote,
       employmentType: row.employmentType,
@@ -2107,7 +2114,7 @@ export interface SemanticJobResult {
   companyLegalName: string | null;
   companySlug: string;
   logoUrl: string | null;
-  isGood: boolean;
+  badges: CompanyBadgeType[];
   locations: string[];
   remote: boolean;
   employmentType: string;
