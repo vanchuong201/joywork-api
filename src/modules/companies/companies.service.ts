@@ -30,7 +30,7 @@ import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { buildS3ObjectUrl, getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
-import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
+import { companyBadgesSelect, parseCompanyBadgeTypes, toBadgeTypes } from '@/shared/company-badges';
 
 export interface Company {
   id: string;
@@ -863,10 +863,12 @@ export class CompaniesService {
       totalPages: number;
     };
   }> {
+    const badgeTypes = parseCompanyBadgeTypes(data.badges);
+
     // Try Elasticsearch first for text queries
     if (data.q) {
       try {
-        const ids = await this.searchCompaniesInEs(data);
+        const ids = await this.searchCompaniesInEs(data, badgeTypes);
         if (ids !== null) {
           if (ids.length === 0) {
             return { companies: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
@@ -933,6 +935,10 @@ export class CompaniesService {
 
     if (size) {
       where.size = size;
+    }
+
+    if (badgeTypes.length > 0) {
+      where.badges = { some: { type: { in: badgeTypes } } };
     }
 
     // Get companies with pagination
@@ -2260,7 +2266,10 @@ export class CompaniesService {
 
   // ─── Elasticsearch search helpers ─────────────────────────────────────────
 
-  private async searchCompaniesInEs(data: SearchCompaniesInput): Promise<string[] | null> {
+  private async searchCompaniesInEs(
+    data: SearchCompaniesInput,
+    badgeTypes: CompanyBadgeType[] = [],
+  ): Promise<string[] | null> {
     const client = getEsClient();
     if (!client) return null;
 
@@ -2284,6 +2293,16 @@ export class CompaniesService {
     if (data.location) {
       const code = resolveProvinceCode(data.location) ?? data.location;
       filter.push({ term: { location: code } });
+    }
+
+    // Badges are not indexed in ES — resolve company IDs via Prisma first
+    if (badgeTypes.length > 0) {
+      const badgeCompanies = await prisma.company.findMany({
+        where: { badges: { some: { type: { in: badgeTypes } } } },
+        select: { id: true },
+      });
+      if (badgeCompanies.length === 0) return [];
+      filter.push({ terms: { id: badgeCompanies.map((c) => c.id) } });
     }
 
     const response = await client.search({

@@ -717,7 +717,7 @@ model Job {
   // Working time
   workingTimeRanges Json?   // [{ dayFrom: 'MON'..'SUN', dayTo, timeStart: 'HH:mm', timeEnd: 'HH:mm' }]
   workingTimeNote   String? @db.Text // Ghi chú thời gian làm việc (tự do)
-  worksOnSaturday   Boolean? // Derived: null=unspecified, true=working Saturday, false=resting Saturday
+  worksOnSaturday   SaturdayWorkPolicy? // NO | FLEXIBLE | FIXED; null = chưa khai báo (job cũ)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -784,6 +784,12 @@ enum EducationLevel {
   BACHELOR
   MASTER
   PHD
+}
+
+enum SaturdayWorkPolicy {
+  NO
+  FLEXIBLE
+  FIXED
 }
 
 // Application model - Job applications

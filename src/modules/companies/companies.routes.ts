@@ -692,6 +692,10 @@ export async function companiesRoutes(fastify: FastifyInstance) {
             ],
             description: 'Filter by company headcount band',
           },
+          badges: {
+            type: 'string',
+            description: 'CSV of company badge types to filter by (OR), e.g. GOOD_COMPANY,BASIC_COMMITMENT',
+          },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
         },

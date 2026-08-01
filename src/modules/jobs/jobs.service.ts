@@ -12,10 +12,9 @@ import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { notificationService } from '@/shared/services/notification.service';
 import { slugifyVietnamese } from '@/shared/job-slug';
-import { computeWorksOnSaturday, type WorkingTimeRange } from '@/shared/working-time';
 import { generateAndStoreJobEmbedding, generateEmbedding } from '@/shared/services/embedding.service';
 import { evaluateCandidateCvReadiness } from '@/shared/candidates/cv-readiness';
-import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
+import { companyBadgesSelect, parseCompanyBadgeTypes, toBadgeTypes } from '@/shared/company-badges';
 import {
   CreateJobInput,
   UpdateJobInput,
@@ -261,7 +260,7 @@ export class JobsService {
         ? (data.workingTimeRanges as Prisma.InputJsonValue)
         : null,
       workingTimeNote: data.workingTimeNote?.trim() ? data.workingTimeNote.trim() : null,
-      worksOnSaturday: computeWorksOnSaturday(data.workingTimeRanges as WorkingTimeRange[] | undefined),
+      worksOnSaturday: data.worksOnSaturday,
     };
     
     const job = await prisma.job.create({
@@ -346,7 +345,7 @@ export class JobsService {
       title: job.title, generalInfo: job.generalInfo, mission: job.mission,
       tasks: job.tasks, knowledge: job.knowledge, skills: job.skills, attitude: job.attitude,
       locations: job.locations, wardCodes: job.wardCodes,
-      remote: job.remote, isActive: job.isActive,
+      remote: job.remote, isActive: job.isActive, worksOnSaturday: job.worksOnSaturday,
       employmentType: job.employmentType, experienceLevel: job.experienceLevel,
       jobLevel: job.jobLevel, educationLevel: job.educationLevel, gender: job.gender,
       salaryMin: job.salaryMin, salaryMax: job.salaryMax, currency: job.currency,
@@ -463,13 +462,13 @@ export class JobsService {
       updateData.workingTimeRanges = hasRanges
         ? (ranges as Prisma.InputJsonValue)
         : Prisma.JsonNull;
-      updateData.worksOnSaturday = computeWorksOnSaturday(
-        hasRanges ? (ranges as WorkingTimeRange[]) : null,
-      );
     }
     if (data.workingTimeNote !== undefined) {
       const note = data.workingTimeNote?.trim();
       updateData.workingTimeNote = note ? note : null;
+    }
+    if (data.worksOnSaturday !== undefined) {
+      updateData.worksOnSaturday = data.worksOnSaturday;
     }
     
     const updatedJob = await prisma.job.update({
@@ -555,7 +554,7 @@ export class JobsService {
       title: updatedJob.title, generalInfo: updatedJob.generalInfo, mission: updatedJob.mission,
       tasks: updatedJob.tasks, knowledge: updatedJob.knowledge, skills: updatedJob.skills,
       attitude: updatedJob.attitude, locations: updatedJob.locations, wardCodes: updatedJob.wardCodes,
-      remote: updatedJob.remote, isActive: updatedJob.isActive,
+      remote: updatedJob.remote, isActive: updatedJob.isActive, worksOnSaturday: updatedJob.worksOnSaturday,
       employmentType: updatedJob.employmentType, experienceLevel: updatedJob.experienceLevel,
       jobLevel: updatedJob.jobLevel, educationLevel: updatedJob.educationLevel, gender: updatedJob.gender,
       salaryMin: updatedJob.salaryMin, salaryMax: updatedJob.salaryMax, currency: updatedJob.currency,
@@ -917,10 +916,27 @@ export class JobsService {
       totalPages: number;
     };
   }> {
+    const badgeTypes = parseCompanyBadgeTypes(data.companyBadges);
+    let badgeCompanyIds: string[] | undefined;
+
+    if (badgeTypes.length > 0) {
+      const badgeCompanies = await prisma.company.findMany({
+        where: { badges: { some: { type: { in: badgeTypes } } } },
+        select: { id: true },
+      });
+      badgeCompanyIds = badgeCompanies.map((c) => c.id);
+      if (badgeCompanyIds.length === 0) {
+        return {
+          jobs: [],
+          pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 },
+        };
+      }
+    }
+
     // Try Elasticsearch first for text/skills queries
     if (data.q || data.skills) {
       try {
-        const esResult = await this.searchJobsInEs(data);
+        const esResult = await this.searchJobsInEs(data, badgeCompanyIds);
         if (esResult !== null) {
           return await this.fetchJobsByIds(esResult.ids, data.page, data.limit, userId, esResult.total);
         }
@@ -1064,14 +1080,23 @@ export class JobsService {
       where.companyId = companyId;
     }
 
-    if (worksOnSaturday) {
-      if (worksOnSaturday === 'WORK') {
-        where.worksOnSaturday = true;
-      } else if (worksOnSaturday === 'REST') {
-        where.worksOnSaturday = false;
-      } else if (worksOnSaturday === 'UNSPECIFIED') {
-        where.worksOnSaturday = null;
+    // Badge filter via resolved company IDs (OR semantics). Combine with explicit companyId if both set.
+    if (badgeCompanyIds && badgeCompanyIds.length > 0) {
+      if (companyId) {
+        if (!badgeCompanyIds.includes(companyId)) {
+          return {
+            jobs: [],
+            pagination: { page, limit, total: 0, totalPages: 0 },
+          };
+        }
+        // companyId already set above and is in the badge set — keep as-is
+      } else {
+        where.companyId = badgeCompanyIds.length === 1 ? badgeCompanyIds[0] : { in: badgeCompanyIds };
       }
+    }
+
+    if (worksOnSaturday) {
+      where.worksOnSaturday = worksOnSaturday;
     }
 
     // Get jobs with pagination
@@ -1825,7 +1850,10 @@ export class JobsService {
 
   // ─── Elasticsearch search helpers ─────────────────────────────────────────
 
-  private async searchJobsInEs(data: SearchJobsInput): Promise<{ ids: string[]; total: number } | null> {
+  private async searchJobsInEs(
+    data: SearchJobsInput,
+    badgeCompanyIds?: string[],
+  ): Promise<{ ids: string[]; total: number } | null> {
     const client = getEsClient();
     if (!client) return null;
 
@@ -1861,6 +1889,11 @@ export class JobsService {
     if (data.experienceLevel) filter.push({ term: { experienceLevel: data.experienceLevel } });
     if (data.companyId) filter.push({ term: { companyId: data.companyId } });
 
+    // Badges are not indexed in ES — filter via pre-resolved company IDs
+    if (badgeCompanyIds && badgeCompanyIds.length > 0) {
+      filter.push({ terms: { companyId: badgeCompanyIds } });
+    }
+
     if (data.location) {
       const code = resolveProvinceCode(data.location) ?? data.location;
       filter.push({ term: { locations: code } });
@@ -1879,6 +1912,10 @@ export class JobsService {
     if (data.jobLevel) filter.push(buildNullableFilter('jobLevel', data.jobLevel));
     if (data.educationLevel) filter.push(buildNullableFilter('educationLevel', data.educationLevel));
     if (data.gender) filter.push(buildNullableFilter('gender', data.gender));
+
+    if (data.worksOnSaturday) {
+      filter.push({ term: { worksOnSaturday: data.worksOnSaturday } });
+    }
 
     if (data.salaryMin !== undefined || data.salaryMax !== undefined) {
       const overlapMust: object[] = [];
@@ -1984,6 +2021,9 @@ export class JobsService {
       if (job.contact) jobResult.contact = job.contact;
       if (job.company.logoUrl) jobResult.company.logoUrl = job.company.logoUrl;
       jobResult.company.badges = toBadgeTypes(job.company.badges);
+      if (job.workingTimeRanges) jobResult.workingTimeRanges = job.workingTimeRanges;
+      if (job.workingTimeNote) jobResult.workingTimeNote = job.workingTimeNote;
+      if (job.worksOnSaturday !== null) jobResult.worksOnSaturday = job.worksOnSaturday;
 
       jobsWithApplications.push(jobResult);
     }

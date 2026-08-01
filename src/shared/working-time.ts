@@ -37,8 +37,3 @@ export function rangeIncludesDay(range: WorkingTimeRange, day: WorkingDay): bool
   }
   return dayIdx >= fromIdx || dayIdx <= toIdx;
 }
-
-export function computeWorksOnSaturday(ranges?: WorkingTimeRange[] | null): boolean | null {
-  if (!Array.isArray(ranges) || ranges.length === 0) return null;
-  return ranges.some((range) => rangeIncludesDay(range, 'SAT'));
-}

@@ -1,3 +1,4 @@
+import type { SaturdayWorkPolicy } from '@prisma/client';
 import { getEsClient } from './client';
 import { JOBS_INDEX, COMPANIES_INDEX, USERS_INDEX } from './indices';
 
@@ -18,6 +19,7 @@ export interface JobForEs {
   wardCodes: string[];
   remote: boolean;
   isActive: boolean;
+  worksOnSaturday: SaturdayWorkPolicy | null;
   employmentType: string;
   experienceLevel: string;
   jobLevel: string | null;
@@ -58,6 +60,8 @@ export async function syncJobToEs(job: JobForEs): Promise<void> {
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     };
+    // Omit null for jobs that have not declared Saturday policy yet
+    if (job.worksOnSaturday != null) doc['worksOnSaturday'] = job.worksOnSaturday;
     if (job.jobLevel != null) doc['jobLevel'] = job.jobLevel;
     if (job.educationLevel != null) doc['educationLevel'] = job.educationLevel;
     if (job.gender != null) doc['gender'] = job.gender;

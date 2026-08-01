@@ -1,6 +1,8 @@
 /**
- * One-time backfill script: indexes all existing Prisma records into Elasticsearch.
- * Run after setting up ES: npx tsx scripts/reindex-es.ts
+ * One-time backfill script: indexes Prisma records into Elasticsearch.
+ * Run after setting up ES or when mapping fields change:
+ *   npm run es:reindex
+ *   npm run es:reindex -- --only=jobs
  */
 import { config as loadEnv } from 'dotenv';
 loadEnv();
@@ -10,6 +12,17 @@ import { initializeIndices } from '../src/shared/elasticsearch/indices';
 import { syncJobToEs, syncCompanyToEs, syncUserToEs } from '../src/shared/elasticsearch/sync';
 
 const BATCH_SIZE = 500;
+
+type ReindexScope = 'all' | 'jobs' | 'companies' | 'users';
+
+function parseScope(argv: string[]): ReindexScope {
+  const onlyArg = argv.find((arg) => arg.startsWith('--only='));
+  if (!onlyArg) return 'all';
+  const value = onlyArg.slice('--only='.length).trim().toLowerCase();
+  if (value === 'jobs' || value === 'companies' || value === 'users') return value;
+  console.error(`❌ Invalid --only value "${value}". Use jobs, companies, or users.`);
+  process.exit(1);
+}
 
 async function reindexJobs(): Promise<void> {
   console.log('📦 Reindexing jobs...');
@@ -25,7 +38,7 @@ async function reindexJobs(): Promise<void> {
       title: job.title, generalInfo: job.generalInfo, mission: job.mission,
       tasks: job.tasks, knowledge: job.knowledge, skills: job.skills, attitude: job.attitude,
       locations: job.locations, wardCodes: job.wardCodes,
-      remote: job.remote, isActive: job.isActive,
+      remote: job.remote, isActive: job.isActive, worksOnSaturday: job.worksOnSaturday,
       employmentType: job.employmentType, experienceLevel: job.experienceLevel,
       jobLevel: job.jobLevel, educationLevel: job.educationLevel, gender: job.gender,
       salaryMin: job.salaryMin, salaryMax: job.salaryMax, currency: job.currency,
@@ -100,15 +113,16 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const scope = parseScope(process.argv.slice(2));
   console.log('🚀 Starting Elasticsearch reindex...');
-  console.log(`   ES: ${process.env['ELASTICSEARCH_URL']}`);
+  console.log(`   Scope: ${scope}`);
 
   await prisma.$connect();
 
   await initializeIndices();
-  await reindexJobs();
-  await reindexCompanies();
-  await reindexUsers();
+  if (scope === 'all' || scope === 'jobs') await reindexJobs();
+  if (scope === 'all' || scope === 'companies') await reindexCompanies();
+  if (scope === 'all' || scope === 'users') await reindexUsers();
 
   console.log('\n✅ Reindex complete!');
   await prisma.$disconnect();

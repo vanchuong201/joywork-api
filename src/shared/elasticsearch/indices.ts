@@ -44,6 +44,7 @@ export const jobsIndexConfig = {
       slug:            { type: 'keyword' },
       isActive:        { type: 'boolean' },
       remote:          { type: 'boolean' },
+      worksOnSaturday: { type: 'keyword' },
       locations:       { type: 'keyword' },
       wardCodes:       { type: 'keyword' },
       employmentType:  { type: 'keyword' },

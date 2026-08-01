@@ -33,6 +33,8 @@ const workingTimeNoteSchema = z
   .string()
   .max(1000, 'Ghi chú thời gian làm việc tối đa 1000 ký tự');
 
+const saturdayWorkPolicySchema = z.enum(['NO', 'FLEXIBLE', 'FIXED']);
+
 // Create job schema - Standard JD format
 export const createJobSchema = z.object({
   // Basic info
@@ -76,6 +78,7 @@ export const createJobSchema = z.object({
   // Working time
   workingTimeRanges: workingTimeRangesSchema.optional(),
   workingTimeNote: workingTimeNoteSchema.optional(),
+  worksOnSaturday: saturdayWorkPolicySchema,
 });
 
 // Update job schema - Standard JD format
@@ -121,6 +124,7 @@ export const updateJobSchema = z.object({
   // Working time
   workingTimeRanges: workingTimeRangesSchema.optional().nullable(),
   workingTimeNote: workingTimeNoteSchema.optional().nullable(),
+  worksOnSaturday: saturdayWorkPolicySchema.optional(),
 });
 
 // Get job schema
@@ -149,11 +153,19 @@ export const searchJobsSchema = z.object({
   skills: z.string().optional(), // Comma-separated skills
   companyId: z.string().cuid('Invalid company ID').optional(),
   isActive: z.coerce.boolean().optional(),
-  // Saturday working filter
-  // WORK = JD ghi rõ làm thứ 7
-  // REST = JD ghi rõ nghỉ thứ 7 (có khai báo thời gian nhưng không bao gồm thứ 7)
-  // UNSPECIFIED = JD chưa khai báo thời gian làm việc
-  worksOnSaturday: z.enum(['WORK', 'REST', 'UNSPECIFIED']).optional(),
+  // CSV CompanyBadgeType, e.g. "GOOD_COMPANY,BASIC_COMMITMENT" (OR semantics)
+  companyBadges: z.string().optional(),
+  // Saturday working filter — NO | FLEXIBLE | FIXED
+  // Legacy query params WORK/REST/UNSPECIFIED are mapped for backward compatibility
+  worksOnSaturday: z.preprocess(
+    (val) => {
+      if (val === 'WORK') return 'FIXED';
+      if (val === 'REST') return 'NO';
+      if (val === 'UNSPECIFIED') return undefined;
+      return val;
+    },
+    saturdayWorkPolicySchema.optional(),
+  ),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });
