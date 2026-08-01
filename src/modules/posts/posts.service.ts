@@ -1,7 +1,7 @@
-import { PostAuditAction } from '@prisma/client';
+import { CompanyBadgeType, PostAuditAction } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
-import { companyBadgesSelect } from '@/shared/company-badges';
+import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
 import { deleteS3Objects } from '@/shared/storage/s3';
 import {
   CreatePostInput,
@@ -60,6 +60,7 @@ export interface Post {
     name: string;
     slug: string;
     logoUrl?: string;
+    badges?: CompanyBadgeType[];
   };
   images?: Array<{ id: string; url: string; width?: number | null; height?: number | null; order: number; type: string }>;
   likes: Array<{
@@ -122,7 +123,12 @@ function mapPostEntity(post: any): Post {
           name: post.createdBy.name ?? undefined,
         }
       : null,
-    company: post.company,
+    company: post.company
+      ? {
+          ...post.company,
+          badges: toBadgeTypes(post.company.badges),
+        }
+      : post.company,
     images: post.images
       ? post.images.map((image: any) => ({
           id: image.id,
@@ -1087,7 +1093,7 @@ export class PostsService {
         include: {
           post: {
             include: {
-              company: { select: { id: true, name: true, slug: true, logoUrl: true } },
+              company: { select: { id: true, name: true, slug: true, logoUrl: true, badges: companyBadgesSelect } },
               images: { select: { id: true, url: true, width: true, height: true, order: true, type: true }, orderBy: { order: 'asc' } },
               createdBy: { select: { id: true, email: true, name: true } },
               likes: {
