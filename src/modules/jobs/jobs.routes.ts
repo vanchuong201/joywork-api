@@ -494,8 +494,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           },
           worksOnSaturday: {
             type: 'string',
-            enum: ['NO', 'FLEXIBLE', 'FIXED'],
-            description: 'Filter by Saturday work policy (NO | FLEXIBLE | FIXED). Legacy WORK/REST still accepted.',
+            enum: ['NO', 'YES', 'FLEXIBLE', 'FIXED'],
+            description:
+              'Filter by Saturday work: NO, YES (FIXED+FLEXIBLE), or exact FLEXIBLE/FIXED. Legacy WORK→YES, REST→NO.',
           },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },

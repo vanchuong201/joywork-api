@@ -1096,7 +1096,10 @@ export class JobsService {
     }
 
     if (worksOnSaturday) {
-      where.worksOnSaturday = worksOnSaturday;
+      where.worksOnSaturday =
+        worksOnSaturday === 'YES'
+          ? { in: ['FIXED', 'FLEXIBLE'] }
+          : worksOnSaturday;
     }
 
     // Get jobs with pagination
@@ -1914,7 +1917,11 @@ export class JobsService {
     if (data.gender) filter.push(buildNullableFilter('gender', data.gender));
 
     if (data.worksOnSaturday) {
-      filter.push({ term: { worksOnSaturday: data.worksOnSaturday } });
+      if (data.worksOnSaturday === 'YES') {
+        filter.push({ terms: { worksOnSaturday: ['FIXED', 'FLEXIBLE'] } });
+      } else {
+        filter.push({ term: { worksOnSaturday: data.worksOnSaturday } });
+      }
     }
 
     if (data.salaryMin !== undefined || data.salaryMax !== undefined) {

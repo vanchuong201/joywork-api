@@ -155,16 +155,16 @@ export const searchJobsSchema = z.object({
   isActive: z.coerce.boolean().optional(),
   // CSV CompanyBadgeType, e.g. "GOOD_COMPANY,BASIC_COMMITMENT" (OR semantics)
   companyBadges: z.string().optional(),
-  // Saturday working filter — NO | FLEXIBLE | FIXED
+  // Saturday working filter — NO | YES (FIXED+FLEXIBLE) | exact FLEXIBLE/FIXED
   // Legacy query params WORK/REST/UNSPECIFIED are mapped for backward compatibility
   worksOnSaturday: z.preprocess(
     (val) => {
-      if (val === 'WORK') return 'FIXED';
+      if (val === 'WORK') return 'YES';
       if (val === 'REST') return 'NO';
       if (val === 'UNSPECIFIED') return undefined;
       return val;
     },
-    saturdayWorkPolicySchema.optional(),
+    z.enum(['NO', 'YES', 'FLEXIBLE', 'FIXED']).optional(),
   ),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),

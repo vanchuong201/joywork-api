@@ -165,6 +165,24 @@ describe('JobsService.searchJobs worksOnSaturday', () => {
       },
     );
 
+    it('applies worksOnSaturday=YES as terms FIXED+FLEXIBLE in ES query', async () => {
+      await service.searchJobs({
+        q: 'Kinh doanh',
+        worksOnSaturday: 'YES',
+        page: 1,
+        limit: 12,
+      });
+
+      const searchArg = esSearchMock.mock.calls[0]?.[0] as {
+        query: { bool: { filter: object[] } };
+      };
+      expect(searchArg.query.bool.filter).toEqual(
+        expect.arrayContaining([
+          { terms: { worksOnSaturday: ['FIXED', 'FLEXIBLE'] } },
+        ]),
+      );
+    });
+
     it('returns worksOnSaturday on hydrated ES results', async () => {
       const result = await service.searchJobs({
         q: 'Kinh doanh',
@@ -232,15 +250,33 @@ describe('JobsService.searchJobs worksOnSaturday', () => {
         );
       },
     );
+
+    it('filters worksOnSaturday=YES as FIXED+FLEXIBLE via Prisma where', async () => {
+      await service.searchJobs({
+        q: 'Kinh doanh',
+        worksOnSaturday: 'YES',
+        page: 1,
+        limit: 12,
+      });
+
+      expect(prismaMock.job.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            worksOnSaturday: { in: ['FIXED', 'FLEXIBLE'] },
+          }),
+        }),
+      );
+    });
   });
 });
 
 describe('searchJobsSchema worksOnSaturday preprocess', () => {
   it('maps legacy WORK/REST and drops UNSPECIFIED', async () => {
     const { searchJobsSchema } = await import('./jobs.schema');
-    expect(searchJobsSchema.parse({ worksOnSaturday: 'WORK' }).worksOnSaturday).toBe('FIXED');
+    expect(searchJobsSchema.parse({ worksOnSaturday: 'WORK' }).worksOnSaturday).toBe('YES');
     expect(searchJobsSchema.parse({ worksOnSaturday: 'REST' }).worksOnSaturday).toBe('NO');
     expect(searchJobsSchema.parse({ worksOnSaturday: 'UNSPECIFIED' }).worksOnSaturday).toBeUndefined();
+    expect(searchJobsSchema.parse({ worksOnSaturday: 'YES' }).worksOnSaturday).toBe('YES');
     expect(searchJobsSchema.parse({ worksOnSaturday: 'FLEXIBLE' }).worksOnSaturday).toBe('FLEXIBLE');
   });
 });
