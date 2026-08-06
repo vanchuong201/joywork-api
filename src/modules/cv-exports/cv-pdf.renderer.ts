@@ -231,15 +231,23 @@ export async function renderCvPdf(document: CvPdfDocument): Promise<Buffer> {
   }
 
   if (document.contactItems.length > 0) {
-    const contactLine = document.contactItems
-      .map(item => `${item.label}: ${normalizeText(item.value)}`)
-      .join('   ·   ');
-    doc.moveDown(0.5);
-    doc
-      .font('Regular')
-      .fontSize(9.5)
-      .fillColor(COLORS.secondary)
-      .text(contactLine, left, doc.y, { width: availableWidth, lineGap: 4 });
+    doc.moveDown(0.45);
+    for (const item of document.contactItems) {
+      const line = `${item.label}: ${normalizeText(item.value)}`;
+      if (!line.trim()) {
+        continue;
+      }
+      ensureSpace(16);
+      doc
+        .font('Regular')
+        .fontSize(9.5)
+        .fillColor(item.masked ? COLORS.maskedText : COLORS.secondary)
+        .text(line, left, doc.y, {
+          width: availableWidth,
+          lineGap: 2,
+        });
+      doc.moveDown(0.12);
+    }
   }
 
   doc.moveDown(0.6);

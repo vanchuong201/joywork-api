@@ -432,11 +432,6 @@ export class CvExportsService {
       contactItems.push({ label: 'GitHub', value: github });
     }
 
-    const cvUrl = toOptionalSanitized(profile?.cvUrl);
-    if (cvUrl && isLikelyHttpUrl(cvUrl)) {
-      contactItems.push({ label: 'File CV', value: cvUrl });
-    }
-
     const addressValue = buildAddressValue(profile);
     if (addressValue) {
       contactItems.push({ label: 'Khu vực', value: addressValue });
@@ -572,13 +567,6 @@ export class CvExportsService {
       'GitHub',
       github && isLikelyHttpUrl(github) ? github : null,
       'github'
-    );
-
-    const cvUrl = toOptionalSanitized(candidateProfile?.cvUrl);
-    pushContact(
-      'File CV',
-      cvUrl && isLikelyHttpUrl(cvUrl) ? cvUrl : null,
-      'cvUrl'
     );
 
     const addressValue = buildAddressValue(candidateProfile);
