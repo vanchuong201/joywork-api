@@ -226,6 +226,7 @@ export class JobsService {
       slug: generatedSlug,
       locations: resolved.locations,
       wardCodes: resolved.wardCodes,
+      specificAddress: data.specificAddress?.trim() ? data.specificAddress.trim() : null,
       remote: data.remote,
       currency: data.currency,
       employmentType: data.employmentType,
@@ -312,6 +313,7 @@ export class JobsService {
       department: job.department,
       jobLevel: job.jobLevel,
       educationLevel: job.educationLevel,
+      gender: job.gender,
       // Required JD fields
       generalInfo: job.generalInfo,
       mission: job.mission,
@@ -521,6 +523,7 @@ export class JobsService {
       department: updatedJob.department,
       jobLevel: updatedJob.jobLevel,
       educationLevel: updatedJob.educationLevel,
+      gender: updatedJob.gender,
       // Required JD fields
       generalInfo: updatedJob.generalInfo,
       mission: updatedJob.mission,
@@ -677,6 +680,7 @@ export class JobsService {
       department: job.department,
       jobLevel: job.jobLevel,
       educationLevel: job.educationLevel,
+      gender: job.gender,
       // Required JD fields
       generalInfo: job.generalInfo,
       mission: job.mission,
@@ -876,6 +880,7 @@ export class JobsService {
         department: job.department,
         jobLevel: job.jobLevel,
         educationLevel: job.educationLevel,
+        gender: job.gender,
         // Required JD fields
         generalInfo: job.generalInfo,
         mission: job.mission,

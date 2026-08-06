@@ -63,8 +63,10 @@ export async function jobsRoutes(fastify: FastifyInstance) {
             enum: ['NO', 'FLEXIBLE', 'FIXED'],
             description: 'Saturday work policy confirmed by poster (NO | FLEXIBLE | FIXED)',
           },
+          location: { type: 'string', description: 'Primary province/city code' },
           locations: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Job location codes' },
           wardCodes: { type: 'array', items: { type: 'string' }, maxItems: 30, description: 'Phường/xã canonical codes' },
+          specificAddress: { type: 'string', maxLength: 200, description: 'Specific address / Địa chỉ cụ thể' },
           remote: { type: 'boolean', default: false, description: 'Remote work allowed' },
           salaryMin: { type: 'number', minimum: 0, description: 'Minimum salary' },
           salaryMax: { type: 'number', minimum: 0, description: 'Maximum salary' },
@@ -99,6 +101,12 @@ export async function jobsRoutes(fastify: FastifyInstance) {
             type: 'string', 
             enum: ['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD'],
             description: 'Education level / Học vấn'
+          },
+          gender: {
+            type: 'string',
+            enum: ['MALE', 'FEMALE', 'OTHER'],
+            nullable: true,
+            description: 'Gender preference / Giới tính',
           },
         },
       },
@@ -158,6 +166,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     department: { type: 'string', nullable: true },
                     jobLevel: { type: 'string', nullable: true },
                     educationLevel: { type: 'string', nullable: true },
+                    gender: { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'], nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
                     company: {
@@ -324,6 +333,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       department: { type: 'string', nullable: true },
                       jobLevel: { type: 'string', nullable: true },
                       educationLevel: { type: 'string', nullable: true },
+                      gender: { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'], nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
                       company: {
@@ -424,6 +434,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     department: { type: 'string', nullable: true },
                     jobLevel: { type: 'string', nullable: true },
                     educationLevel: { type: 'string', nullable: true },
+                    gender: { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'], nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
                     company: {
@@ -560,6 +571,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       department: { type: 'string', nullable: true },
                       jobLevel: { type: 'string', nullable: true },
                       educationLevel: { type: 'string', nullable: true },
+                      gender: { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'], nullable: true },
                       createdAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
                       company: {
@@ -994,8 +1006,10 @@ export async function jobsRoutes(fastify: FastifyInstance) {
             enum: ['NO', 'FLEXIBLE', 'FIXED'],
             description: 'Saturday work policy confirmed by poster (NO | FLEXIBLE | FIXED)',
           },
+          location: { type: 'string', nullable: true, description: 'Primary province/city code (null to clear)' },
           locations: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Job location codes' },
           wardCodes: { type: 'array', items: { type: 'string' }, maxItems: 30, description: 'Phường/xã canonical codes' },
+          specificAddress: { type: 'string', maxLength: 200, nullable: true, description: 'Specific address / Địa chỉ cụ thể' },
           remote: { type: 'boolean', description: 'Remote work allowed' },
           salaryMin: { type: 'number', minimum: 0, nullable: true, description: 'Minimum salary' },
           salaryMax: { type: 'number', minimum: 0, nullable: true, description: 'Maximum salary' },
@@ -1038,6 +1052,13 @@ export async function jobsRoutes(fastify: FastifyInstance) {
               { type: 'null' },
             ],
             description: 'Education level / Học vấn',
+          },
+          gender: {
+            anyOf: [
+              { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'] },
+              { type: 'null' },
+            ],
+            description: 'Gender preference / Giới tính',
           },
         },
       },
@@ -1097,6 +1118,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                     department: { type: 'string', nullable: true },
                     jobLevel: { type: 'string', nullable: true },
                     educationLevel: { type: 'string', nullable: true },
+                    gender: { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'], nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
                     company: {
