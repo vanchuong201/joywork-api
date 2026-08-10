@@ -40,7 +40,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           relationships: { type: 'string', maxLength: 10000, description: 'Work relationships' },
           careerPath: { type: 'string', maxLength: 10000, description: 'Career path' },
           benefitsIncome: { type: 'string', maxLength: 200, description: 'Income / salary info' },
-          benefitsPerks: { type: 'string', maxLength: 2000, description: 'Benefits / perks' },
+          benefitsPerks: { type: 'string', maxLength: 10000, description: 'Benefits / perks' },
           contact: { type: 'string', maxLength: 500, description: 'Contact information' },
           workingTimeRanges: {
             type: 'array',
@@ -982,7 +982,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           relationships: { type: 'string', maxLength: 10000, nullable: true, description: 'Work relationships' },
           careerPath: { type: 'string', maxLength: 10000, nullable: true, description: 'Career path' },
           benefitsIncome: { type: 'string', maxLength: 200, nullable: true, description: 'Income / salary info' },
-          benefitsPerks: { type: 'string', maxLength: 2000, nullable: true, description: 'Benefits / perks' },
+          benefitsPerks: { type: 'string', maxLength: 10000, nullable: true, description: 'Benefits / perks' },
           contact: { type: 'string', maxLength: 500, nullable: true, description: 'Contact information' },
           workingTimeRanges: {
             type: 'array',

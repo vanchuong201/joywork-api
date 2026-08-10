@@ -59,20 +59,20 @@ export const createJobSchema = z.object({
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
 
   // Required JD fields (rich text/markdown)
-  generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional(),
-  mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(5000, 'Sứ mệnh/Vai trò must be less than 5000 characters'),
+  generalInfo: z.string().max(10000, 'Thông tin bổ sung must be less than 10000 characters').optional(),
+  mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(10000, 'Sứ mệnh/Vai trò must be less than 10000 characters'),
   tasks: z.string().min(1, 'Nhiệm vụ chuyên môn is required').max(10000, 'Nhiệm vụ chuyên môn must be less than 10000 characters'),
-  knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(5000, 'Kiến thức chuyên môn must be less than 5000 characters'),
-  skills: z.string().min(1, 'Kỹ năng cần thiết is required').max(5000, 'Kỹ năng cần thiết must be less than 5000 characters'),
-  attitude: z.string().min(1, 'Thái độ và phẩm chất is required').max(5000, 'Thái độ và phẩm chất must be less than 5000 characters'),
+  knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(10000, 'Kiến thức chuyên môn must be less than 10000 characters'),
+  skills: z.string().min(1, 'Kỹ năng cần thiết is required').max(10000, 'Kỹ năng cần thiết must be less than 10000 characters'),
+  attitude: z.string().min(1, 'Thái độ và phẩm chất is required').max(10000, 'Thái độ và phẩm chất must be less than 10000 characters'),
   
   // Optional JD fields
-  kpis: z.string().max(5000, 'Kết quả chuyên môn must be less than 5000 characters').optional(),
-  authority: z.string().max(5000, 'Quyền hạn must be less than 5000 characters').optional(),
-  relationships: z.string().max(5000, 'Quan hệ công việc must be less than 5000 characters').optional(),
-  careerPath: z.string().max(5000, 'Lộ trình phát triển must be less than 5000 characters').optional(),
+  kpis: z.string().max(10000, 'Kết quả chuyên môn must be less than 10000 characters').optional(),
+  authority: z.string().max(10000, 'Quyền hạn must be less than 10000 characters').optional(),
+  relationships: z.string().max(10000, 'Quan hệ công việc must be less than 10000 characters').optional(),
+  careerPath: z.string().max(10000, 'Lộ trình phát triển must be less than 10000 characters').optional(),
   benefitsIncome: z.string().max(200, 'Thu nhập must be less than 200 characters').optional(),
-  benefitsPerks: z.string().max(2000, 'Phúc lợi must be less than 2000 characters').optional(),
+  benefitsPerks: z.string().max(10000, 'Phúc lợi must be less than 10000 characters').optional(),
   contact: z.string().max(500, 'Thông tin liên hệ must be less than 500 characters').optional(),
 
   // Working time
@@ -105,20 +105,20 @@ export const updateJobSchema = z.object({
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
   
   // Required JD fields (rich text/markdown)
-  generalInfo: z.string().max(5000, 'Thông tin bổ sung must be less than 5000 characters').optional(),
-  mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(5000, 'Sứ mệnh/Vai trò must be less than 5000 characters').optional(),
+  generalInfo: z.string().max(10000, 'Thông tin bổ sung must be less than 10000 characters').optional(),
+  mission: z.string().min(1, 'Sứ mệnh/Vai trò is required').max(10000, 'Sứ mệnh/Vai trò must be less than 10000 characters').optional(),
   tasks: z.string().min(1, 'Nhiệm vụ chuyên môn is required').max(10000, 'Nhiệm vụ chuyên môn must be less than 10000 characters').optional(),
-  knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(5000, 'Kiến thức chuyên môn must be less than 5000 characters').optional(),
-  skills: z.string().min(1, 'Kỹ năng cần thiết is required').max(5000, 'Kỹ năng cần thiết must be less than 5000 characters').optional(),
-  attitude: z.string().min(1, 'Thái độ và phẩm chất is required').max(5000, 'Thái độ và phẩm chất must be less than 5000 characters').optional(),
+  knowledge: z.string().min(1, 'Kiến thức chuyên môn is required').max(10000, 'Kiến thức chuyên môn must be less than 10000 characters').optional(),
+  skills: z.string().min(1, 'Kỹ năng cần thiết is required').max(10000, 'Kỹ năng cần thiết must be less than 10000 characters').optional(),
+  attitude: z.string().min(1, 'Thái độ và phẩm chất is required').max(10000, 'Thái độ và phẩm chất must be less than 10000 characters').optional(),
   
   // Optional JD fields
-  kpis: z.string().max(5000, 'Kết quả chuyên môn must be less than 5000 characters').optional().nullable(),
-  authority: z.string().max(5000, 'Quyền hạn must be less than 5000 characters').optional().nullable(),
-  relationships: z.string().max(5000, 'Quan hệ công việc must be less than 5000 characters').optional().nullable(),
-  careerPath: z.string().max(5000, 'Lộ trình phát triển must be less than 5000 characters').optional().nullable(),
+  kpis: z.string().max(10000, 'Kết quả chuyên môn must be less than 10000 characters').optional().nullable(),
+  authority: z.string().max(10000, 'Quyền hạn must be less than 10000 characters').optional().nullable(),
+  relationships: z.string().max(10000, 'Quan hệ công việc must be less than 10000 characters').optional().nullable(),
+  careerPath: z.string().max(10000, 'Lộ trình phát triển must be less than 10000 characters').optional().nullable(),
   benefitsIncome: z.string().max(200, 'Thu nhập must be less than 200 characters').optional().nullable(),
-  benefitsPerks: z.string().max(2000, 'Phúc lợi must be less than 2000 characters').optional().nullable(),
+  benefitsPerks: z.string().max(10000, 'Phúc lợi must be less than 10000 characters').optional().nullable(),
   contact: z.string().max(500, 'Thông tin liên hệ must be less than 500 characters').optional().nullable(),
 
   // Working time
