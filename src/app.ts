@@ -16,6 +16,7 @@ import { postsRoutes } from '@/modules/posts/posts.routes';
 import { jobsRoutes } from '@/modules/jobs/jobs.routes';
 import { inboxRoutes } from '@/modules/inbox/inbox.routes';
 import { systemRoutes } from '@/modules/system/system.routes';
+import { bannersAdminRoutes, bannersRoutes } from '@/modules/banners/banners.routes';
 import { uploadsRoutes } from '@/modules/uploads/uploads.routes';
 import { ticketsRoutes } from '@/modules/tickets/tickets.routes';
 import notificationsRoutes from '@/modules/notifications/notifications.routes';
@@ -218,6 +219,8 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(jobsRoutes, { prefix: '/api/jobs' });
   await app.register(inboxRoutes, { prefix: '/api/inbox' });
   await app.register(systemRoutes, { prefix: '/api/system' });
+  await app.register(bannersAdminRoutes, { prefix: '/api/system/banners' });
+  await app.register(bannersRoutes, { prefix: '/api/banners' });
   await app.register(uploadsRoutes, { prefix: '/api/uploads' });
   await app.register(ticketsRoutes, { prefix: '/api/tickets' });
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });

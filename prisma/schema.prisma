@@ -438,6 +438,26 @@ model CompanyShowcaseSlot {
   @@map("company_showcase_slots")
 }
 
+/// Banner CMS theo slot (homepage-hero, ...). Generic để scale thêm vị trí hiển thị.
+model BannerItem {
+  id           String    @id @default(cuid())
+  slot         String
+  imageUrl     String
+  href         String
+  alt          String
+  sortOrder    Int       @default(0)
+  isActive     Boolean   @default(true)
+  openInNewTab Boolean   @default(true)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([slot, sortOrder])
+  @@index([slot, isActive])
+  @@map("banner_items")
+}
+
 // New model for detailed Company Profile (Showcase)
 model CompanyProfile {
   companyId String  @id
