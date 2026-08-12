@@ -748,7 +748,7 @@ export class CvFlipService {
           monthOfBirth: opts.maskIdentity ? null : profile?.monthOfBirth ?? null,
           yearOfBirth: opts.maskIdentity ? null : profile?.yearOfBirth ?? null,
           isSearchingJob: profile?.isSearchingJob ?? false,
-          allowCvFlip: profile?.allowCvFlip ?? true,
+          allowCvFlip: profile?.allowCvFlip ?? false,
         },
         experiences: candidate.experiences,
         educations: candidate.educations,

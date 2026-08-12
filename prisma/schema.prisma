@@ -261,7 +261,7 @@ model UserProfile {
   status     UserStatus? @default(OPEN_TO_WORK)
   isPublic   Boolean     @default(true)
   isSearchingJob Boolean @default(true)
-  allowCvFlip    Boolean @default(true)
+  allowCvFlip    Boolean @default(false)
   visibility Json? // { bio: boolean, experience: boolean, education: boolean, ksa: boolean, expectations: boolean }
 
   // KSA (Knowledge, Skills, Attitude)
