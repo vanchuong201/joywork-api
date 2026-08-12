@@ -47,7 +47,10 @@ export class CompaniesController {
   // Get company by ID (minimal info for support)
   async getCompanyById(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: string };
-    
+
+    // Mutable profile JSON — never edge-cache (Cloudflare / shared proxies).
+    reply.header('Cache-Control', 'private, no-store');
+
     const company = await this.companiesService.getCompanyById(id);
     
     if (!company) {
@@ -67,7 +70,10 @@ export class CompaniesController {
   // Get company by slug
   async getCompany(request: FastifyRequest, reply: FastifyReply) {
     const { slug } = getCompanySchema.parse(request.params);
-    
+
+    // Mutable profile JSON — never edge-cache (Cloudflare / shared proxies).
+    reply.header('Cache-Control', 'private, no-store');
+
     const company = await this.companiesService.getCompanyBySlug(slug);
     
     if (!company) {
@@ -86,6 +92,9 @@ export class CompaniesController {
 
   async getCompanySummary(request: FastifyRequest, reply: FastifyReply) {
     const { companyId } = getCompanySummarySchema.parse(request.params);
+
+    // Mutable company summary — never edge-cache (Cloudflare / shared proxies).
+    reply.header('Cache-Control', 'private, no-store');
 
     const summary = await this.companiesService.getCompanySummary(companyId);
 
