@@ -3,6 +3,8 @@ import { config } from '@/config/env';
 import type { BrevoImportContact } from './brevo-contact.mapper';
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
+/** Brevo import API ignores boolean attributes; set them via updateBatchContacts. */
+const UPDATE_BATCH_SIZE = 100;
 
 export type BrevoImportResult = {
   processId: number;
@@ -28,9 +30,17 @@ export function getBrevoListId(): number {
   return config.BREVO_LIST_ID;
 }
 
+function textAttributesForImport(
+  attributes: BrevoImportContact['attributes'],
+): Record<string, unknown> {
+  const { CV_ACTIVATE: _cvActivate, ...rest } = attributes;
+  return rest;
+}
+
 /**
- * Import a batch of contacts (upsert). Returns process id; caller may poll.
- * Attributes not in Brevo account are ignored by Brevo — we still only send whitelist.
+ * Import a batch of contacts (upsert text attrs + list). Returns process id; caller may poll.
+ * Boolean attrs (CV_ACTIVATE) must be set separately via updateContactsAttributesBatch —
+ * Brevo import silently drops booleans.
  */
 export async function importContactsBatch(
   contacts: BrevoImportContact[],
@@ -47,7 +57,7 @@ export async function importContactsBatch(
   const response = await client.contacts.importContacts({
     jsonBody: contacts.map((c) => ({
       email: c.email,
-      attributes: c.attributes as Record<string, unknown>,
+      attributes: textAttributesForImport(c.attributes),
     })),
     listIds: [listId],
     updateExistingContacts: true,
@@ -60,6 +70,47 @@ export async function importContactsBatch(
     throw new Error('Brevo importContacts did not return processId');
   }
   return { processId };
+}
+
+/**
+ * Update contacts via POST /contacts/batch (supports boolean attributes like CV_ACTIVATE).
+ * Chunks requests; also re-attaches list membership.
+ */
+export async function updateContactsAttributesBatch(
+  contacts: BrevoImportContact[],
+): Promise<{ chunksOk: number; chunksFailed: number }> {
+  const client = getClient();
+  if (!client) {
+    throw new Error('BREVO_API_KEY is not configured');
+  }
+  if (contacts.length === 0) {
+    return { chunksOk: 0, chunksFailed: 0 };
+  }
+
+  const listId = getBrevoListId();
+  let chunksOk = 0;
+  let chunksFailed = 0;
+
+  for (let i = 0; i < contacts.length; i += UPDATE_BATCH_SIZE) {
+    const chunk = contacts.slice(i, i + UPDATE_BATCH_SIZE);
+    try {
+      await client.contacts.updateBatchContacts({
+        contacts: chunk.map((c) => ({
+          email: c.email,
+          attributes: c.attributes as Record<string, unknown>,
+          listIds: [listId],
+        })),
+      });
+      chunksOk++;
+    } catch {
+      chunksFailed++;
+    }
+    if (i + UPDATE_BATCH_SIZE < contacts.length) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  return { chunksOk, chunksFailed };
 }
 
 export async function getImportProcessStatus(processId: number): Promise<BrevoImportResult> {

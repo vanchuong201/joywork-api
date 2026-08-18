@@ -20,6 +20,7 @@ import {
   importContactsBatch,
   isBrevoConfigured,
   waitForImportProcess,
+  updateContactsAttributesBatch,
   getBrevoListId,
 } from '../src/shared/services/brevo.service';
 
@@ -143,6 +144,8 @@ async function main() {
 
     let batchesOk = 0;
     let batchesFailed = 0;
+    let attributeChunksOk = 0;
+    let attributeChunksFailed = 0;
 
     for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
       const batch = contacts.slice(i, i + BATCH_SIZE);
@@ -158,13 +161,22 @@ async function main() {
         const result = await waitForImportProcess(processId);
         if (result.status === 'completed') {
           batchesOk++;
-          console.log(`[brevo-sync] Batch ${batchNo} completed`);
+          console.log(`[brevo-sync] Batch ${batchNo} import completed`);
         } else {
           batchesFailed++;
           console.error(
-            `[brevo-sync] Batch ${batchNo} ended with status=${result.status}`,
+            `[brevo-sync] Batch ${batchNo} import ended with status=${result.status}`,
           );
         }
+
+        // Import drops boolean attrs; set CV_ACTIVATE via contacts/batch.
+        console.log(`[brevo-sync] Batch ${batchNo} updating CV_ACTIVATE via contacts/batch...`);
+        const attrResult = await updateContactsAttributesBatch(batch);
+        attributeChunksOk += attrResult.chunksOk;
+        attributeChunksFailed += attrResult.chunksFailed;
+        console.log(
+          `[brevo-sync] Batch ${batchNo} attributes chunksOk=${attrResult.chunksOk}, chunksFailed=${attrResult.chunksFailed}`,
+        );
       } catch (err) {
         batchesFailed++;
         console.error(
@@ -179,10 +191,10 @@ async function main() {
     }
 
     console.log(
-      `[brevo-sync] Done. batchesOk=${batchesOk}, batchesFailed=${batchesFailed}, contacts=${contacts.length}`,
+      `[brevo-sync] Done. importOk=${batchesOk}, importFailed=${batchesFailed}, attrChunksOk=${attributeChunksOk}, attrChunksFailed=${attributeChunksFailed}, contacts=${contacts.length}`,
     );
 
-    if (batchesFailed > 0) {
+    if (batchesFailed > 0 || attributeChunksFailed > 0) {
       process.exitCode = 1;
     }
   } finally {
