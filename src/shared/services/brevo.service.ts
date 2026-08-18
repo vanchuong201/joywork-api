@@ -199,6 +199,17 @@ async function updateContactsChunkWithRetry(
   throw lastError;
 }
 
+function dedupeContactsByEmail(contacts: BrevoImportContact[]): BrevoImportContact[] {
+  const byEmail = new Map<string, BrevoImportContact>();
+  for (const contact of contacts) {
+    byEmail.set(contact.email.toLowerCase(), {
+      ...contact,
+      email: contact.email.toLowerCase(),
+    });
+  }
+  return [...byEmail.values()];
+}
+
 /**
  * Update CV_ACTIVATE via POST /contacts/batch (import drops booleans).
  * If a chunk contains emails not yet in Brevo, create them then finish the rest.
@@ -210,7 +221,8 @@ export async function updateContactsAttributesBatch(
   if (!client) {
     throw new Error('BREVO_API_KEY is not configured');
   }
-  if (contacts.length === 0) {
+  const uniqueContacts = dedupeContactsByEmail(contacts);
+  if (uniqueContacts.length === 0) {
     return { chunksOk: 0, chunksFailed: 0, createdMissing: 0 };
   }
 
@@ -218,8 +230,8 @@ export async function updateContactsAttributesBatch(
   let chunksFailed = 0;
   let createdMissing = 0;
 
-  for (let i = 0; i < contacts.length; i += UPDATE_BATCH_SIZE) {
-    const chunk = contacts.slice(i, i + UPDATE_BATCH_SIZE);
+  for (let i = 0; i < uniqueContacts.length; i += UPDATE_BATCH_SIZE) {
+    const chunk = uniqueContacts.slice(i, i + UPDATE_BATCH_SIZE);
     try {
       const result = await updateContactsChunkWithRetry(client, chunk);
       createdMissing += result.createdMissing;
@@ -230,7 +242,7 @@ export async function updateContactsAttributesBatch(
         `[brevo] updateBatchContacts failed chunk=${Math.floor(i / UPDATE_BATCH_SIZE) + 1} size=${chunk.length}: ${formatBrevoError(err)}`,
       );
     }
-    if (i + UPDATE_BATCH_SIZE < contacts.length) {
+    if (i + UPDATE_BATCH_SIZE < uniqueContacts.length) {
       await new Promise((resolve) => setTimeout(resolve, UPDATE_CHUNK_DELAY_MS));
     }
   }
