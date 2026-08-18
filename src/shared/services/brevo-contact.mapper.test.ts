@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isCvCompleted,
+  isCvActivate,
   mapUserToBrevoContact,
   splitVietnameseName,
   type BrevoMapperUser,
 } from './brevo-contact.mapper';
 
-function completeUser(overrides: Partial<BrevoMapperUser> = {}): BrevoMapperUser {
+function readyUser(overrides: Partial<BrevoMapperUser> = {}): BrevoMapperUser {
   return {
     id: 'user_1',
     email: 'a@example.com',
@@ -22,13 +22,9 @@ function completeUser(overrides: Partial<BrevoMapperUser> = {}): BrevoMapperUser
       knowledge: ['JS'],
       skills: [],
       attitude: [],
-      expectedCulture: 'Open',
-      careerGoals: [],
-      workMode: null,
       linkedin: 'https://linkedin.com/in/a',
     },
     experiences: [{ id: 'exp1' }],
-    educations: [{ id: 'edu1' }],
     ...overrides,
     profile:
       overrides.profile === null
@@ -43,9 +39,6 @@ function completeUser(overrides: Partial<BrevoMapperUser> = {}): BrevoMapperUser
             knowledge: ['JS'],
             skills: [],
             attitude: [],
-            expectedCulture: 'Open',
-            careerGoals: [],
-            workMode: null,
             linkedin: 'https://linkedin.com/in/a',
             ...overrides.profile,
           },
@@ -72,23 +65,19 @@ describe('splitVietnameseName', () => {
   });
 });
 
-describe('isCvCompleted', () => {
-  it('true khi đủ 5 mục', () => {
-    expect(isCvCompleted(completeUser())).toBe(true);
+describe('isCvActivate', () => {
+  it('true khi đủ basic + KSA + experience (rule apply CV)', () => {
+    expect(isCvActivate(readyUser())).toBe(true);
   });
 
   it('false khi thiếu experiences', () => {
-    expect(isCvCompleted(completeUser({ experiences: [] }))).toBe(false);
-  });
-
-  it('false khi thiếu educations', () => {
-    expect(isCvCompleted(completeUser({ educations: [] }))).toBe(false);
+    expect(isCvActivate(readyUser({ experiences: [] }))).toBe(false);
   });
 
   it('false khi thiếu KSA', () => {
     expect(
-      isCvCompleted(
-        completeUser({
+      isCvActivate(
+        readyUser({
           profile: {
             knowledge: [],
             skills: [],
@@ -101,31 +90,34 @@ describe('isCvCompleted', () => {
 
   it('false khi thiếu basic info (title)', () => {
     expect(
-      isCvCompleted(
-        completeUser({
+      isCvActivate(
+        readyUser({
           profile: { title: '' },
         }),
       ),
     ).toBe(false);
   });
 
-  it('basic info chấp nhận location legacy string', () => {
+  it('false khi locations rỗng (cv-readiness không dùng legacy location string)', () => {
     expect(
-      isCvCompleted(
-        completeUser({
+      isCvActivate(
+        readyUser({
           profile: {
             locations: [],
-            location: 'HCMC',
           },
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('true dù không có educations / expectations (không bắt buộc cho apply)', () => {
+    expect(isCvActivate(readyUser())).toBe(true);
   });
 });
 
 describe('mapUserToBrevoContact', () => {
-  it('map whitelist attributes + CV_COMPLETED', () => {
-    const contact = mapUserToBrevoContact(completeUser());
+  it('map whitelist attributes + CV_ACTIVATE', () => {
+    const contact = mapUserToBrevoContact(readyUser());
     expect(contact).toEqual({
       email: 'a@example.com',
       attributes: {
@@ -135,19 +127,24 @@ describe('mapUserToBrevoContact', () => {
         PHONE: '0901234567',
         JOB_TITLE: 'Developer',
         LINKEDIN: 'https://linkedin.com/in/a',
-        CV_COMPLETED: true,
+        CV_ACTIVATE: true,
       },
     });
   });
 
+  it('CV_ACTIVATE false khi chưa sẵn sàng apply', () => {
+    const contact = mapUserToBrevoContact(readyUser({ experiences: [] }));
+    expect(contact?.attributes.CV_ACTIVATE).toBe(false);
+  });
+
   it('null khi email không hợp lệ', () => {
-    expect(mapUserToBrevoContact(completeUser({ email: 'not-an-email' }))).toBeNull();
-    expect(mapUserToBrevoContact(completeUser({ email: '  ' }))).toBeNull();
+    expect(mapUserToBrevoContact(readyUser({ email: 'not-an-email' }))).toBeNull();
+    expect(mapUserToBrevoContact(readyUser({ email: '  ' }))).toBeNull();
   });
 
   it('dùng user.phone khi không có contactPhone', () => {
     const contact = mapUserToBrevoContact(
-      completeUser({
+      readyUser({
         phone: '0911111111',
         profile: { contactPhone: null },
       }),
@@ -157,7 +154,7 @@ describe('mapUserToBrevoContact', () => {
 
   it('bỏ PHONE/JOB_TITLE/LINKEDIN khi trống', () => {
     const contact = mapUserToBrevoContact(
-      completeUser({
+      readyUser({
         phone: null,
         profile: {
           contactPhone: null,
@@ -170,11 +167,12 @@ describe('mapUserToBrevoContact', () => {
     expect(contact?.attributes.JOB_TITLE).toBeUndefined();
     expect(contact?.attributes.LINKEDIN).toBeUndefined();
     expect(contact?.attributes.EXT_ID).toBe('user_1');
+    expect(contact?.attributes.CV_ACTIVATE).toBe(false);
   });
 
   it('một từ tên → chỉ FIRSTNAME', () => {
     const contact = mapUserToBrevoContact(
-      completeUser({
+      readyUser({
         name: 'Madonna',
         profile: { fullName: 'Madonna' },
       }),

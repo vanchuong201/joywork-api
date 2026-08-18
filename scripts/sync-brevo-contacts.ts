@@ -102,23 +102,17 @@ async function main() {
             knowledge: true,
             skills: true,
             attitude: true,
-            expectedCulture: true,
-            careerGoals: true,
-            expectedSalaryMin: true,
-            expectedSalaryMax: true,
-            workMode: true,
             linkedin: true,
           },
         },
         experiences: { select: { id: true } },
-        educations: { select: { id: true } },
       },
     });
 
     console.log(`[brevo-sync] Loaded ${users.length} users from DB`);
 
     let skippedInvalidEmail = 0;
-    let cvCompletedCount = 0;
+    let cvActivateCount = 0;
     const contacts: BrevoImportContact[] = [];
 
     for (const user of users) {
@@ -127,14 +121,14 @@ async function main() {
         skippedInvalidEmail++;
         continue;
       }
-      if (mapped.attributes.CV_COMPLETED) {
-        cvCompletedCount++;
+      if (mapped.attributes.CV_ACTIVATE) {
+        cvActivateCount++;
       }
       contacts.push(mapped);
     }
 
     console.log(
-      `[brevo-sync] Mapped=${contacts.length}, skippedInvalidEmail=${skippedInvalidEmail}, cvCompleted=${cvCompletedCount}`,
+      `[brevo-sync] Mapped=${contacts.length}, skippedInvalidEmail=${skippedInvalidEmail}, cvActivate=${cvActivateCount}`,
     );
 
     if (dryRun) {
