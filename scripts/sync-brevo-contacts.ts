@@ -3,6 +3,8 @@
  *
  * Run: npm run brevo:sync
  * Dry-run: npm run brevo:sync -- --dry-run   OR   BREVO_SYNC_DRY_RUN=1
+ * Attributes only (CV_ACTIVATE via contacts/batch, no import):
+ *   npx tsx scripts/sync-brevo-contacts.ts --attributes-only
  *
  * Cron (host): 0 3 * * * docker exec joywork-api npm run brevo:sync
  * See joywork-deploy/QUICK_OPS.md
@@ -36,6 +38,10 @@ function wantsDryRun(argv: string[]): boolean {
   return config.BREVO_SYNC_DRY_RUN === true;
 }
 
+function wantsAttributesOnly(argv: string[]): boolean {
+  return argv.includes('--attributes-only');
+}
+
 function acquireLock(): number | null {
   try {
     mkdirSync(dirname(LOCK_PATH), { recursive: true });
@@ -67,9 +73,11 @@ function releaseLock(fd: number | null) {
 }
 
 async function main() {
-  const dryRun = wantsDryRun(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const dryRun = wantsDryRun(argv);
+  const attributesOnly = wantsAttributesOnly(argv);
   console.log(
-    `[brevo-sync] Starting (dryRun=${dryRun}, listId=${getBrevoListId()})...`,
+    `[brevo-sync] Starting (dryRun=${dryRun}, attributesOnly=${attributesOnly}, listId=${getBrevoListId()})...`,
   );
 
   if (!dryRun && !isBrevoConfigured()) {
@@ -142,6 +150,18 @@ async function main() {
       return;
     }
 
+    if (attributesOnly) {
+      console.log('[brevo-sync] Updating CV_ACTIVATE via contacts/batch (no import)...');
+      const attrResult = await updateContactsAttributesBatch(contacts);
+      console.log(
+        `[brevo-sync] Done. attrChunksOk=${attrResult.chunksOk}, attrChunksFailed=${attrResult.chunksFailed}, contacts=${contacts.length}`,
+      );
+      if (attrResult.chunksFailed > 0) {
+        process.exitCode = 1;
+      }
+      return;
+    }
+
     let batchesOk = 0;
     let batchesFailed = 0;
     let attributeChunksOk = 0;
@@ -168,6 +188,9 @@ async function main() {
             `[brevo-sync] Batch ${batchNo} import ended with status=${result.status}`,
           );
         }
+
+        // Give import a beat before batch updates (rate limits).
+        await sleep(1_000);
 
         // Import drops boolean attrs; set CV_ACTIVATE via contacts/batch.
         console.log(`[brevo-sync] Batch ${batchNo} updating CV_ACTIVATE via contacts/batch...`);
