@@ -6,10 +6,11 @@ const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 /**
  * Brevo import API ignores boolean attributes; set them via updateBatchContacts.
  * Keep chunks small and spaced — batch endpoint is stricter on rate limits than import.
+ * updateBatchContacts fails the entire chunk if any email is missing (404 indexes).
  */
 const UPDATE_BATCH_SIZE = 50;
 const UPDATE_CHUNK_DELAY_MS = 400;
-const UPDATE_MAX_RETRIES = 3;
+const UPDATE_MAX_RETRIES = 4;
 
 export type BrevoImportResult = {
   processId: number;
@@ -61,6 +62,27 @@ function formatBrevoError(err: unknown): string {
   return `${anyErr.message}${status}${detail}`.trim();
 }
 
+function getErrorStatusCode(err: unknown): number | undefined {
+  return (err as { statusCode?: number })?.statusCode;
+}
+
+function getErrorMessage(err: unknown): string {
+  const anyErr = err as { message?: string; body?: { message?: string } };
+  return anyErr.body?.message || anyErr.message || '';
+}
+
+/** Parse "No contact found for indexes 24,39" → [24, 39]. */
+export function parseMissingContactIndexes(message: string): number[] {
+  const match = message.match(/indexes?\s+([\d,\s]+)/i);
+  if (!match?.[1]) {
+    return [];
+  }
+  return match[1]
+    .split(',')
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((n) => Number.isInteger(n) && n >= 0);
+}
+
 /**
  * Import a batch of contacts (upsert text attrs + list). Returns process id; caller may poll.
  * Boolean attrs (CV_ACTIVATE) must be set separately via updateContactsAttributesBatch —
@@ -96,25 +118,76 @@ export async function importContactsBatch(
   return { processId };
 }
 
+async function createOrUpdateContact(
+  client: BrevoClient,
+  contact: BrevoImportContact,
+): Promise<void> {
+  const listId = getBrevoListId();
+  await client.contacts.createContact({
+    email: contact.email,
+    attributes: {
+      ...textAttributesForImport(contact.attributes),
+      CV_ACTIVATE: contact.attributes.CV_ACTIVATE,
+    },
+    listIds: [listId],
+    updateEnabled: true,
+  });
+}
+
 async function updateContactsChunkWithRetry(
   client: BrevoClient,
   chunk: BrevoImportContact[],
-): Promise<void> {
+): Promise<{ createdMissing: number }> {
+  let remaining = [...chunk];
+  let createdMissing = 0;
   let lastError: unknown;
+
   for (let attempt = 1; attempt <= UPDATE_MAX_RETRIES; attempt++) {
+    if (remaining.length === 0) {
+      return { createdMissing };
+    }
+
     try {
-      // Only CV_ACTIVATE — text attrs already set by import; list membership already applied.
       await client.contacts.updateBatchContacts({
-        contacts: chunk.map((c) => ({
+        contacts: remaining.map((c) => ({
           email: c.email,
           attributes: { CV_ACTIVATE: c.attributes.CV_ACTIVATE },
         })),
       });
-      return;
+      return { createdMissing };
     } catch (err) {
       lastError = err;
-      const anyErr = err as { statusCode?: number };
-      const retryable = anyErr.statusCode === 429 || anyErr.statusCode === 503;
+      const status = getErrorStatusCode(err);
+      const message = getErrorMessage(err);
+
+      if (status === 404) {
+        const indexes = parseMissingContactIndexes(message);
+        if (indexes.length === 0) {
+          throw err;
+        }
+
+        const missingSet = new Set(indexes.filter((i) => i < remaining.length));
+        const missingContacts = remaining.filter((_, i) => missingSet.has(i));
+        const nextRemaining = remaining.filter((_, i) => !missingSet.has(i));
+
+        for (const contact of missingContacts) {
+          try {
+            await createOrUpdateContact(client, contact);
+            createdMissing++;
+          } catch (createErr) {
+            // Still count as failure for this contact; continue others.
+            console.error(
+              `[brevo] createContact failed email=${contact.email}: ${formatBrevoError(createErr)}`,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        remaining = nextRemaining;
+        continue;
+      }
+
+      const retryable = status === 429 || status === 503;
       if (!retryable || attempt === UPDATE_MAX_RETRIES) {
         throw err;
       }
@@ -122,31 +195,34 @@ async function updateContactsChunkWithRetry(
       await new Promise((resolve) => setTimeout(resolve, backoffMs));
     }
   }
+
   throw lastError;
 }
 
 /**
  * Update CV_ACTIVATE via POST /contacts/batch (import drops booleans).
- * Chunks + retries; does not re-send text attributes or listIds.
+ * If a chunk contains emails not yet in Brevo, create them then finish the rest.
  */
 export async function updateContactsAttributesBatch(
   contacts: BrevoImportContact[],
-): Promise<{ chunksOk: number; chunksFailed: number }> {
+): Promise<{ chunksOk: number; chunksFailed: number; createdMissing: number }> {
   const client = getClient();
   if (!client) {
     throw new Error('BREVO_API_KEY is not configured');
   }
   if (contacts.length === 0) {
-    return { chunksOk: 0, chunksFailed: 0 };
+    return { chunksOk: 0, chunksFailed: 0, createdMissing: 0 };
   }
 
   let chunksOk = 0;
   let chunksFailed = 0;
+  let createdMissing = 0;
 
   for (let i = 0; i < contacts.length; i += UPDATE_BATCH_SIZE) {
     const chunk = contacts.slice(i, i + UPDATE_BATCH_SIZE);
     try {
-      await updateContactsChunkWithRetry(client, chunk);
+      const result = await updateContactsChunkWithRetry(client, chunk);
+      createdMissing += result.createdMissing;
       chunksOk++;
     } catch (err) {
       chunksFailed++;
@@ -159,7 +235,7 @@ export async function updateContactsAttributesBatch(
     }
   }
 
-  return { chunksOk, chunksFailed };
+  return { chunksOk, chunksFailed, createdMissing };
 }
 
 export async function getImportProcessStatus(processId: number): Promise<BrevoImportResult> {

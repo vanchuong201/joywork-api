@@ -99,7 +99,7 @@ export function isValidEmail(email: string): boolean {
 
 /** Map one user to Brevo import payload, or null if email invalid. */
 export function mapUserToBrevoContact(user: BrevoMapperUser): BrevoImportContact | null {
-  const email = user.email?.trim();
+  const email = user.email?.trim().toLowerCase();
   if (!email || !isValidEmail(email)) {
     return null;
   }

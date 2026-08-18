@@ -154,7 +154,7 @@ async function main() {
       console.log('[brevo-sync] Updating CV_ACTIVATE via contacts/batch (no import)...');
       const attrResult = await updateContactsAttributesBatch(contacts);
       console.log(
-        `[brevo-sync] Done. attrChunksOk=${attrResult.chunksOk}, attrChunksFailed=${attrResult.chunksFailed}, contacts=${contacts.length}`,
+        `[brevo-sync] Done. attrChunksOk=${attrResult.chunksOk}, attrChunksFailed=${attrResult.chunksFailed}, createdMissing=${attrResult.createdMissing}, contacts=${contacts.length}`,
       );
       if (attrResult.chunksFailed > 0) {
         process.exitCode = 1;
@@ -166,6 +166,7 @@ async function main() {
     let batchesFailed = 0;
     let attributeChunksOk = 0;
     let attributeChunksFailed = 0;
+    let createdMissing = 0;
 
     for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
       const batch = contacts.slice(i, i + BATCH_SIZE);
@@ -197,8 +198,9 @@ async function main() {
         const attrResult = await updateContactsAttributesBatch(batch);
         attributeChunksOk += attrResult.chunksOk;
         attributeChunksFailed += attrResult.chunksFailed;
+        createdMissing += attrResult.createdMissing;
         console.log(
-          `[brevo-sync] Batch ${batchNo} attributes chunksOk=${attrResult.chunksOk}, chunksFailed=${attrResult.chunksFailed}`,
+          `[brevo-sync] Batch ${batchNo} attributes chunksOk=${attrResult.chunksOk}, chunksFailed=${attrResult.chunksFailed}, createdMissing=${attrResult.createdMissing}`,
         );
       } catch (err) {
         batchesFailed++;
@@ -214,7 +216,7 @@ async function main() {
     }
 
     console.log(
-      `[brevo-sync] Done. importOk=${batchesOk}, importFailed=${batchesFailed}, attrChunksOk=${attributeChunksOk}, attrChunksFailed=${attributeChunksFailed}, contacts=${contacts.length}`,
+      `[brevo-sync] Done. importOk=${batchesOk}, importFailed=${batchesFailed}, attrChunksOk=${attributeChunksOk}, attrChunksFailed=${attributeChunksFailed}, createdMissing=${createdMissing}, contacts=${contacts.length}`,
     );
 
     if (batchesFailed > 0 || attributeChunksFailed > 0) {
