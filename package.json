@@ -23,7 +23,7 @@
     "seed:candidates": "tsx scripts/seed-candidate-users.ts",
     "migrate:location-codes": "tsx scripts/migrate-location-codes.ts",
     "embed:backfill": "tsx scripts/backfill-embeddings.ts",
-    "brevo:sync": "tsx scripts/sync-brevo-contacts.ts",
+    "brevo:sync": "npx tsx scripts/sync-brevo-contacts.ts",
     "backfill:user-slugs": "npx tsx scripts/generate-user-slugs.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
