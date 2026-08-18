@@ -109,6 +109,13 @@ const envSchema = z.object({
   // Candidate onboarding: thời hạn (ngày) của link kích hoạt gửi qua email
   ONBOARDING_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(90),
 
+  // Brevo CRM / marketing contact sync (optional — leave empty to disable)
+  BREVO_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  /** Default: identified_contacts list on JOYWORK Brevo account */
+  BREVO_LIST_ID: z.coerce.number().int().positive().default(5),
+  /** When true, sync script maps + counts without calling Brevo */
+  BREVO_SYNC_DRY_RUN: z.preprocess(stringToBoolean, z.boolean().default(false)),
+
   // Internal API secret — shared with joywork-admin for server-to-server calls
   // Required: app will refuse to start if missing or < 32 chars
   INTERNAL_API_SECRET: z.string().min(32, 'INTERNAL_API_SECRET must be at least 32 characters'),
