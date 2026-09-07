@@ -261,6 +261,11 @@ export class AuthService {
     }
   }
 
+  async issueSessionTokens(userId: string): Promise<AuthTokens> {
+    await this.assertUserActive(userId);
+    return this.generateTokens(userId);
+  }
+
   // Generate JWT tokens
   private generateTokens(userId: string): AuthTokens {
     const accessToken = jwt.sign(

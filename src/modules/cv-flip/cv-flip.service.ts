@@ -19,7 +19,14 @@ import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
 import { emailService } from '@/shared/services/email.service';
 import { notificationService } from '@/shared/services/notification.service';
+import { AuthService } from '@/modules/auth/auth.service';
 import { Prisma } from '@prisma/client';
+import {
+  buildCvFlipEmailActionUrl,
+  signCvFlipEmailActionToken,
+  verifyCvFlipEmailActionToken,
+  type CvFlipEmailAction,
+} from './cv-flip-email-token';
 import type {
   CandidateDetailQuery,
   CandidatesQuery,
@@ -73,9 +80,12 @@ const profileUrl = (slug: string | null): string => {
   return slug ? `${base}/candidates/${slug}` : `${base}/account/profile`;
 };
 
-const cvFlipRequestsUrl = (): string => {
-  const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
-  return `${base}/account/profile`;
+const toAbsoluteAssetUrl = (url: string | null | undefined): string | undefined => {
+  if (!url?.trim()) return undefined;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+  const origin = (config.CDN_BASE_URL || config.FRONTEND_ORIGIN || 'https://joywork.vn').replace(/\/$/, '');
+  return trimmed.startsWith('/') ? `${origin}${trimmed}` : `${origin}/${trimmed}`;
 };
 
 export class CvFlipService {
@@ -1105,7 +1115,7 @@ export class CvFlipService {
 
     const company = await prisma.company.findUnique({
       where: { id: companyId },
-      select: { name: true, slug: true },
+      select: { name: true, slug: true, logoUrl: true },
     });
     const companyName = company?.name ?? 'Doanh nghiệp';
     const frontendOrigin = config.FRONTEND_ORIGIN || 'https://joywork.vn';
@@ -1119,12 +1129,12 @@ export class CvFlipService {
       userId: candidateUserId,
       type: 'CV_FLIP_REQUEST',
       title: 'Yêu cầu mở thông tin hồ sơ',
-      content: `${companyName} muốn xem thông tin liên hệ trong hồ sơ của bạn${requestContentSuffix}. Mở Cài đặt hồ sơ để Đồng ý / Từ chối.${messageHint}`,
+      content: `${companyName} muốn xem thông tin liên hệ trong hồ sơ của bạn${requestContentSuffix}. Mở Doanh nghiệp kết nối để Đồng ý / Từ chối.${messageHint}`,
       metadata: {
         requestId: request.id,
         companyId,
         candidateUserId,
-        targetUrl: '/account/profile',
+        targetUrl: '/connections',
         ...(selectedJob ? { jobId: selectedJob.id } : {}),
       },
       relatedEntityType: 'CV_FLIP_REQUEST',
@@ -1134,12 +1144,18 @@ export class CvFlipService {
     const candidateEmail = await getVerifiedEmailForUser(candidateUserId);
     if (candidateEmail) {
       try {
+        const emailActionUrls = this.buildEmailActionUrls(candidateUserId, request.id, request.expiresAt);
+        const companyLogoUrl = toAbsoluteAssetUrl(company?.logoUrl);
         await emailService.sendCvFlipRequestEmail(candidateEmail, {
           companyName,
           companyProfileUrl,
           candidateName: candidate.name,
-          requestsUrl: cvFlipRequestsUrl(),
+          requestsUrl: emailActionUrls.list,
+          approveUrl: emailActionUrls.approve,
+          rejectUrl: emailActionUrls.reject,
+          profileSettingsUrl: `${frontendOrigin}/account/profile`,
           profileUrl: profileUrl(candidate.slug),
+          ...(companyLogoUrl ? { companyLogoUrl } : {}),
           ...(selectedJob?.title ? { jobTitle: selectedJob.title } : {}),
           ...(jobUrl ? { jobUrl } : {}),
           ...(normalizedMessage ? { message: normalizedMessage } : {}),
@@ -1604,6 +1620,46 @@ export class CvFlipService {
       status: 'APPROVED' as const,
       connectionId: approved.id,
       flippedAt: approved.flippedAt,
+    };
+  }
+
+  private buildEmailActionUrls(userId: string, requestId: string, expiresAt: Date) {
+    const build = (action: CvFlipEmailAction) =>
+      buildCvFlipEmailActionUrl(
+        signCvFlipEmailActionToken({
+          userId,
+          requestId,
+          action,
+          expiresAt,
+        }),
+      );
+
+    return {
+      approve: build('approve'),
+      reject: build('reject'),
+      list: build('list'),
+    };
+  }
+
+  async consumeEmailAction(token: string) {
+    const payload = verifyCvFlipEmailActionToken(token);
+    const authService = new AuthService();
+    const tokens = await authService.issueSessionTokens(payload.userId);
+
+    if (payload.action === 'list') {
+      return {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        action: payload.action,
+      };
+    }
+
+    const result = await this.respondRequest(payload.userId, payload.requestId, payload.action);
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      action: payload.action,
+      requestStatus: result.status,
     };
   }
 }

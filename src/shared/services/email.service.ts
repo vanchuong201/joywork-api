@@ -1454,8 +1454,12 @@ Trân trọng,
     payload: {
       companyName: string;
       companyProfileUrl: string;
+      companyLogoUrl?: string;
       candidateName: string | null;
       requestsUrl: string;
+      approveUrl: string;
+      rejectUrl: string;
+      profileSettingsUrl: string;
       profileUrl: string;
       jobTitle?: string;
       jobUrl?: string;
@@ -1465,51 +1469,136 @@ Trân trọng,
     const candidateName = this.escapeHtml(payload.candidateName || 'bạn');
     const companyName = this.escapeHtml(payload.companyName);
     const companyLink = this.escapeHtml(payload.companyProfileUrl);
+    const companyLinkLabel = this.escapeHtml(
+      payload.companyProfileUrl.replace(/^https?:\/\//, ''),
+    );
+    const approveUrl = this.escapeHtml(payload.approveUrl);
+    const rejectUrl = this.escapeHtml(payload.rejectUrl);
+    const requestsUrl = this.escapeHtml(payload.requestsUrl);
+    const profileSettingsUrl = this.escapeHtml(payload.profileSettingsUrl);
     const jobTitle = payload.jobTitle ? this.escapeHtml(payload.jobTitle) : null;
     const jobUrl = payload.jobUrl ? this.escapeHtml(payload.jobUrl) : null;
     const requestMessage = payload.message?.trim() ? this.formatMultilineText(payload.message) : null;
-    const jobInfoVi = jobTitle
-      ? `<p><strong>Việc làm phù hợp:</strong> ${
+    const logoUrl = payload.companyLogoUrl ? this.escapeHtml(payload.companyLogoUrl) : null;
+    const brandOrigin = (config.FRONTEND_ORIGIN || 'https://joywork.vn').replace(/\/$/, '');
+    const joyworkLogo = this.escapeHtml(`${brandOrigin}/JW-original.png`);
+
+    const companyLogoHtml = logoUrl
+      ? `<img src="${logoUrl}" alt="${companyName}" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid #e5e7eb;" />`
+      : `<div style="width:48px;height:48px;border-radius:8px;background:#f3f4f6;border:1px solid #e5e7eb;color:#6b7280;font-size:11px;line-height:48px;text-align:center;">Logo</div>`;
+
+    const jobRow = jobTitle
+      ? `<p style="margin:8px 0 0;font-size:14px;color:#374151;">JD phù hợp với bạn: ${
           jobUrl
-            ? `<a href="${jobUrl}" style="color:#295892;word-break:break-all;">${jobTitle}</a>`
+            ? `<a href="${jobUrl}" style="color:#1e3a5f;text-decoration:underline;">${jobTitle}</a>`
             : jobTitle
         }</p>`
-      : '';
-    const jobInfoEn = jobTitle
-      ? `<p><strong>Relevant job:</strong> ${
-          jobUrl
-            ? `<a href="${jobUrl}" style="color:#295892;word-break:break-all;">${jobTitle}</a>`
-            : jobTitle
-        }</p>`
-      : '';
-    const messageVi = requestMessage
-      ? `<p><strong>Lời nhắn từ doanh nghiệp:</strong><br/>${requestMessage}</p>`
-      : '';
-    const messageEn = requestMessage
-      ? `<p><strong>Message from employer:</strong><br/>${requestMessage}</p>`
       : '';
 
-    const html = this.talentPoolWrapper(
-      'Yêu cầu cho phép xem thông tin liên hệ',
-      `<p>Chào ${candidateName},</p>
-      <p>Doanh nghiệp <strong>${companyName}</strong> vừa gửi yêu cầu xem thông tin liên hệ trong hồ sơ của bạn.</p>
-      <p><strong>Trang doanh nghiệp:</strong> <a href="${companyLink}" style="color:#295892;word-break:break-all;">${companyLink}</a></p>
-      ${jobInfoVi}
-      ${messageVi}
-      <p>Bạn có thể vào mục quản lý hồ sơ để <strong>đồng ý hoặc từ chối</strong> yêu cầu này.</p>`,
-      `<p>Hi ${candidateName},</p>
-      <p><strong>${companyName}</strong> has requested access to your profile contact details.</p>
-      <p><strong>Company page:</strong> <a href="${companyLink}" style="color:#295892;word-break:break-all;">${companyLink}</a></p>
-      ${jobInfoEn}
-      ${messageEn}
-      <p>Please review the request in your profile settings to approve or reject it.</p>`,
-      payload.requestsUrl,
-      'Xử lý yêu cầu / Review Request',
-    );
+    const messageBlock = requestMessage
+      ? `<tr>
+          <td style="padding:16px 20px 20px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#295892;">Lời nhắn của Doanh Nghiệp</p>
+            <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${requestMessage}</p>
+          </td>
+        </tr>`
+      : '';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yêu cầu cho phép xem thông tin liên hệ</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f6f8;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f6f8;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td style="padding:20px 24px 16px;border-bottom:3px solid #f4b6c2;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <img src="${joyworkLogo}" alt="JOYWORK" height="36" style="display:block;height:36px;width:auto;" />
+                  </td>
+                  <td style="vertical-align:middle;text-align:right;font-size:12px;color:#6b7280;">
+                    Nền tảng tuyển dụng của những doanh nghiệp tốt
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 24px 8px;">
+              <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#1e3a5f;">Yêu cầu cho phép xem thông tin liên hệ</h1>
+              <p style="margin:0 0 12px;font-size:15px;">Xin chào <strong>${candidateName}</strong>,</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#374151;">
+                Doanh nghiệp dưới đây thấy CV của bạn rất phù hợp với vị trí mà họ đang tuyển dụng, họ cần sự đồng ý của bạn để xem thông tin liên hệ:
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 24px 20px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e5e7eb;border-radius:10px;">
+                <tr>
+                  <td style="padding:20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="vertical-align:top;width:56px;">${companyLogoHtml}</td>
+                        <td style="vertical-align:top;padding-left:12px;">
+                          <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#111827;">${companyName}</p>
+                          <p style="margin:0;font-size:13px;color:#374151;">
+                            Trang doanh nghiệp:
+                            <a href="${companyLink}" style="color:#1e3a5f;text-decoration:underline;word-break:break-all;">${companyLinkLabel}</a>
+                          </p>
+                          ${jobRow}
+                        </td>
+                        <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
+                          <a href="${approveUrl}" style="display:inline-block;background:#1e3a5f;color:#ffffff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:700;">Đồng ý</a>
+                          <a href="${rejectUrl}" style="display:inline-block;background:#ffffff;color:#374151;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:700;border:1px solid #d1d5db;margin-left:6px;">Từ chối</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                ${messageBlock}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 24px 24px;">
+              <a href="${requestsUrl}" style="display:block;background:#1e3a5f;color:#ffffff;text-decoration:none;text-align:center;padding:14px 20px;border-radius:8px;font-size:15px;font-weight:700;">Xem danh sách tất cả các yêu cầu</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 24px 28px;">
+              <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#374151;">
+                Nếu bạn bấm vào <strong>Đồng ý</strong>, doanh nghiệp sẽ được xem thông tin liên hệ của bạn. Nếu bạn thấy doanh nghiệp hoặc công việc chưa phù hợp, hãy bấm vào <strong>Từ chối</strong>.
+              </p>
+              <p style="margin:0;font-size:13px;line-height:1.6;color:#6b7280;font-style:italic;">
+                Nếu bạn đã tìm được công việc như ý và không muốn các doanh nghiệp khác tiếp tục xem hồ sơ, hãy truy cập
+                <a href="${profileSettingsUrl}" style="color:#1e3a5f;">tại đây</a>
+                để tắt chế độ tìm kiếm hồ sơ của bạn.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 24px 24px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;letter-spacing:0.08em;">
+              JOYWORK
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
     await this.sendEmail({
       to,
-      subject: '[JOYWORK] Yêu cầu mở thông tin hồ sơ / Yêu cầu mở CV',
+      subject: '[JOYWORK] Yêu cầu mở thông tin hồ sơ',
       html,
     });
   }

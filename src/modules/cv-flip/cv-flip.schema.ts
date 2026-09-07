@@ -94,3 +94,9 @@ export const respondRequestBodySchema = z.object({
 });
 
 export type RespondRequestBody = z.infer<typeof respondRequestBodySchema>;
+
+export const consumeEmailActionBodySchema = z.object({
+  token: z.string().min(1),
+});
+
+export type ConsumeEmailActionBody = z.infer<typeof consumeEmailActionBodySchema>;

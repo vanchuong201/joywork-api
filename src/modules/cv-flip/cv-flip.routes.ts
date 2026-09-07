@@ -139,6 +139,20 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
     },
   }, controller.listCompanyRequests.bind(controller));
 
+  fastify.post('/email-actions/consume', {
+    schema: {
+      description: 'Đổi token email yêu cầu mở CV thành phiên đăng nhập và thực hiện action',
+      tags: ['Mở CV'],
+      body: {
+        type: 'object',
+        required: ['token'],
+        properties: {
+          token: { type: 'string' },
+        },
+      },
+    },
+  }, controller.consumeEmailAction.bind(controller));
+
   fastify.post('/requests/:requestId/respond', {
     preHandler: secured,
     schema: {

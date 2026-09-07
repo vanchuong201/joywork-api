@@ -1,4 +1,4 @@
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '@/shared/errors/errorHandler';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import { CvFlipService } from './cv-flip.service';
@@ -6,6 +6,7 @@ import {
   candidateDetailQuerySchema,
   candidatesQuerySchema,
   companyRequestsQuerySchema,
+  consumeEmailActionBodySchema,
   flipBodySchema,
   requestsQuerySchema,
   respondRequestBodySchema,
@@ -106,5 +107,29 @@ export class CvFlipController {
 
     const result = await this.service.respondRequest(userId, requestId, parsed.data.action);
     return reply.send({ data: result });
+  }
+
+  async consumeEmailAction(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = consumeEmailActionBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+
+    const result = await this.service.consumeEmailAction(parsed.data.token);
+    reply.setCookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    return reply.send({
+      data: {
+        accessToken: result.accessToken,
+        action: result.action,
+        ...(result.requestStatus ? { requestStatus: result.requestStatus } : {}),
+      },
+    });
   }
 }

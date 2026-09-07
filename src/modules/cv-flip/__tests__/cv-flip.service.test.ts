@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CvFlipService } from '../cv-flip.service';
+import { signCvFlipEmailActionToken } from '../cv-flip-email-token';
 
 vi.mock('@/shared/database/prisma', () => ({
   prisma: {
     user: {
       count: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
     },
     companyMember: {
       findFirst: vi.fn(),
@@ -13,6 +15,8 @@ vi.mock('@/shared/database/prisma', () => ({
     cvFlipRequest: {
       updateMany: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
       count: vi.fn(),
     },
     cvFlipConnection: {
@@ -26,6 +30,8 @@ vi.mock('@/shared/database/prisma', () => ({
 vi.mock('@/config/env', () => ({
   config: {
     FRONTEND_ORIGIN: 'http://localhost:3000',
+    JWT_SECRET: 'a'.repeat(32),
+    REFRESH_SECRET: 'b'.repeat(32),
   },
 }));
 
@@ -38,7 +44,9 @@ vi.mock('@/shared/services/email.service', () => ({
 }));
 
 vi.mock('@/shared/services/notification.service', () => ({
-  notificationService: {},
+  notificationService: {
+    createNotification: vi.fn(),
+  },
 }));
 
 import { prisma } from '@/shared/database/prisma';
@@ -266,6 +274,66 @@ describe('CvFlipService.listCompanyRequests', () => {
     expect(result.requests[1]).toMatchObject({
       source: 'REQUEST',
       status: 'APPROVED',
+    });
+  });
+});
+
+describe('CvFlipService.consumeEmailAction', () => {
+  it('từ chối token không hợp lệ', async () => {
+    await expect(service.consumeEmailAction('not-a-jwt')).rejects.toMatchObject({
+      code: 'CV_FLIP_EMAIL_TOKEN_INVALID',
+    });
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('action list cấp session mà không đổi request', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ accountStatus: 'ACTIVE' } as never);
+    const token = signCvFlipEmailActionToken({
+      userId: 'user-1',
+      requestId: 'req-1',
+      action: 'list',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const result = await service.consumeEmailAction(token);
+
+    expect(result.action).toBe('list');
+    expect(result.accessToken).toBeTruthy();
+    expect(result.refreshToken).toBeTruthy();
+    expect(prisma.cvFlipRequest.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('reject thành công khi request còn PENDING', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ accountStatus: 'ACTIVE' } as never);
+    vi.mocked(prisma.cvFlipRequest.findUnique).mockResolvedValue({
+      id: 'req-1',
+      companyId: 'company-1',
+      userId: 'user-1',
+      requestedBy: 'hr-1',
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 60_000),
+      company: { name: 'ACME' },
+      user: { name: 'Ứng viên A', slug: 'ung-vien-a' },
+    } as never);
+    vi.mocked(prisma.cvFlipRequest.update).mockResolvedValue({} as never);
+
+    const token = signCvFlipEmailActionToken({
+      userId: 'user-1',
+      requestId: 'req-1',
+      action: 'reject',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const result = await service.consumeEmailAction(token);
+
+    expect(result).toMatchObject({
+      action: 'reject',
+      requestStatus: 'REJECTED',
+    });
+    expect(result.accessToken).toBeTruthy();
+    expect(prisma.cvFlipRequest.update).toHaveBeenCalledWith({
+      where: { id: 'req-1' },
+      data: { status: 'REJECTED', respondedAt: expect.any(Date) },
     });
   });
 });
