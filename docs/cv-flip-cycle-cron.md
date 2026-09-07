@@ -24,7 +24,7 @@ Hai đồng hồ:
 | Gói (`expiresAt` + `cycleCount`) | Tắt hẳn Mở CV sau N tháng | **Có** — đây là việc cron sẽ làm |
 | Quota chu kỳ (`getCyclePeriod` + `CvFlipUsage` month/year) | Đếm lượt trong 1 tháng chu kỳ | Không — sang kỳ mới tự dùng row usage khác |
 
-Hết **Tổng lượt mở** trong kỳ: expire mọi `CvFlipRequest` `PENDING` của DN (không phải việc của cron gói). Request PENDING cũng hết hạn lazy +7 ngày trong `listMyRequests`.
+Hết **Tổng lượt mở** trong kỳ: expire mọi `CvFlipRequest` `PENDING` của DN (không phải việc của cron gói). Request PENDING cũng hết hạn lazy +10 ngày trong `listMyRequests`.
 
 ## Việc cron nên làm
 

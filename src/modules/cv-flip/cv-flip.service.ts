@@ -29,7 +29,7 @@ import type {
 } from './cv-flip.schema';
 
 const CV_FLIP_FEATURE_KEY = 'CV_FLIP';
-const REQUEST_EXPIRE_DAYS = 7;
+const REQUEST_EXPIRE_DAYS = 10;
 const USD_TO_VND_RATE = 26_000;
 
 const companyRequestSelect = {
