@@ -120,6 +120,25 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
     },
   }, controller.listMyRequests.bind(controller));
 
+  fastify.get('/company-requests', {
+    preHandler: secured,
+    schema: {
+      description: 'Danh sách yêu cầu mở CV do doanh nghiệp đã gửi',
+      tags: ['Mở CV'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 50 },
+          status: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED'] },
+        },
+      },
+    },
+  }, controller.listCompanyRequests.bind(controller));
+
   fastify.post('/requests/:requestId/respond', {
     preHandler: secured,
     schema: {

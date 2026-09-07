@@ -80,6 +80,15 @@ export const requestsQuerySchema = z.object({
 
 export type RequestsQuery = z.infer<typeof requestsQuerySchema>;
 
+export const companyRequestsQuerySchema = z.object({
+  companyId: z.string().cuid(),
+  page: pageSchema,
+  limit: limitSchema,
+  status: z.nativeEnum(CvFlipRequestStatus).optional(),
+});
+
+export type CompanyRequestsQuery = z.infer<typeof companyRequestsQuerySchema>;
+
 export const respondRequestBodySchema = z.object({
   action: z.enum(['approve', 'reject']),
 });

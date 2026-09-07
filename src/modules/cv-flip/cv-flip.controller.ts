@@ -5,6 +5,7 @@ import { CvFlipService } from './cv-flip.service';
 import {
   candidateDetailQuerySchema,
   candidatesQuerySchema,
+  companyRequestsQuerySchema,
   flipBodySchema,
   requestsQuerySchema,
   respondRequestBodySchema,
@@ -81,6 +82,17 @@ export class CvFlipController {
     }
 
     const result = await this.service.listMyRequests(userId, parsed.data);
+    return reply.send({ data: result });
+  }
+
+  async listCompanyRequests(request: AuthenticatedRequest, reply: FastifyReply) {
+    const userId = this.getUserId(request);
+    const parsed = companyRequestsQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+
+    const result = await this.service.listCompanyRequests(userId, parsed.data);
     return reply.send({ data: result });
   }
 

@@ -20,11 +20,41 @@ import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service'
 import { emailService } from '@/shared/services/email.service';
 import { notificationService } from '@/shared/services/notification.service';
 import { Prisma } from '@prisma/client';
-import type { CandidateDetailQuery, CandidatesQuery, FlipBody, RequestsQuery } from './cv-flip.schema';
+import type {
+  CandidateDetailQuery,
+  CandidatesQuery,
+  CompanyRequestsQuery,
+  FlipBody,
+  RequestsQuery,
+} from './cv-flip.schema';
 
 const CV_FLIP_FEATURE_KEY = 'CV_FLIP';
 const REQUEST_EXPIRE_DAYS = 7;
 const USD_TO_VND_RATE = 26_000;
+
+const companyRequestSelect = {
+  id: true,
+  status: true,
+  expiresAt: true,
+  createdAt: true,
+  respondedAt: true,
+  message: true,
+  job: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+    },
+  },
+  user: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      avatar: true,
+    },
+  },
+} as const;
 
 type CompanyLimits = {
   enabled: boolean;
@@ -1139,6 +1169,19 @@ export class CvFlipService {
     });
   }
 
+  private async expireOutdatedCompanyRequests(companyId: string): Promise<void> {
+    await prisma.cvFlipRequest.updateMany({
+      where: {
+        companyId,
+        status: 'PENDING',
+        expiresAt: { lt: new Date() },
+      },
+      data: {
+        status: 'EXPIRED',
+      },
+    });
+  }
+
   async listMyRequests(userId: string, query: RequestsQuery) {
     await this.expireOutdatedRequests(userId);
     const { page, limit, status } = query;
@@ -1192,6 +1235,197 @@ export class CvFlipService {
         limit,
         total,
         totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async listCompanyRequests(userId: string, query: CompanyRequestsQuery) {
+    const { companyId, page, limit, status } = query;
+    await this.assertCanManageCompany(userId, companyId);
+    await this.expireOutdatedCompanyRequests(companyId);
+
+    const includeDirectOpens = !status || status === 'APPROVED';
+    if (!includeDirectOpens) {
+      return this.listCompanyRequestRows(companyId, page, limit, status);
+    }
+
+    return this.listCompanyOpenedRows(companyId, page, limit, status);
+  }
+
+  private async listCompanyRequestRows(
+    companyId: string,
+    page: number,
+    limit: number,
+    status: CompanyRequestsQuery['status'],
+  ) {
+    const where: Prisma.CvFlipRequestWhereInput = { companyId };
+    if (status) {
+      where.status = status;
+    }
+
+    const [requests, total] = await Promise.all([
+      prisma.cvFlipRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: companyRequestSelect,
+      }),
+      prisma.cvFlipRequest.count({ where }),
+    ]);
+
+    return {
+      requests: requests.map((request) => this.mapCompanyRequestRow(request)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  private async listCompanyOpenedRows(
+    companyId: string,
+    page: number,
+    limit: number,
+    status: CompanyRequestsQuery['status'],
+  ) {
+    const requestWhere: Prisma.CvFlipRequestWhereInput = { companyId };
+    if (status) {
+      requestWhere.status = status;
+    }
+
+    const connectionWhere: Prisma.CvFlipConnectionWhereInput = {
+      companyId,
+      user: {
+        cvFlipRequestsReceived: {
+          none: { companyId, status: 'APPROVED' },
+        },
+      },
+    };
+
+    const [requestKeys, connectionKeys] = await Promise.all([
+      prisma.cvFlipRequest.findMany({
+        where: requestWhere,
+        select: { id: true, createdAt: true },
+      }),
+      prisma.cvFlipConnection.findMany({
+        where: connectionWhere,
+        select: { id: true, flippedAt: true },
+      }),
+    ]);
+
+    const merged = [
+      ...requestKeys.map((row) => ({ id: row.id, at: row.createdAt, kind: 'request' as const })),
+      ...connectionKeys.map((row) => ({ id: row.id, at: row.flippedAt, kind: 'connection' as const })),
+    ].sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id));
+
+    const total = merged.length;
+    const pageKeys = merged.slice((page - 1) * limit, page * limit);
+    const requestIds = pageKeys.filter((row) => row.kind === 'request').map((row) => row.id);
+    const connectionIds = pageKeys.filter((row) => row.kind === 'connection').map((row) => row.id);
+
+    const [requests, connections] = await Promise.all([
+      requestIds.length > 0
+        ? prisma.cvFlipRequest.findMany({
+            where: { id: { in: requestIds } },
+            select: companyRequestSelect,
+          })
+        : Promise.resolve([]),
+      connectionIds.length > 0
+        ? prisma.cvFlipConnection.findMany({
+            where: { id: { in: connectionIds } },
+            select: {
+              id: true,
+              flippedAt: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  avatar: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const requestById = new Map(requests.map((row) => [row.id, row]));
+    const connectionById = new Map(connections.map((row) => [row.id, row]));
+    const pageRows: Array<
+      ReturnType<CvFlipService['mapCompanyRequestRow']> | ReturnType<CvFlipService['mapCompanyDirectOpenRow']>
+    > = [];
+
+    for (const key of pageKeys) {
+      if (key.kind === 'request') {
+        const request = requestById.get(key.id);
+        if (request) pageRows.push(this.mapCompanyRequestRow(request));
+        continue;
+      }
+      const connection = connectionById.get(key.id);
+      if (connection) pageRows.push(this.mapCompanyDirectOpenRow(connection));
+    }
+
+    return {
+      requests: pageRows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  private mapCompanyRequestRow(request: {
+    id: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+    expiresAt: Date;
+    createdAt: Date;
+    respondedAt: Date | null;
+    message: string | null;
+    job: { id: string; title: string; slug: string | null } | null;
+    user: { id: string; name: string | null; slug: string | null; avatar: string | null };
+  }) {
+    return {
+      id: request.id,
+      status: request.status,
+      expiresAt: request.expiresAt,
+      createdAt: request.createdAt,
+      respondedAt: request.respondedAt,
+      message: request.message,
+      job: request.job,
+      source: 'REQUEST' as const,
+      candidate: {
+        id: request.user.id,
+        name: request.user.name,
+        slug: request.user.slug,
+        avatar: request.user.avatar,
+      },
+    };
+  }
+
+  private mapCompanyDirectOpenRow(connection: {
+    id: string;
+    flippedAt: Date;
+    user: { id: string; name: string | null; slug: string | null; avatar: string | null };
+  }) {
+    return {
+      id: `direct:${connection.id}`,
+      status: 'APPROVED' as const,
+      expiresAt: connection.flippedAt,
+      createdAt: connection.flippedAt,
+      respondedAt: connection.flippedAt,
+      message: null,
+      job: null,
+      source: 'DIRECT_OPEN' as const,
+      candidate: {
+        id: connection.user.id,
+        name: connection.user.name,
+        slug: connection.user.slug,
+        avatar: connection.user.avatar,
       },
     };
   }
