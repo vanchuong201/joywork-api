@@ -13,6 +13,18 @@ const csvToArray = (value: unknown): string[] | undefined => {
   return parts.length > 0 ? parts : undefined;
 };
 
+const optionalCuidSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().cuid().optional());
+
+const optionalMessageSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().max(500).optional());
+
 export const candidatesQuerySchema = z.object({
   page: pageSchema,
   limit: limitSchema,
@@ -48,6 +60,8 @@ export type CandidateDetailQuery = z.infer<typeof candidateDetailQuerySchema>;
 export const flipBodySchema = z.object({
   companyId: z.string().cuid(),
   candidateUserId: z.string().cuid(),
+  jobId: optionalCuidSchema,
+  message: optionalMessageSchema,
 });
 
 export type FlipBody = z.infer<typeof flipBodySchema>;

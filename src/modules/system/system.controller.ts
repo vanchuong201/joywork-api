@@ -200,7 +200,8 @@ export class SystemController {
       companyId,
       parsed.data.enabled,
       parsed.data.monthlyTotalLimit,
-      parsed.data.monthlyRequestLimit
+      parsed.data.cycleStartDay,
+      parsed.data.cycleCount
     );
     return reply.send({ data: { company } });
   }

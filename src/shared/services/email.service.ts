@@ -25,6 +25,19 @@ class EmailService {
     return `${fromName} <${fromEmail}>`;
   }
 
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private formatMultilineText(value: string): string {
+    return this.escapeHtml(value).replace(/\n/g, '<br/>');
+  }
+
   private async sendEmail(options: {
     to: string;
     subject: string;
@@ -1444,19 +1457,51 @@ Trân trọng,
       candidateName: string | null;
       requestsUrl: string;
       profileUrl: string;
+      jobTitle?: string;
+      jobUrl?: string;
+      message?: string;
     }
   ): Promise<void> {
-    const candidateName = payload.candidateName || 'bạn';
-    const companyLink = payload.companyProfileUrl;
+    const candidateName = this.escapeHtml(payload.candidateName || 'bạn');
+    const companyName = this.escapeHtml(payload.companyName);
+    const companyLink = this.escapeHtml(payload.companyProfileUrl);
+    const jobTitle = payload.jobTitle ? this.escapeHtml(payload.jobTitle) : null;
+    const jobUrl = payload.jobUrl ? this.escapeHtml(payload.jobUrl) : null;
+    const requestMessage = payload.message?.trim() ? this.formatMultilineText(payload.message) : null;
+    const jobInfoVi = jobTitle
+      ? `<p><strong>Việc làm phù hợp:</strong> ${
+          jobUrl
+            ? `<a href="${jobUrl}" style="color:#295892;word-break:break-all;">${jobTitle}</a>`
+            : jobTitle
+        }</p>`
+      : '';
+    const jobInfoEn = jobTitle
+      ? `<p><strong>Relevant job:</strong> ${
+          jobUrl
+            ? `<a href="${jobUrl}" style="color:#295892;word-break:break-all;">${jobTitle}</a>`
+            : jobTitle
+        }</p>`
+      : '';
+    const messageVi = requestMessage
+      ? `<p><strong>Lời nhắn từ doanh nghiệp:</strong><br/>${requestMessage}</p>`
+      : '';
+    const messageEn = requestMessage
+      ? `<p><strong>Message from employer:</strong><br/>${requestMessage}</p>`
+      : '';
+
     const html = this.talentPoolWrapper(
       'Yêu cầu cho phép xem thông tin liên hệ',
       `<p>Chào ${candidateName},</p>
-      <p>Doanh nghiệp <strong>${payload.companyName}</strong> vừa gửi yêu cầu xem thông tin liên hệ trong hồ sơ của bạn.</p>
+      <p>Doanh nghiệp <strong>${companyName}</strong> vừa gửi yêu cầu xem thông tin liên hệ trong hồ sơ của bạn.</p>
       <p><strong>Trang doanh nghiệp:</strong> <a href="${companyLink}" style="color:#295892;word-break:break-all;">${companyLink}</a></p>
+      ${jobInfoVi}
+      ${messageVi}
       <p>Bạn có thể vào mục quản lý hồ sơ để <strong>đồng ý hoặc từ chối</strong> yêu cầu này.</p>`,
       `<p>Hi ${candidateName},</p>
-      <p><strong>${payload.companyName}</strong> has requested access to your profile contact details.</p>
+      <p><strong>${companyName}</strong> has requested access to your profile contact details.</p>
       <p><strong>Company page:</strong> <a href="${companyLink}" style="color:#295892;word-break:break-all;">${companyLink}</a></p>
+      ${jobInfoEn}
+      ${messageEn}
       <p>Please review the request in your profile settings to approve or reject it.</p>`,
       payload.requestsUrl,
       'Xử lý yêu cầu / Review Request',

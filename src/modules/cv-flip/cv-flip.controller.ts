@@ -58,7 +58,7 @@ export class CvFlipController {
       throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
     }
 
-    const result = await this.service.flipCandidate(userId, parsed.data.companyId, parsed.data.candidateUserId);
+    const result = await this.service.flipCandidate(userId, parsed.data);
     return reply.send({ data: result });
   }
 

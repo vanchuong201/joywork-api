@@ -80,6 +80,8 @@ export async function cvFlipRoutes(fastify: FastifyInstance) {
         properties: {
           companyId: { type: 'string' },
           candidateUserId: { type: 'string' },
+          jobId: { type: 'string' },
+          message: { type: 'string', maxLength: 500 },
         },
       },
     },

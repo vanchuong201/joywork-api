@@ -53,6 +53,8 @@ export const adminCompanyCvFlipPatchSchema = z.object({
   enabled: z.boolean(),
   monthlyTotalLimit: z.coerce.number().int().min(1).max(100000).optional(),
   monthlyRequestLimit: z.coerce.number().int().min(1).max(100000).optional(),
+  cycleStartDay: z.coerce.number().int().min(1).max(31).optional(),
+  cycleCount: z.coerce.number().int().min(1).max(120).optional(),
 });
 
 export type AdminCompanyCvFlipPatch = z.infer<typeof adminCompanyCvFlipPatchSchema>;

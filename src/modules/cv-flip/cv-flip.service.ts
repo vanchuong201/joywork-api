@@ -7,58 +7,30 @@ import {
   resolveEmployerCandidateVisibility,
 } from '@/shared/candidates/employer-candidate-visibility';
 import { buildCvReadyUserWhere, cvReadyRawSqlCondition } from '@/shared/candidates/cv-readiness';
+import {
+  getCyclePeriod,
+  parseCvFlipLimitMetadata,
+} from '@/shared/cv-flip-cycle';
 import { AppError } from '@/shared/errors/errorHandler';
 import { buildMaskedFieldPresence, maskNameToInitials } from '@/shared/mask';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
+import { buildJobUrl } from '@/shared/job-slug';
 import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
 import { getVerifiedEmailForUser } from '@/shared/services/email-helper.service';
 import { emailService } from '@/shared/services/email.service';
 import { notificationService } from '@/shared/services/notification.service';
 import { Prisma } from '@prisma/client';
-import type { CandidateDetailQuery, CandidatesQuery, RequestsQuery } from './cv-flip.schema';
+import type { CandidateDetailQuery, CandidatesQuery, FlipBody, RequestsQuery } from './cv-flip.schema';
 
 const CV_FLIP_FEATURE_KEY = 'CV_FLIP';
-const DEFAULT_MONTHLY_TOTAL_LIMIT = 500;
-const DEFAULT_MONTHLY_REQUEST_LIMIT = 100;
 const REQUEST_EXPIRE_DAYS = 7;
 const USD_TO_VND_RATE = 26_000;
 
 type CompanyLimits = {
   enabled: boolean;
   monthlyTotalLimit: number;
-  monthlyRequestLimit: number;
+  cycleStartDay: number;
 };
-
-const parsePositiveNumber = (value: unknown): number | null => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-  if (value <= 0) return null;
-  return Math.floor(value);
-};
-
-const parseCompanyLimits = (metadata: Prisma.JsonValue | null | undefined): Pick<CompanyLimits, 'monthlyTotalLimit' | 'monthlyRequestLimit'> => {
-  const fallback = {
-    monthlyTotalLimit: DEFAULT_MONTHLY_TOTAL_LIMIT,
-    monthlyRequestLimit: DEFAULT_MONTHLY_REQUEST_LIMIT,
-  };
-
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-    return fallback;
-  }
-
-  const record = metadata as Record<string, unknown>;
-  const monthlyTotalLimit = parsePositiveNumber(record['monthlyTotalLimit']) ?? DEFAULT_MONTHLY_TOTAL_LIMIT;
-  const monthlyRequestLimit = parsePositiveNumber(record['monthlyRequestLimit']) ?? DEFAULT_MONTHLY_REQUEST_LIMIT;
-
-  return {
-    monthlyTotalLimit,
-    monthlyRequestLimit: Math.min(monthlyRequestLimit, monthlyTotalLimit),
-  };
-};
-
-const getMonthYear = (date = new Date()): { month: number; year: number } => ({
-  month: date.getUTCMonth() + 1,
-  year: date.getUTCFullYear(),
-});
 
 const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
@@ -211,6 +183,42 @@ export class CvFlipService {
     }
   }
 
+  private async expirePendingRequestsForCompany(
+    companyId: string,
+    now = new Date(),
+    db: {
+      cvFlipRequest: {
+        updateMany: (args: Prisma.CvFlipRequestUpdateManyArgs) => Promise<Prisma.BatchPayload>;
+      };
+    } = prisma,
+  ): Promise<void> {
+    await db.cvFlipRequest.updateMany({
+      where: { companyId, status: 'PENDING' },
+      data: { status: 'EXPIRED', respondedAt: now },
+    });
+  }
+
+  /** Lazy tắt gói hết `expiresAt`. Chưa có cron — xem docs/cv-flip-cycle-cron.md. */
+  private async disableExpiredCvFlipEntitlements(companyIds?: string[]): Promise<void> {
+    await prisma.companyFeatureEntitlement.updateMany({
+      where: {
+        featureKey: CV_FLIP_FEATURE_KEY,
+        enabled: true,
+        expiresAt: { lte: new Date() },
+        ...(companyIds ? { companyId: { in: companyIds } } : {}),
+      },
+      data: { enabled: false },
+    });
+  }
+
+  private isCvFlipEnabled(
+    entitlement?: { enabled: boolean; expiresAt?: Date | null } | null,
+  ): boolean {
+    if (!entitlement?.enabled) return false;
+    if (entitlement.expiresAt && entitlement.expiresAt.getTime() <= Date.now()) return false;
+    return true;
+  }
+
   private async getCompanyLimits(companyId: string): Promise<CompanyLimits> {
     const entitlement = await prisma.companyFeatureEntitlement.findUnique({
       where: {
@@ -222,15 +230,30 @@ export class CvFlipService {
       select: {
         enabled: true,
         metadata: true,
+        expiresAt: true,
       },
     });
 
-    const parsed = parseCompanyLimits(entitlement?.metadata);
+    let enabled = entitlement?.enabled ?? false;
+    if (enabled && entitlement?.expiresAt && entitlement.expiresAt.getTime() <= Date.now()) {
+      enabled = false;
+      await prisma.companyFeatureEntitlement.update({
+        where: {
+          companyId_featureKey: {
+            companyId,
+            featureKey: CV_FLIP_FEATURE_KEY,
+          },
+        },
+        data: { enabled: false },
+      });
+    }
+
+    const parsed = parseCvFlipLimitMetadata(entitlement?.metadata);
 
     return {
-      enabled: entitlement?.enabled ?? false,
+      enabled,
       monthlyTotalLimit: parsed.monthlyTotalLimit,
-      monthlyRequestLimit: parsed.monthlyRequestLimit,
+      cycleStartDay: parsed.cycleStartDay,
     };
   }
 
@@ -254,7 +277,7 @@ export class CvFlipService {
             featureEntitlements: {
               where: { featureKey: CV_FLIP_FEATURE_KEY },
               take: 1,
-              select: { enabled: true, metadata: true },
+              select: { enabled: true, metadata: true, expiresAt: true },
             },
           },
         },
@@ -262,10 +285,13 @@ export class CvFlipService {
       orderBy: { joinedAt: 'desc' },
     });
 
+    await this.disableExpiredCvFlipEntitlements(companies.map((item) => item.company.id));
+
     return {
       companies: companies.map((item) => {
         const entitlement = item.company.featureEntitlements[0];
-        const limits = parseCompanyLimits(entitlement?.metadata);
+        const limits = parseCvFlipLimitMetadata(entitlement?.metadata);
+        const enabled = this.isCvFlipEnabled(entitlement);
         return {
           id: item.company.id,
           name: item.company.name,
@@ -274,10 +300,10 @@ export class CvFlipService {
           logoUrl: item.company.logoUrl,
           badges: toBadgeTypes(item.company.badges),
           role: item.role,
-          isPremium: entitlement?.enabled ?? false,
-          cvFlipEnabled: entitlement?.enabled ?? false,
+          isPremium: enabled,
+          cvFlipEnabled: enabled,
           monthlyTotalLimit: limits.monthlyTotalLimit,
-          monthlyRequestLimit: limits.monthlyRequestLimit,
+          monthlyRequestLimit: limits.monthlyTotalLimit,
         };
       }),
     };
@@ -847,7 +873,7 @@ export class CvFlipService {
     await this.assertCanManageCompany(userId, companyId);
 
     const limits = await this.getCompanyLimits(companyId);
-    const { month, year } = getMonthYear();
+    const { month, year, expiresOn } = getCyclePeriod(limits.cycleStartDay);
     const usage = await prisma.cvFlipUsage.findUnique({
       where: {
         companyId_month_year: { companyId, month, year },
@@ -859,25 +885,27 @@ export class CvFlipService {
     });
 
     const totalUsed = usage?.totalCount ?? 0;
-    const requestUsed = usage?.requestCount ?? 0;
+    const remaining = Math.max(0, limits.monthlyTotalLimit - totalUsed);
 
     return {
       total: {
         used: totalUsed,
         limit: limits.monthlyTotalLimit,
-        remaining: Math.max(0, limits.monthlyTotalLimit - totalUsed),
+        remaining,
       },
       request: {
-        used: requestUsed,
-        limit: limits.monthlyRequestLimit,
-        remaining: Math.max(0, limits.monthlyRequestLimit - requestUsed),
+        used: totalUsed,
+        limit: limits.monthlyTotalLimit,
+        remaining,
       },
       month,
       year,
+      expiresOn,
     };
   }
 
-  async flipCandidate(userId: string, companyId: string, candidateUserId: string) {
+  async flipCandidate(userId: string, payload: FlipBody) {
+    const { companyId, candidateUserId, jobId, message } = payload;
     await this.assertCanManageCompany(userId, companyId);
 
     const candidate = await prisma.user.findUnique({
@@ -928,7 +956,7 @@ export class CvFlipService {
       );
     }
 
-    const { month, year } = getMonthYear();
+    const { month, year } = getCyclePeriod(limits.cycleStartDay);
     const usage = await prisma.cvFlipUsage.findUnique({
       where: { companyId_month_year: { companyId, month, year } },
       select: { totalCount: true, requestCount: true },
@@ -938,6 +966,7 @@ export class CvFlipService {
     const requestCount = usage?.requestCount ?? 0;
 
     if (totalCount >= limits.monthlyTotalLimit) {
+      await this.expirePendingRequestsForCompany(companyId);
       throw new AppError('Doanh nghiệp đã hết tổng lượt mở CV trong tháng', 429, 'CV_FLIP_TOTAL_LIMIT_REACHED');
     }
 
@@ -964,6 +993,10 @@ export class CvFlipService {
         return connection;
       });
 
+      if (totalCount + 1 >= limits.monthlyTotalLimit) {
+        await this.expirePendingRequestsForCompany(companyId);
+      }
+
       return {
         status: 'FLIPPED' as const,
         connectionId: flipped.id,
@@ -971,9 +1004,26 @@ export class CvFlipService {
       };
     }
 
-    if (requestCount >= limits.monthlyRequestLimit) {
-      throw new AppError('Doanh nghiệp đã hết lượt mở CV qua yêu cầu trong tháng', 429, 'CV_FLIP_REQUEST_LIMIT_REACHED');
+    const selectedJob = jobId
+      ? await prisma.job.findFirst({
+          where: {
+            id: jobId,
+            companyId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        })
+      : null;
+
+    if (jobId && !selectedJob) {
+      throw new AppError('Việc làm được chọn không hợp lệ hoặc đã đóng', 400, 'CV_FLIP_JOB_INVALID');
     }
+
+    const normalizedMessage = message?.trim() ? message.trim() : null;
 
     const existingRequest = await prisma.cvFlipRequest.findUnique({
       where: {
@@ -1003,6 +1053,8 @@ export class CvFlipService {
           data: {
             status: 'PENDING',
             requestedBy: userId,
+            jobId: selectedJob?.id ?? null,
+            message: normalizedMessage,
             expiresAt,
             respondedAt: null,
           },
@@ -1013,6 +1065,8 @@ export class CvFlipService {
             companyId,
             userId: candidateUserId,
             requestedBy: userId,
+            jobId: selectedJob?.id ?? null,
+            message: normalizedMessage,
             status: 'PENDING',
             expiresAt,
           },
@@ -1024,19 +1078,24 @@ export class CvFlipService {
       select: { name: true, slug: true },
     });
     const companyName = company?.name ?? 'Doanh nghiệp';
+    const frontendOrigin = config.FRONTEND_ORIGIN || 'https://joywork.vn';
     const companyProfilePath = company?.slug ? `/companies/${company.slug}` : '/companies';
-    const companyProfileUrl = `${config.FRONTEND_ORIGIN || 'https://joywork.vn'}${companyProfilePath}`;
+    const companyProfileUrl = `${frontendOrigin}${companyProfilePath}`;
+    const jobUrl = selectedJob ? `${frontendOrigin}${buildJobUrl(selectedJob)}` : undefined;
+    const requestContentSuffix = selectedJob ? ` cho vị trí ${selectedJob.title}` : '';
+    const messageHint = normalizedMessage ? ' Doanh nghiệp có để lại lời nhắn trong yêu cầu.' : '';
 
     await notificationService.createNotification({
       userId: candidateUserId,
       type: 'CV_FLIP_REQUEST',
       title: 'Yêu cầu mở thông tin hồ sơ',
-      content: `${companyName} muốn xem thông tin liên hệ trong hồ sơ của bạn. Mở Cài đặt hồ sơ để Đồng ý / Từ chối.`,
+      content: `${companyName} muốn xem thông tin liên hệ trong hồ sơ của bạn${requestContentSuffix}. Mở Cài đặt hồ sơ để Đồng ý / Từ chối.${messageHint}`,
       metadata: {
         requestId: request.id,
         companyId,
         candidateUserId,
         targetUrl: '/account/profile',
+        ...(selectedJob ? { jobId: selectedJob.id } : {}),
       },
       relatedEntityType: 'CV_FLIP_REQUEST',
       relatedEntityId: request.id,
@@ -1051,6 +1110,9 @@ export class CvFlipService {
           candidateName: candidate.name,
           requestsUrl: cvFlipRequestsUrl(),
           profileUrl: profileUrl(candidate.slug),
+          ...(selectedJob?.title ? { jobTitle: selectedJob.title } : {}),
+          ...(jobUrl ? { jobUrl } : {}),
+          ...(normalizedMessage ? { message: normalizedMessage } : {}),
         });
       } catch {
         // Ignore email failure to avoid blocking request flow.
@@ -1100,6 +1162,14 @@ export class CvFlipService {
           expiresAt: true,
           createdAt: true,
           respondedAt: true,
+          message: true,
+          job: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+            },
+          },
           company: {
             select: {
               id: true,
@@ -1200,19 +1270,15 @@ export class CvFlipService {
         throw new AppError('Yêu cầu đã hết hạn', 409, 'CV_FLIP_REQUEST_EXPIRED');
       }
 
-      const { month, year } = getMonthYear(now);
+      const { month, year } = getCyclePeriod(limits.cycleStartDay, now);
       const usage = await tx.cvFlipUsage.findUnique({
         where: { companyId_month_year: { companyId: request.companyId, month, year } },
         select: { totalCount: true, requestCount: true },
       });
 
       const totalCount = usage?.totalCount ?? 0;
-      const requestCount = usage?.requestCount ?? 0;
-      if (totalCount >= limits.monthlyTotalLimit || requestCount >= limits.monthlyRequestLimit) {
-        await tx.cvFlipRequest.update({
-          where: { id: request.id },
-          data: { status: 'EXPIRED', respondedAt: now },
-        });
+      if (totalCount >= limits.monthlyTotalLimit) {
+        await this.expirePendingRequestsForCompany(request.companyId, now, tx);
         throw new AppError('Yêu cầu đã hết hạn', 409, 'CV_FLIP_REQUEST_EXPIRED');
       }
 
@@ -1263,6 +1329,11 @@ export class CvFlipService {
             requestCount: { increment: 1 },
           },
         });
+      }
+
+      const nextTotal = existingConnection ? totalCount : totalCount + 1;
+      if (nextTotal >= limits.monthlyTotalLimit) {
+        await this.expirePendingRequestsForCompany(request.companyId, now, tx);
       }
 
       return connection;

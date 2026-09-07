@@ -38,6 +38,13 @@ import type {
   UpdateCompanyProfileInput,
 } from '@/modules/companies/companies.schema';
 import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
+import {
+  clampCycleCount,
+  clampCycleStartDay,
+  computeCvFlipExpiresAt,
+  DEFAULT_CYCLE_COUNT,
+  parseCvFlipLimitMetadata,
+} from '@/shared/cv-flip-cycle';
 
 export interface SystemOverview {
   users: number;
@@ -79,6 +86,8 @@ export interface AdminCompanyListItem {
   cvFlipEnabled: boolean;
   cvFlipMonthlyTotalLimit: number;
   cvFlipMonthlyRequestLimit: number;
+  cvFlipCycleStartDay: number;
+  cvFlipCycleCount: number;
   createdAt: Date;
   memberCount: number;
   jobCount: number;
@@ -237,33 +246,33 @@ function subtractDays(base: Date, days: number): Date {
 export class SystemService {
   private static readonly TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
   private static readonly CV_FLIP_FEATURE_KEY = 'CV_FLIP';
-  private static readonly CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT = 500;
-  private static readonly CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT = 100;
   private static readonly SHOWCASE_MAX_FILE_SIZE = 8 * 1024 * 1024;
 
   private parseCvFlipLimits(metadata: Prisma.JsonValue | null | undefined): {
     monthlyTotalLimit: number;
     monthlyRequestLimit: number;
+    cycleStartDay: number;
+    cycleCount: number;
   } {
-    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-      return {
-        monthlyTotalLimit: SystemService.CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT,
-        monthlyRequestLimit: SystemService.CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT,
-      };
-    }
-
-    const data = metadata as Record<string, unknown>;
-    const total = typeof data['monthlyTotalLimit'] === 'number' && data['monthlyTotalLimit'] > 0
-      ? Math.floor(data['monthlyTotalLimit'])
-      : SystemService.CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT;
-    const request = typeof data['monthlyRequestLimit'] === 'number' && data['monthlyRequestLimit'] > 0
-      ? Math.floor(data['monthlyRequestLimit'])
-      : SystemService.CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT;
-
+    const parsed = parseCvFlipLimitMetadata(metadata);
     return {
-      monthlyTotalLimit: total,
-      monthlyRequestLimit: Math.min(request, total),
+      monthlyTotalLimit: parsed.monthlyTotalLimit,
+      monthlyRequestLimit: parsed.monthlyTotalLimit,
+      cycleStartDay: parsed.cycleStartDay,
+      cycleCount: parsed.cycleCount,
     };
+  }
+
+  /** Lazy tắt gói hết `expiresAt`. Chưa có cron — xem docs/cv-flip-cycle-cron.md. */
+  private async disableExpiredCvFlipEntitlements(): Promise<void> {
+    await prisma.companyFeatureEntitlement.updateMany({
+      where: {
+        featureKey: SystemService.CV_FLIP_FEATURE_KEY,
+        enabled: true,
+        expiresAt: { lte: new Date() },
+      },
+      data: { enabled: false },
+    });
   }
 
   private sanitizeFileName(name: string): string {
@@ -408,6 +417,7 @@ export class SystemService {
   }> {
     const { page, limit, q, verificationStatus, premiumStatus, cvFlipStatus } = query;
     const skip = (page - 1) * limit;
+    await this.disableExpiredCvFlipEntitlements();
 
     const where: Prisma.CompanyWhereInput = {};
     const andConditions: Prisma.CompanyWhereInput[] = [];
@@ -494,7 +504,7 @@ export class SystemService {
                 in: [SystemService.TALENT_POOL_FEATURE_KEY, SystemService.CV_FLIP_FEATURE_KEY],
               },
             },
-            select: { enabled: true, featureKey: true, metadata: true },
+            select: { enabled: true, featureKey: true, metadata: true, expiresAt: true },
           },
         },
       }),
@@ -504,6 +514,9 @@ export class SystemService {
       const premiumEntitlement = c.featureEntitlements.find((ent) => ent.featureKey === SystemService.TALENT_POOL_FEATURE_KEY);
       const cvFlipEntitlement = c.featureEntitlements.find((ent) => ent.featureKey === SystemService.CV_FLIP_FEATURE_KEY);
       const cvFlipLimits = this.parseCvFlipLimits(cvFlipEntitlement?.metadata);
+      const cvFlipExpired = Boolean(
+        cvFlipEntitlement?.expiresAt && cvFlipEntitlement.expiresAt.getTime() <= Date.now(),
+      );
 
       return {
         id: c.id,
@@ -514,9 +527,11 @@ export class SystemService {
         isVerified: c.isVerified,
         badges: toBadgeTypes(c.badges),
         isPremium: premiumEntitlement?.enabled ?? false,
-        cvFlipEnabled: cvFlipEntitlement?.enabled ?? false,
+        cvFlipEnabled: (cvFlipEntitlement?.enabled ?? false) && !cvFlipExpired,
         cvFlipMonthlyTotalLimit: cvFlipLimits.monthlyTotalLimit,
-        cvFlipMonthlyRequestLimit: cvFlipLimits.monthlyRequestLimit,
+        cvFlipMonthlyRequestLimit: cvFlipLimits.monthlyTotalLimit,
+        cvFlipCycleStartDay: cvFlipLimits.cycleStartDay,
+        cvFlipCycleCount: cvFlipLimits.cycleCount,
         createdAt: c.createdAt,
         memberCount: c._count.members,
         jobCount: c._count.jobs,
@@ -1494,8 +1509,16 @@ export class SystemService {
     companyId: string,
     enabled: boolean,
     monthlyTotalLimit?: number,
-    monthlyRequestLimit?: number
-  ): Promise<{ id: string; enabled: boolean; monthlyTotalLimit: number; monthlyRequestLimit: number }> {
+    cycleStartDay?: number,
+    cycleCount?: number
+  ): Promise<{
+    id: string;
+    enabled: boolean;
+    monthlyTotalLimit: number;
+    monthlyRequestLimit: number;
+    cycleStartDay: number;
+    cycleCount: number;
+  }> {
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true },
@@ -1505,19 +1528,43 @@ export class SystemService {
       throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
     }
 
+    const existing = await prisma.companyFeatureEntitlement.findUnique({
+      where: {
+        companyId_featureKey: {
+          companyId,
+          featureKey: SystemService.CV_FLIP_FEATURE_KEY,
+        },
+      },
+      select: { enabled: true, metadata: true, expiresAt: true },
+    });
+    const existingLimits = this.parseCvFlipLimits(existing?.metadata);
+    const turningOn = enabled && existing?.enabled !== true;
+    const vietnamToday = new Date(Date.now() + 7 * 60 * 60 * 1000).getUTCDate();
+
     const safeTotalLimit = monthlyTotalLimit && monthlyTotalLimit > 0
       ? Math.floor(monthlyTotalLimit)
-      : SystemService.CV_FLIP_DEFAULT_MONTHLY_TOTAL_LIMIT;
+      : existingLimits.monthlyTotalLimit;
 
-    const safeRequestLimitRaw = monthlyRequestLimit && monthlyRequestLimit > 0
-      ? Math.floor(monthlyRequestLimit)
-      : SystemService.CV_FLIP_DEFAULT_MONTHLY_REQUEST_LIMIT;
-    const safeRequestLimit = Math.min(safeRequestLimitRaw, safeTotalLimit);
+    const safeCycleStartDay = cycleStartDay !== undefined
+      ? clampCycleStartDay(cycleStartDay)
+      : turningOn
+        ? clampCycleStartDay(vietnamToday)
+        : existingLimits.cycleStartDay;
+
+    const safeCycleCount = cycleCount !== undefined
+      ? clampCycleCount(cycleCount)
+      : existingLimits.cycleCount || DEFAULT_CYCLE_COUNT;
 
     const metadata = {
       monthlyTotalLimit: safeTotalLimit,
-      monthlyRequestLimit: safeRequestLimit,
+      monthlyRequestLimit: safeTotalLimit,
+      cycleStartDay: safeCycleStartDay,
+      cycleCount: safeCycleCount,
     };
+
+    const expiresAt = enabled
+      ? computeCvFlipExpiresAt(safeCycleStartDay, safeCycleCount)
+      : existing?.expiresAt ?? null;
 
     await prisma.companyFeatureEntitlement.upsert({
       where: {
@@ -1531,10 +1578,12 @@ export class SystemService {
         featureKey: SystemService.CV_FLIP_FEATURE_KEY,
         enabled,
         metadata,
+        expiresAt,
       },
       update: {
         enabled,
         metadata,
+        expiresAt,
       },
     });
 
@@ -1542,7 +1591,9 @@ export class SystemService {
       id: company.id,
       enabled,
       monthlyTotalLimit: safeTotalLimit,
-      monthlyRequestLimit: safeRequestLimit,
+      monthlyRequestLimit: safeTotalLimit,
+      cycleStartDay: safeCycleStartDay,
+      cycleCount: safeCycleCount,
     };
   }
 
