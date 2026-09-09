@@ -1478,7 +1478,9 @@ Trân trọng,
     const profileSettingsUrl = this.escapeHtml(payload.profileSettingsUrl);
     const jobTitle = payload.jobTitle ? this.escapeHtml(payload.jobTitle) : null;
     const jobUrl = payload.jobUrl ? this.escapeHtml(payload.jobUrl) : null;
-    const requestMessage = payload.message?.trim() ? this.formatMultilineText(payload.message) : null;
+    const defaultRequestMessage =
+      'Chúng tôi đã xem hồ sơ của bạn và tin rằng bạn là ứng viên phù hợp cho vị trí đang tuyển. Rất mong được kết nối và trao đổi thêm cùng bạn.';
+    const requestMessage = this.formatMultilineText(payload.message?.trim() || defaultRequestMessage);
     const logoUrl = payload.companyLogoUrl ? this.escapeHtml(payload.companyLogoUrl) : null;
     const brandOrigin = (config.FRONTEND_ORIGIN || 'https://joywork.vn').replace(/\/$/, '');
     const joyworkLogo = this.escapeHtml(`${brandOrigin}/JW-original.png`);
@@ -1495,14 +1497,12 @@ Trân trọng,
         }</p>`
       : '';
 
-    const messageBlock = requestMessage
-      ? `<tr>
+    const messageBlock = `<tr>
           <td style="padding:16px 20px 20px;border-top:1px solid #e5e7eb;">
             <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#295892;">Lời nhắn của Doanh Nghiệp</p>
             <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${requestMessage}</p>
           </td>
-        </tr>`
-      : '';
+        </tr>`;
 
     const html = `<!DOCTYPE html>
 <html>
@@ -1598,7 +1598,7 @@ Trân trọng,
 
     await this.sendEmail({
       to,
-      subject: '[JOYWORK] Yêu cầu mở thông tin hồ sơ',
+      subject: '[Quan trọng] Có doanh nghiệp muốn liên hệ với bạn - JOYWORK',
       html,
     });
   }
