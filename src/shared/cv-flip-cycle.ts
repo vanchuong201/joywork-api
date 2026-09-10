@@ -85,6 +85,53 @@ export const getCyclePeriod = (
   };
 };
 
+export type CvFlipPackageCycleStatus = {
+  expired: boolean;
+  remainingCycles: number;
+  totalCycles: number;
+};
+
+const monthsBetween = (
+  from: { year: number; month: number },
+  to: { year: number; month: number },
+): number => (to.year - from.year) * 12 + (to.month - from.month);
+
+/**
+ * Chu kỳ còn lại của gói Mở CV, không tính chu kỳ đang diễn ra.
+ * Anchor suy từ `expiresAt` (nửa đêm VN ngày bắt đầu chu kỳ N+1).
+ */
+export const computeCvFlipPackageCycles = (
+  cycleStartDay: number,
+  totalCycles: number,
+  expiresAt: Date | null | undefined,
+  date = new Date(),
+): CvFlipPackageCycleStatus => {
+  const startDay = clampCycleStartDay(cycleStartDay);
+  const count = clampCycleCount(totalCycles);
+
+  if (expiresAt && date.getTime() >= expiresAt.getTime()) {
+    return { expired: true, remainingCycles: 0, totalCycles: count };
+  }
+
+  if (expiresAt) {
+    const expVn = vietnamYmd(expiresAt);
+    const anchor = shiftMonth(expVn.year, expVn.month, -count);
+    const current = getCyclePeriodStart(startDay, date);
+    const currentIndex = Math.min(count, Math.max(1, monthsBetween(anchor, current) + 1));
+    return {
+      expired: false,
+      remainingCycles: Math.max(0, count - currentIndex),
+      totalCycles: count,
+    };
+  }
+
+  return {
+    expired: false,
+    remainingCycles: Math.max(0, count - 1),
+    totalCycles: count,
+  };
+};
+
 /** Instant gói hết hạn: nửa đêm VN ngày bắt đầu chu kỳ thứ N+1. */
 export const computeCvFlipExpiresAt = (
   cycleStartDay: number,

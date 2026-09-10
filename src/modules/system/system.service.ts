@@ -42,6 +42,7 @@ import {
   clampCycleCount,
   clampCycleStartDay,
   computeCvFlipExpiresAt,
+  computeCvFlipPackageCycles,
   DEFAULT_CYCLE_COUNT,
   parseCvFlipLimitMetadata,
 } from '@/shared/cv-flip-cycle';
@@ -88,6 +89,8 @@ export interface AdminCompanyListItem {
   cvFlipMonthlyRequestLimit: number;
   cvFlipCycleStartDay: number;
   cvFlipCycleCount: number;
+  cvFlipRemainingCycles: number;
+  cvFlipExpired: boolean;
   createdAt: Date;
   memberCount: number;
   jobCount: number;
@@ -514,9 +517,12 @@ export class SystemService {
       const premiumEntitlement = c.featureEntitlements.find((ent) => ent.featureKey === SystemService.TALENT_POOL_FEATURE_KEY);
       const cvFlipEntitlement = c.featureEntitlements.find((ent) => ent.featureKey === SystemService.CV_FLIP_FEATURE_KEY);
       const cvFlipLimits = this.parseCvFlipLimits(cvFlipEntitlement?.metadata);
-      const cvFlipExpired = Boolean(
-        cvFlipEntitlement?.expiresAt && cvFlipEntitlement.expiresAt.getTime() <= Date.now(),
+      const packageCycles = computeCvFlipPackageCycles(
+        cvFlipLimits.cycleStartDay,
+        cvFlipLimits.cycleCount,
+        cvFlipEntitlement?.expiresAt,
       );
+      const cvFlipExpired = packageCycles.expired;
 
       return {
         id: c.id,
@@ -531,7 +537,9 @@ export class SystemService {
         cvFlipMonthlyTotalLimit: cvFlipLimits.monthlyTotalLimit,
         cvFlipMonthlyRequestLimit: cvFlipLimits.monthlyTotalLimit,
         cvFlipCycleStartDay: cvFlipLimits.cycleStartDay,
-        cvFlipCycleCount: cvFlipLimits.cycleCount,
+        cvFlipCycleCount: packageCycles.totalCycles,
+        cvFlipRemainingCycles: packageCycles.remainingCycles,
+        cvFlipExpired,
         createdAt: c.createdAt,
         memberCount: c._count.members,
         jobCount: c._count.jobs,

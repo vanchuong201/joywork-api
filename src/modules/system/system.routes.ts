@@ -476,6 +476,8 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       cvFlipMonthlyRequestLimit: { type: 'number' },
                       cvFlipCycleStartDay: { type: 'number' },
                       cvFlipCycleCount: { type: 'number' },
+                      cvFlipRemainingCycles: { type: 'number' },
+                      cvFlipExpired: { type: 'boolean' },
                       createdAt: { type: 'string' },
                       memberCount: { type: 'number' },
                       jobCount: { type: 'number' },

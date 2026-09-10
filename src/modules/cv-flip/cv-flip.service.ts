@@ -1489,7 +1489,11 @@ export class CvFlipService {
         type: 'CV_FLIP_REJECTED',
         title: 'Ứng viên đã từ chối yêu cầu',
         content: 'Yêu cầu xem thông tin liên hệ đã bị từ chối.',
-        metadata: { requestId: request.id, companyId: request.companyId },
+        metadata: {
+          requestId: request.id,
+          companyId: request.companyId,
+          targetUrl: '/candidates/cv-requests',
+        },
         relatedEntityType: 'CV_FLIP_REQUEST',
         relatedEntityId: request.id,
       });
@@ -1598,6 +1602,7 @@ export class CvFlipService {
         requestId: request.id,
         companyId: request.companyId,
         candidateUserId: request.userId,
+        targetUrl: '/candidates/cv-requests',
       },
       relatedEntityType: 'CV_FLIP_REQUEST',
       relatedEntityId: request.id,
