@@ -396,7 +396,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
           dayOfBirth: { type: 'integer', minimum: 1, maximum: 31, nullable: true },
           monthOfBirth: { type: 'integer', minimum: 1, maximum: 12, nullable: true },
           yearOfBirth: { type: 'integer', minimum: 1900, maximum: 2100, nullable: true },
-          educationLevel: { type: 'string', enum: ['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER', null], nullable: true },
+          educationLevel: { type: 'string', enum: ['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', null], nullable: true },
         },
       },
       response: {

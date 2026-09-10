@@ -85,7 +85,7 @@ export const updateProfileSchema = z.object({
   dayOfBirth: z.number().int().min(1).max(31).optional().nullable(),
   monthOfBirth: z.number().int().min(1).max(12).optional().nullable(),
   yearOfBirth: z.number().int().min(1900).max(new Date().getFullYear() - 16, 'Must be at least 16 years old').optional().nullable(),
-  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD', 'TRAINING_CENTER']).optional().nullable(),
+  educationLevel: z.enum(['TRAINING_CENTER', 'INTERMEDIATE', 'COLLEGE', 'BACHELOR', 'MASTER', 'PHD']).optional().nullable(),
   // Address info
   specificAddress: z.string().max(255, 'Specific address must be less than 255 characters').optional().nullable().transform((val) => val === '' ? null : val),
 });
