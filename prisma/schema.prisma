@@ -13,58 +13,58 @@ datasource db {
 
 // User model - Core user entity
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
+  id            String            @id @default(cuid())
+  email         String            @unique
   password      String
   name          String?
-  slug          String?  @unique
+  slug          String?           @unique
   avatar        String? // Avatar for account (separate from profile avatar)
   phone         String?
-  emailVerified Boolean  @default(false)
-  role          UserRole @default(USER)
+  emailVerified Boolean           @default(false)
+  role          UserRole          @default(USER)
   accountStatus UserAccountStatus @default(ACTIVE)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   // Relations
-  profile                 UserProfile?
-  experiences             UserExperience[]
-  educations              UserEducation[]
-  companies               CompanyMember[]
-  applications            Application[]
-  messages                Message[]
-  follows                 Follow[]
-  likes                   Like[]
-  jobFavorites            JobFavorite[]
-  posts                   Post[]
-  postAuditLogs           PostAuditLog[]
-  postReactions           PostReaction[]
-  emailVerificationTokens EmailVerificationToken[]
-  passwordResetTokens     PasswordResetToken[]
-  postFavorites           PostFavorite[]
-  socialAccounts          UserSocialAccount[]
-  tickets                 CompanyTicket[]          @relation("TicketApplicant")
-  ticketMessages          CompanyTicketMessage[]
-  sentInvitations         CompanyInvitation[]      @relation("SentInvitations")
-  notifications           Notification[]
-  cvFlipConnections       CvFlipConnection[]
-  cvFlipFlippedBy         CvFlipConnection[]       @relation("CvFlipFlippedBy")
-  cvFlipRequestsReceived  CvFlipRequest[]          @relation("CvFlipRequestTarget")
-  cvFlipRequestsSent      CvFlipRequest[]          @relation("CvFlipRequester")
-  cvImportJobs            CvImportJob[]
-  apiTokens               ApiToken[]
-  onboardingTokens        OnboardingToken[]
-  candidateImportRecords  CandidateImportRecord[]
-  candidateImportBatchesCreated CandidateImportBatch[] @relation("CandidateImportBatchCreatedBy")
+  profile                       UserProfile?
+  experiences                   UserExperience[]
+  educations                    UserEducation[]
+  companies                     CompanyMember[]
+  applications                  Application[]
+  messages                      Message[]
+  follows                       Follow[]
+  likes                         Like[]
+  jobFavorites                  JobFavorite[]
+  posts                         Post[]
+  postAuditLogs                 PostAuditLog[]
+  postReactions                 PostReaction[]
+  emailVerificationTokens       EmailVerificationToken[]
+  passwordResetTokens           PasswordResetToken[]
+  postFavorites                 PostFavorite[]
+  socialAccounts                UserSocialAccount[]
+  tickets                       CompanyTicket[]          @relation("TicketApplicant")
+  ticketMessages                CompanyTicketMessage[]
+  sentInvitations               CompanyInvitation[]      @relation("SentInvitations")
+  notifications                 Notification[]
+  cvFlipConnections             CvFlipConnection[]
+  cvFlipFlippedBy               CvFlipConnection[]       @relation("CvFlipFlippedBy")
+  cvFlipRequestsReceived        CvFlipRequest[]          @relation("CvFlipRequestTarget")
+  cvFlipRequestsSent            CvFlipRequest[]          @relation("CvFlipRequester")
+  cvImportJobs                  CvImportJob[]
+  apiTokens                     ApiToken[]
+  onboardingTokens              OnboardingToken[]
+  candidateImportRecords        CandidateImportRecord[]
+  candidateImportBatchesCreated CandidateImportBatch[]   @relation("CandidateImportBatchCreatedBy")
 
   // Talent Pool
-  talentPoolMember          TalentPoolMember?        @relation("TalentPoolMemberUser")
-  talentPoolMembersAddedBy  TalentPoolMember[]       @relation("TalentPoolAddedBy")
-  talentPoolRequests        TalentPoolRequest[]      @relation("TalentPoolRequestUser")
-  talentPoolRequestsReviewed TalentPoolRequest[]     @relation("TalentPoolReviewedBy")
-  talentPoolLogs            TalentPoolLog[]          @relation("TalentPoolLogUser")
-  talentPoolLogsActed       TalentPoolLog[]          @relation("TalentPoolLogActor")
-  courseEnrollments         CourseEnrollment[]
+  talentPoolMember           TalentPoolMember?   @relation("TalentPoolMemberUser")
+  talentPoolMembersAddedBy   TalentPoolMember[]  @relation("TalentPoolAddedBy")
+  talentPoolRequests         TalentPoolRequest[] @relation("TalentPoolRequestUser")
+  talentPoolRequestsReviewed TalentPoolRequest[] @relation("TalentPoolReviewedBy")
+  talentPoolLogs             TalentPoolLog[]     @relation("TalentPoolLogUser")
+  talentPoolLogsActed        TalentPoolLog[]     @relation("TalentPoolLogActor")
+  courseEnrollments          CourseEnrollment[]
 
   @@index([slug])
   @@map("users")
@@ -105,19 +105,19 @@ model PasswordResetToken {
 // API Token — long-lived tokens for external system access to admin data
 model ApiToken {
   id          String    @id @default(cuid())
-  name        String                          // tên mô tả do admin đặt
-  tokenHash   String    @unique               // SHA-256(raw_token) — raw value không lưu DB
-  tokenPrefix String                          // 8 ký tự đầu của raw token để nhận dạng trong UI
-  scopes      String[]  @default([])          // ["read:overview", "read:users", ...]
-  expiresAt   DateTime?                       // null = không hết hạn
+  name        String // tên mô tả do admin đặt
+  tokenHash   String    @unique // SHA-256(raw_token) — raw value không lưu DB
+  tokenPrefix String // 8 ký tự đầu của raw token để nhận dạng trong UI
+  scopes      String[]  @default([]) // ["read:overview", "read:users", ...]
+  expiresAt   DateTime? // null = không hết hạn
   lastUsedAt  DateTime?
   enabled     Boolean   @default(true)
-  createdById String?                         // nullable: token tồn tại kể cả khi admin bị xóa
+  createdById String? // nullable: token tồn tại kể cả khi admin bị xóa
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   // SetNull: xóa admin không xóa tokens (tránh break external integrations)
-  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([tokenHash])
   @@index([createdById])
@@ -134,8 +134,8 @@ model CandidateImportBatch {
   failed           Int
   createdAt        DateTime @default(now())
 
-  createdByAdmin  User                    @relation("CandidateImportBatchCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Cascade)
-  records         CandidateImportRecord[]
+  createdByAdmin   User                    @relation("CandidateImportBatchCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Cascade)
+  records          CandidateImportRecord[]
   onboardingTokens OnboardingToken[]
 
   @@index([createdByAdminId])
@@ -177,13 +177,13 @@ model CandidateImportRecord {
 }
 
 model OnboardingToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   batchId   String?
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   batch CandidateImportBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
@@ -235,34 +235,34 @@ enum Gender {
 
 // UserProfile - Extended user information
 model UserProfile {
-  id       String   @id @default(cuid())
-  userId   String   @unique
-  avatar   String?
-  headline String?
-  bio      String?
-  skills   String[]
-  cvUrl    String?
-  locations String[] @default([])
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  avatar          String?
+  headline        String?
+  bio             String?
+  skills          String[]
+  cvUrl           String?
+  locations       String[] @default([])
   /// Mã phường/xã canonical: `{provinceCode}/{officialWardCode}` — ví dụ `ha-noi/00004`
-  wardCodes String[] @default([])
+  wardCodes       String[] @default([])
   /// Địa chỉ cụ thể: số nhà, tên đường, khu xóm
   specificAddress String?
-  website  String?
-  linkedin String?
-  github   String?
+  website         String?
+  linkedin        String?
+  github          String?
 
   // Contact info specific for CV/applications (independent from User.email/phone)
   contactEmail String?
   contactPhone String?
 
   // Profile-specific fields
-  fullName   String? // Full name for CV/applications (separate from User.name)
-  title      String?
-  status     UserStatus? @default(OPEN_TO_WORK)
-  isPublic   Boolean     @default(true)
-  isSearchingJob Boolean @default(true)
-  allowCvFlip    Boolean @default(false)
-  visibility Json? // { bio: boolean, experience: boolean, education: boolean, ksa: boolean, expectations: boolean }
+  fullName       String? // Full name for CV/applications (separate from User.name)
+  title          String?
+  status         UserStatus? @default(OPEN_TO_WORK)
+  isPublic       Boolean     @default(true)
+  isSearchingJob Boolean     @default(true)
+  allowCvFlip    Boolean     @default(false)
+  visibility     Json? // { bio: boolean, experience: boolean, education: boolean, ksa: boolean, expectations: boolean }
 
   // KSA (Knowledge, Skills, Attitude)
   knowledge String[] // Array of knowledge items
@@ -271,7 +271,7 @@ model UserProfile {
   // Expectations
   expectedSalaryMin BigInt?
   expectedSalaryMax BigInt?
-  salaryCurrency    String?   @default("VND")
+  salaryCurrency    String? @default("VND")
   workMode          String?
   expectedCulture   String?
 
@@ -279,10 +279,10 @@ model UserProfile {
   careerGoals String[]
 
   // Personal info for candidate filters
-  gender        Gender?       @default(MALE)
-  dayOfBirth    Int?
-  monthOfBirth  Int?
-  yearOfBirth  Int?
+  gender         Gender?         @default(MALE)
+  dayOfBirth     Int?
+  monthOfBirth   Int?
+  yearOfBirth    Int?
   educationLevel EducationLevel?
 
   createdAt DateTime @default(now())
@@ -352,7 +352,7 @@ model Company {
   coverUrl                 String?
   website                  String?
   location                 String?
-  wardCodes                String[]        @default([])
+  wardCodes                String[]                  @default([])
   specificAddress          String?
   email                    String?
   phone                    String?
@@ -555,27 +555,27 @@ enum CompanyMemberRole {
 
 // Post model - Company posts (Story posts)
 model Post {
-  id          String         @id @default(cuid())
-  companyId   String
-  createdById String?
-  title       String
-  content     String
-  excerpt     String?
-  coverUrl    String?
-  type        PostType       @default(STORY)
-  visibility  PostVisibility @default(PUBLIC)
-  hiddenFromFeed Boolean     @default(false)
-  deletedByJoyworkAt DateTime?
+  id                     String         @id @default(cuid())
+  companyId              String
+  createdById            String?
+  title                  String
+  content                String
+  excerpt                String?
+  coverUrl               String?
+  type                   PostType       @default(STORY)
+  visibility             PostVisibility @default(PUBLIC)
+  hiddenFromFeed         Boolean        @default(false)
+  deletedByJoyworkAt     DateTime?
   deletedByJoyworkReason String?
-  publishedAt DateTime?
-  statementId String?
-  statementSnapshot Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  publishedAt            DateTime?
+  statementId            String?
+  statementSnapshot      Json?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
 
   // Relations
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy     User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
   statement     CompanyStatement? @relation(fields: [statementId], references: [id], onDelete: SetNull)
   likes         Like[]
   postReactions PostReaction[]
@@ -715,7 +715,7 @@ model Job {
   department     String? // Bộ phận
   jobLevel       JobLevel? // Cấp bậc
   educationLevel EducationLevel? // Học vấn
-  gender        Gender? // Giới tính (nullable - không giới hạn)
+  gender         Gender? // Giới tính (nullable - không giới hạn)
 
   // JD chuẩn - Required fields
   generalInfo String @db.Text // "1. Thông tin chung" - markdown/rich text
@@ -735,20 +735,20 @@ model Job {
   contact        String? // Thông tin liên hệ - plain text
 
   // Working time
-  workingTimeRanges Json?   // [{ dayFrom: 'MON'..'SUN', dayTo, timeStart: 'HH:mm', timeEnd: 'HH:mm' }]
-  workingTimeNote   String? @db.Text // Ghi chú thời gian làm việc (tự do)
+  workingTimeRanges Json? // [{ dayFrom: 'MON'..'SUN', dayTo, timeStart: 'HH:mm', timeEnd: 'HH:mm' }]
+  workingTimeNote   String?             @db.Text // Ghi chú thời gian làm việc (tự do)
   worksOnSaturday   SaturdayWorkPolicy? // NO | FLEXIBLE | FIXED; null = chưa khai báo (job cũ)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
   reminderSentAt DateTime?
   embedding      Unsupported("vector(1536)")?
 
   // Relations
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  applications Application[]
-  favorites    JobFavorite[]
-  PostJob      PostJob[]
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  applications   Application[]
+  favorites      JobFavorite[]
+  PostJob        PostJob[]
   cvFlipRequests CvFlipRequest[]
 
   @@index([slug])
@@ -1343,16 +1343,16 @@ model CvImportJob {
 }
 
 model ProvinceRegistry {
-  code          String   @id
+  code          String    @id
   name          String
   type          String
   region        String
-  merged        Boolean  @default(false)
-  isActive      Boolean  @default(true)
+  merged        Boolean   @default(false)
+  isActive      Boolean   @default(true)
   effectiveFrom DateTime?
   effectiveTo   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   aliases ProvinceAlias[]
   wards   WardRegistry[]
@@ -1424,19 +1424,19 @@ enum CourseAttachmentSource {
 }
 
 model Course {
-  id                String           @id @default(cuid())
-  title             String
-  slug              String           @unique
-  shortDescription  String
-  description       String?
-  thumbnailUrl      String?
-  visibility        CourseVisibility @default(PUBLIC)
-  status            CourseStatus     @default(DRAFT)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  title            String
+  slug             String           @unique
+  shortDescription String
+  description      String?
+  thumbnailUrl     String?
+  visibility       CourseVisibility @default(PUBLIC)
+  status           CourseStatus     @default(DRAFT)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  lessons      Lesson[]
-  enrollments  CourseEnrollment[]
+  lessons     Lesson[]
+  enrollments CourseEnrollment[]
 
   @@index([status, visibility])
   @@index([slug])
@@ -1451,9 +1451,9 @@ model Lesson {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  course       Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  videos       LessonVideo[]
-  attachments  LessonAttachment[]
+  course      Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  videos      LessonVideo[]
+  attachments LessonAttachment[]
 
   @@index([courseId])
   @@index([courseId, sortOrder])
@@ -1505,4 +1505,47 @@ model CourseEnrollment {
   @@unique([courseId, userId])
   @@index([userId])
   @@map("course_enrollments")
+}
+
+// ============================================
+// SEO URL MAPPINGS
+// ============================================
+
+enum SeoUrlMappingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Loại trang đích mà một SEO URL render nội bộ. Mở rộng bằng renderer mới.
+enum SeoDestinationType {
+  JOB_SEARCH
+}
+
+/// Ánh xạ SEO-friendly URL sang đường dẫn nội bộ đã chuẩn hóa.
+/// `originalPath` giữ nguyên chuỗi admin nhập; `destinationParams` là bản
+/// chuẩn hóa dùng khi render và để nhóm các mapping cùng bộ lọc đích.
+/// Nhiều SEO URL được phép trỏ cùng một bộ lọc; trong mỗi nhóm
+/// `destinationKey` chỉ một mapping mang `isCanonical` để nhận canonical URL
+/// và vào sitemap, các mapping còn lại canonical trỏ về nó.
+model SeoUrlMapping {
+  id                String              @id @default(cuid())
+  seoPath           String              @unique
+  title             String
+  description       String              @db.Text
+  heading           String?
+  originalPath      String
+  destinationType   SeoDestinationType
+  destinationParams Json
+  destinationKey    String
+  isCanonical       Boolean             @default(false)
+  status            SeoUrlMappingStatus @default(DRAFT)
+  publishedAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([destinationKey, status])
+  @@index([destinationKey, isCanonical])
+  @@index([status, updatedAt])
+  @@map("seo_url_mappings")
 }
