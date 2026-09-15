@@ -1,5 +1,10 @@
 import { CompanyBadgeType, UserAccountStatus } from '@prisma/client';
 import { z } from 'zod';
+import {
+  ADMIN_DATE_PRESETS,
+  ADMIN_DATE_RANGE_MAX_DAYS,
+  daysBetweenInclusive,
+} from '@/modules/system/admin-date-range';
 
 const pageSchema = z.coerce.number().int().min(1).default(1);
 const limitSchema = z.coerce.number().int().min(1).max(100).default(20);
@@ -31,11 +36,84 @@ export const adminCompanyParamSchema = z.object({
 
 export type AdminCompanyParam = z.infer<typeof adminCompanyParamSchema>;
 
-export const adminReportTimeseriesQuerySchema = z.object({
-  days: z.coerce.number().int().min(7).max(90).default(30),
+const ymdSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày phải dạng YYYY-MM-DD');
+
+const adminDateRangeBaseSchema = z.object({
+  preset: z.enum(ADMIN_DATE_PRESETS).default('last30d'),
+  from: ymdSchema.optional(),
+  to: ymdSchema.optional(),
 });
 
-export type AdminReportTimeseriesQuery = z.infer<typeof adminReportTimeseriesQuerySchema>;
+function refineCustomRange(
+  value: {
+    preset: string;
+    from?: string | undefined;
+    to?: string | undefined;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (value.preset !== 'custom') {
+    return;
+  }
+  if (!value.from) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'from bắt buộc khi preset=custom',
+      path: ['from'],
+    });
+  }
+  if (!value.to) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'to bắt buộc khi preset=custom',
+      path: ['to'],
+    });
+  }
+  if (value.from && value.to) {
+    if (value.from > value.to) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'from phải nhỏ hơn hoặc bằng to',
+        path: ['from'],
+      });
+    } else if (daysBetweenInclusive(value.from, value.to) > ADMIN_DATE_RANGE_MAX_DAYS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Khoảng thời gian tối đa ${ADMIN_DATE_RANGE_MAX_DAYS} ngày`,
+        path: ['to'],
+      });
+    }
+  }
+}
+
+/** Overview: period filter hoặc lifetime=true (external API). */
+export const adminOverviewQuerySchema = adminDateRangeBaseSchema
+  .extend({
+    lifetime: z
+      .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+      .optional()
+      .transform((v) => v === true || v === 'true' || v === '1')
+      .default(false),
+  })
+  .superRefine((value, ctx) => {
+    if (value.lifetime) {
+      return;
+    }
+    refineCustomRange(value, ctx);
+  });
+
+export type AdminOverviewQuery = z.infer<typeof adminOverviewQuerySchema>;
+
+export const adminDateRangeQuerySchema = adminDateRangeBaseSchema.superRefine(refineCustomRange);
+
+export type AdminDateRangeQuery = z.infer<typeof adminDateRangeQuerySchema>;
+
+/** Timeseries dùng cùng contract preset/from/to. */
+export const adminReportTimeseriesQuerySchema = adminDateRangeQuerySchema;
+
+export type AdminReportTimeseriesQuery = AdminDateRangeQuery;
 
 export const adminUserAccountPatchSchema = z.object({
   accountStatus: z.nativeEnum(UserAccountStatus),

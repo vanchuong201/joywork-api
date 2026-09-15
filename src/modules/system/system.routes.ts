@@ -246,9 +246,35 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.get('/overview', {
     preHandler: internalOrAdminPre,
     schema: {
-      description: 'Get system overview stats',
+      description:
+        'Get system overview stats trong kỳ (múi giờ VN). Dùng lifetime=true để lấy tổng toàn thời gian (external API).',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          preset: {
+            type: 'string',
+            enum: [
+              'today',
+              'yesterday',
+              'last7d',
+              'last30d',
+              'this_week',
+              'last_week',
+              'this_month',
+              'last_month',
+              'this_year',
+              'last_year',
+              'custom',
+            ],
+            default: 'last30d',
+          },
+          from: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          to: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          lifetime: { type: 'boolean' },
+        },
+      },
       response: {
         200: {
           type: 'object',
@@ -268,6 +294,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
                     jobFavorites: { type: 'number' },
                   },
                 },
+                preset: { type: 'string' },
+                from: { type: 'string' },
+                to: { type: 'string' },
+                lifetime: { type: 'boolean' },
               },
             },
           },
@@ -1137,13 +1167,32 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.get('/reports/timeseries', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
     schema: {
-      description: 'Chuỗi thời gian đăng ký user và ứng tuyển theo ngày (UTC, PostgreSQL)',
+      description:
+        'Chuỗi thời gian đăng ký user và ứng tuyển theo ngày (múi giờ Asia/Ho_Chi_Minh)',
       tags: ['System'],
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
         properties: {
-          days: { type: 'integer', minimum: 7, maximum: 90 },
+          preset: {
+            type: 'string',
+            enum: [
+              'today',
+              'yesterday',
+              'last7d',
+              'last30d',
+              'this_week',
+              'last_week',
+              'this_month',
+              'last_month',
+              'this_year',
+              'last_year',
+              'custom',
+            ],
+            default: 'last30d',
+          },
+          from: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          to: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
         },
       },
       response: {
@@ -1153,7 +1202,9 @@ export async function systemRoutes(fastify: FastifyInstance) {
             data: {
               type: 'object',
               properties: {
-                days: { type: 'number' },
+                preset: { type: 'string' },
+                from: { type: 'string' },
+                to: { type: 'string' },
                 userSignups: {
                   type: 'array',
                   items: {

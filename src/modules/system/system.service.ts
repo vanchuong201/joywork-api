@@ -24,9 +24,14 @@ import type {
   AdminCompanyShowcaseType,
   AdminJobsQuery,
   AdminPostsQuery,
-  AdminReportTimeseriesQuery,
+  AdminDateRangeQuery,
+  AdminOverviewQuery,
   AdminUsersQuery,
 } from '@/modules/system/system.schema';
+import {
+  resolveAdminDateRange,
+  type AdminDatePreset,
+} from '@/modules/system/admin-date-range';
 import { getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { assertWardsBelongToProvinces } from '@/shared/wards';
 import {
@@ -213,20 +218,6 @@ export interface CompanyShowcaseItem {
 
 function toDateKeyUTC(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-function buildDayRange(days: number): { start: Date; keys: string[] } {
-  const end = new Date();
-  end.setUTCHours(0, 0, 0, 0);
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  const keys: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date(start);
-    d.setUTCDate(start.getUTCDate() + i);
-    keys.push(toDateKeyUTC(d));
-  }
-  return { start, keys };
 }
 
 function mapCountsToSeries(
@@ -1445,33 +1436,41 @@ export class SystemService {
     return { closedCount: result.count };
   }
 
-  async getReportTimeseries(query: AdminReportTimeseriesQuery): Promise<{
-    days: number;
+  async getReportTimeseries(query: AdminDateRangeQuery): Promise<{
+    preset: AdminDatePreset;
+    from: string;
+    to: string;
     userSignups: ReportDayPoint[];
     applications: ReportDayPoint[];
   }> {
-    const days = query.days;
-    const { start, keys } = buildDayRange(days);
+    const range = resolveAdminDateRange({
+      preset: query.preset,
+      from: query.from,
+      to: query.to,
+    });
+    const { start, endExclusive, keys } = range;
 
     const [userRows, appRows] = await Promise.all([
       prisma.$queryRaw<{ day: Date; count: number }[]>`
-        SELECT (date_trunc('day', "createdAt"))::date AS day, COUNT(*)::int AS count
+        SELECT (("createdAt" + interval '7 hours')::date) AS day, COUNT(*)::int AS count
         FROM users
-        WHERE "createdAt" >= ${start}
+        WHERE "createdAt" >= ${start} AND "createdAt" < ${endExclusive}
         GROUP BY 1
         ORDER BY 1 ASC
       `,
       prisma.$queryRaw<{ day: Date; count: number }[]>`
-        SELECT (date_trunc('day', "appliedAt"))::date AS day, COUNT(*)::int AS count
+        SELECT (("appliedAt" + interval '7 hours')::date) AS day, COUNT(*)::int AS count
         FROM applications
-        WHERE "appliedAt" >= ${start}
+        WHERE "appliedAt" >= ${start} AND "appliedAt" < ${endExclusive}
         GROUP BY 1
         ORDER BY 1 ASC
       `,
     ]);
 
     return {
-      days,
+      preset: range.preset,
+      from: range.from,
+      to: range.to,
       userSignups: mapCountsToSeries(keys, userRows),
       applications: mapCountsToSeries(keys, appRows),
     };
@@ -1660,25 +1659,72 @@ export class SystemService {
     };
   }
 
-  async getOverview(): Promise<SystemOverview> {
+  async getOverview(query?: AdminOverviewQuery): Promise<{
+    stats: SystemOverview;
+    preset?: AdminDatePreset;
+    from?: string;
+    to?: string;
+    lifetime?: boolean;
+  }> {
+    const resolvedQuery = query ?? { preset: 'last30d' as const, lifetime: false };
+    if (resolvedQuery.lifetime) {
+      const [users, companies, posts, jobs, applications, follows, jobFavorites] = await Promise.all([
+        prisma.user.count(),
+        prisma.company.count(),
+        prisma.post.count(),
+        prisma.job.count(),
+        prisma.application.count(),
+        prisma.follow.count(),
+        prisma.jobFavorite.count(),
+      ]);
+
+      return {
+        stats: {
+          users,
+          companies,
+          posts,
+          jobs,
+          applications,
+          follows,
+          jobFavorites,
+        },
+        lifetime: true,
+      };
+    }
+
+    const range = resolveAdminDateRange({
+      preset: resolvedQuery.preset,
+      from: resolvedQuery.from,
+      to: resolvedQuery.to,
+    });
+    const createdInRange = {
+      gte: range.start,
+      lt: range.endExclusive,
+    };
+
     const [users, companies, posts, jobs, applications, follows, jobFavorites] = await Promise.all([
-      prisma.user.count(),
-      prisma.company.count(),
-      prisma.post.count(),
-      prisma.job.count(),
-      prisma.application.count(),
-      prisma.follow.count(),
-      prisma.jobFavorite.count(),
+      prisma.user.count({ where: { createdAt: createdInRange } }),
+      prisma.company.count({ where: { createdAt: createdInRange } }),
+      prisma.post.count({ where: { createdAt: createdInRange } }),
+      prisma.job.count({ where: { createdAt: createdInRange } }),
+      prisma.application.count({ where: { appliedAt: createdInRange } }),
+      prisma.follow.count({ where: { createdAt: createdInRange } }),
+      prisma.jobFavorite.count({ where: { createdAt: createdInRange } }),
     ]);
 
     return {
-      users,
-      companies,
-      posts,
-      jobs,
-      applications,
-      follows,
-      jobFavorites,
+      stats: {
+        users,
+        companies,
+        posts,
+        jobs,
+        applications,
+        follows,
+        jobFavorites,
+      },
+      preset: range.preset,
+      from: range.from,
+      to: range.to,
     };
   }
 

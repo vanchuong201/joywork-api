@@ -20,6 +20,7 @@ import {
   adminCompanyPremiumPatchSchema,
   adminCompanyCvFlipPatchSchema,
   adminCompanyBadgePatchSchema,
+  adminOverviewQuerySchema,
   adminReportTimeseriesQuerySchema,
   adminUserAccountPatchSchema,
   adminUsersQuerySchema,
@@ -28,11 +29,15 @@ import {
 export class SystemController {
   constructor(private systemService: SystemService) {}
 
-  async getOverview(_request: FastifyRequest, reply: FastifyReply) {
-    const stats = await this.systemService.getOverview();
+  async getOverview(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = adminOverviewQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const result = await this.systemService.getOverview(parsed.data);
 
     return reply.send({
-      data: { stats },
+      data: result,
     });
   }
 
