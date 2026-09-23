@@ -298,6 +298,14 @@ export async function systemRoutes(fastify: FastifyInstance) {
                 from: { type: 'string' },
                 to: { type: 'string' },
                 lifetime: { type: 'boolean' },
+                cvActive: {
+                  type: ['object', 'null'],
+                  properties: {
+                    count: { type: 'number' },
+                    recordedAt: { type: 'string' },
+                    periodDate: { type: 'string' },
+                  },
+                },
               },
             },
           },
@@ -1232,6 +1240,74 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.getReportTimeseries.bind(systemController));
+
+  fastify.get('/reports/cv-active', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description:
+        'Snapshot tổng CV ready theo ngày (stock). Granularity: dưới 42 ngày=daily, 42–180=weekly, trên 180=monthly (múi giờ VN).',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          preset: {
+            type: 'string',
+            enum: [
+              'today',
+              'yesterday',
+              'last7d',
+              'last30d',
+              'this_week',
+              'last_week',
+              'this_month',
+              'last_month',
+              'this_year',
+              'last_year',
+              'custom',
+            ],
+            default: 'last30d',
+          },
+          from: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          to: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                preset: { type: 'string' },
+                from: { type: 'string' },
+                to: { type: 'string' },
+                granularity: { type: 'string', enum: ['daily', 'weekly', 'monthly'] },
+                latest: {
+                  type: ['object', 'null'],
+                  properties: {
+                    count: { type: 'number' },
+                    recordedAt: { type: 'string' },
+                    periodDate: { type: 'string' },
+                  },
+                },
+                points: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      date: { type: 'string' },
+                      count: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.getCvActiveReport.bind(systemController));
 
   fastify.get('/company-verifications', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],

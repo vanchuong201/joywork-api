@@ -308,6 +308,15 @@ export class SystemController {
     return reply.send({ data: result });
   }
 
+  async getCvActiveReport(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = adminReportTimeseriesQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      throw new AppError('Tham số không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const result = await this.systemService.getCvActiveReport(parsed.data);
+    return reply.send({ data: result });
+  }
+
   async listCompanyVerifications(request: FastifyRequest, reply: FastifyReply) {
     const { status } = request.query as { status?: string };
     const items = await this.systemService.listCompanyVerifications(status);

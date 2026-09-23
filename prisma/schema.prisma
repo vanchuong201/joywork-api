@@ -1522,6 +1522,18 @@ enum SeoDestinationType {
   JOB_SEARCH
 }
 
+/// Snapshot tổng số CV ready (evaluateCandidateCvReadiness) theo ngày lịch VN.
+/// Ghi nhận định kỳ (cron) hoặc lazy khi admin mở overview; một dòng / ngày.
+model CvActiveDailySnapshot {
+  id         String   @id @default(cuid())
+  periodDate DateTime @db.Date
+  count      Int
+  recordedAt DateTime @default(now())
+
+  @@unique([periodDate])
+  @@map("cv_active_daily_snapshots")
+}
+
 /// Ánh xạ SEO-friendly URL sang đường dẫn nội bộ đã chuẩn hóa.
 /// `originalPath` giữ nguyên chuỗi admin nhập; `destinationParams` là bản
 /// chuẩn hóa dùng khi render và để nhóm các mapping cùng bộ lọc đích.

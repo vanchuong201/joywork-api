@@ -29,9 +29,21 @@ import type {
   AdminUsersQuery,
 } from '@/modules/system/system.schema';
 import {
+  parseYmd,
   resolveAdminDateRange,
   type AdminDatePreset,
 } from '@/modules/system/admin-date-range';
+import {
+  aggregateCvActiveSnapshots,
+  periodDateFromYmd,
+  periodDateToKey,
+  resolveCvActiveGranularityForRange,
+  vnPeriodDateKeyToday,
+  vnPeriodDateToday,
+  type CvActiveGranularity,
+  type CvActiveSnapshotPoint,
+} from '@/modules/system/cv-active-snapshot';
+import { buildCvReadyUserWhere } from '@/shared/candidates/cv-readiness';
 import { getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { assertWardsBelongToProvinces } from '@/shared/wards';
 import {
@@ -60,6 +72,12 @@ export interface SystemOverview {
   applications: number;
   follows: number;
   jobFavorites: number;
+}
+
+export interface CvActiveOverviewSnapshot {
+  count: number;
+  recordedAt: string;
+  periodDate: string;
 }
 
 export interface AdminPagination {
@@ -1476,6 +1494,100 @@ export class SystemService {
     };
   }
 
+  async recordCvActiveSnapshot(now: Date = new Date()): Promise<CvActiveOverviewSnapshot> {
+    const periodDate = vnPeriodDateToday(now);
+    const count = await prisma.user.count({ where: buildCvReadyUserWhere() });
+    const recordedAt = now;
+
+    const row = await prisma.cvActiveDailySnapshot.upsert({
+      where: { periodDate },
+      create: { periodDate, count, recordedAt },
+      update: { count, recordedAt },
+    });
+
+    return {
+      count: row.count,
+      recordedAt: row.recordedAt.toISOString(),
+      periodDate: periodDateToKey(row.periodDate),
+    };
+  }
+
+  async getLatestCvActiveSnapshot(): Promise<CvActiveOverviewSnapshot | null> {
+    const row = await prisma.cvActiveDailySnapshot.findFirst({
+      orderBy: [{ periodDate: 'desc' }, { recordedAt: 'desc' }],
+    });
+    if (!row) {
+      return null;
+    }
+    return {
+      count: row.count,
+      recordedAt: row.recordedAt.toISOString(),
+      periodDate: periodDateToKey(row.periodDate),
+    };
+  }
+
+  /**
+   * Đảm bảo có snapshot ngày VN hôm nay (lazy khi admin mở overview), rồi trả latest.
+   */
+  async ensureTodayCvActiveSnapshot(now: Date = new Date()): Promise<CvActiveOverviewSnapshot> {
+    const todayKey = vnPeriodDateKeyToday(now);
+    const existing = await prisma.cvActiveDailySnapshot.findUnique({
+      where: { periodDate: vnPeriodDateToday(now) },
+    });
+    if (existing && periodDateToKey(existing.periodDate) === todayKey) {
+      return {
+        count: existing.count,
+        recordedAt: existing.recordedAt.toISOString(),
+        periodDate: todayKey,
+      };
+    }
+    return this.recordCvActiveSnapshot(now);
+  }
+
+  async getCvActiveReport(query: AdminDateRangeQuery): Promise<{
+    preset: AdminDatePreset;
+    from: string;
+    to: string;
+    granularity: CvActiveGranularity;
+    latest: CvActiveOverviewSnapshot | null;
+    points: CvActiveSnapshotPoint[];
+  }> {
+    const range = resolveAdminDateRange({
+      preset: query.preset,
+      from: query.from,
+      to: query.to,
+    });
+    const fromYmd = parseYmd(range.from);
+    const toYmd = parseYmd(range.to);
+    const fromDate = periodDateFromYmd(fromYmd.y, fromYmd.m, fromYmd.day);
+    const toDate = periodDateFromYmd(toYmd.y, toYmd.m, toYmd.day);
+
+    const rows = await prisma.cvActiveDailySnapshot.findMany({
+      where: {
+        periodDate: { gte: fromDate, lte: toDate },
+      },
+      orderBy: { periodDate: 'asc' },
+    });
+
+    const dailyPoints: CvActiveSnapshotPoint[] = rows.map((r) => ({
+      date: periodDateToKey(r.periodDate),
+      count: r.count,
+    }));
+
+    const granularity = resolveCvActiveGranularityForRange(range.from, range.to);
+    const points = aggregateCvActiveSnapshots(dailyPoints, granularity);
+    const latest = await this.getLatestCvActiveSnapshot();
+
+    return {
+      preset: range.preset,
+      from: range.from,
+      to: range.to,
+      granularity,
+      latest,
+      points,
+    };
+  }
+
   async setCompanyPremiumStatus(
     companyId: string,
     isPremium: boolean
@@ -1665,6 +1777,7 @@ export class SystemService {
     from?: string;
     to?: string;
     lifetime?: boolean;
+    cvActive?: CvActiveOverviewSnapshot | null;
   }> {
     const resolvedQuery = query ?? { preset: 'last30d' as const, lifetime: false };
     if (resolvedQuery.lifetime) {
@@ -1702,15 +1815,17 @@ export class SystemService {
       lt: range.endExclusive,
     };
 
-    const [users, companies, posts, jobs, applications, follows, jobFavorites] = await Promise.all([
-      prisma.user.count({ where: { createdAt: createdInRange } }),
-      prisma.company.count({ where: { createdAt: createdInRange } }),
-      prisma.post.count({ where: { createdAt: createdInRange } }),
-      prisma.job.count({ where: { createdAt: createdInRange } }),
-      prisma.application.count({ where: { appliedAt: createdInRange } }),
-      prisma.follow.count({ where: { createdAt: createdInRange } }),
-      prisma.jobFavorite.count({ where: { createdAt: createdInRange } }),
-    ]);
+    const [users, companies, posts, jobs, applications, follows, jobFavorites, cvActive] =
+      await Promise.all([
+        prisma.user.count({ where: { createdAt: createdInRange } }),
+        prisma.company.count({ where: { createdAt: createdInRange } }),
+        prisma.post.count({ where: { createdAt: createdInRange } }),
+        prisma.job.count({ where: { createdAt: createdInRange } }),
+        prisma.application.count({ where: { appliedAt: createdInRange } }),
+        prisma.follow.count({ where: { createdAt: createdInRange } }),
+        prisma.jobFavorite.count({ where: { createdAt: createdInRange } }),
+        this.ensureTodayCvActiveSnapshot(),
+      ]);
 
     return {
       stats: {
@@ -1725,6 +1840,7 @@ export class SystemService {
       preset: range.preset,
       from: range.from,
       to: range.to,
+      cvActive,
     };
   }
 

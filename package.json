@@ -24,6 +24,8 @@
     "migrate:location-codes": "tsx scripts/migrate-location-codes.ts",
     "embed:backfill": "tsx scripts/backfill-embeddings.ts",
     "brevo:sync": "npx tsx scripts/sync-brevo-contacts.ts",
+    "metrics:cv-active": "npx tsx scripts/record-cv-active-snapshot.ts",
+    "metrics:cv-active:seed": "npx tsx scripts/seed-cv-active-snapshots.ts",
     "backfill:user-slugs": "npx tsx scripts/generate-user-slugs.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
