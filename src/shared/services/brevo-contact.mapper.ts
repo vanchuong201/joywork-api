@@ -5,6 +5,7 @@
  * Do not invent new attributes — Marketing creates them in Brevo first, then we update this mapper.
  */
 
+import { createHash } from 'crypto';
 import { evaluateCandidateCvReadiness } from '@/shared/candidates/cv-readiness';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,6 +47,43 @@ export type BrevoImportContact = {
   email: string;
   attributes: BrevoContactAttributes;
 };
+
+export type BrevoMappedContact = BrevoImportContact & {
+  userId: string;
+  syncHash: string;
+};
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(',')}}`;
+}
+
+/** Stable hash of mapped Brevo payload (email + whitelist attributes). */
+export function hashBrevoContact(contact: BrevoImportContact): string {
+  const payload = stableStringify({
+    email: contact.email,
+    attributes: contact.attributes,
+  });
+  return createHash('sha256').update(payload).digest('hex').slice(0, 32);
+}
+
+export function withBrevoSyncHash(
+  userId: string,
+  contact: BrevoImportContact,
+): BrevoMappedContact {
+  return {
+    ...contact,
+    userId,
+    syncHash: hashBrevoContact(contact),
+  };
+}
 
 /**
  * Vietnamese name split: last token → FIRSTNAME (tên gọi), remainder → LASTNAME.

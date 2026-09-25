@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hashBrevoContact,
   isCvActivate,
   mapUserToBrevoContact,
   splitVietnameseName,
+  withBrevoSyncHash,
   type BrevoMapperUser,
 } from './brevo-contact.mapper';
 
@@ -179,5 +181,24 @@ describe('mapUserToBrevoContact', () => {
     );
     expect(contact?.attributes.FIRSTNAME).toBe('Madonna');
     expect(contact?.attributes.LASTNAME).toBeUndefined();
+  });
+
+  it('hashBrevoContact ổn định theo payload whitelist', () => {
+    const a = mapUserToBrevoContact(readyUser())!;
+    const b = mapUserToBrevoContact(readyUser())!;
+    expect(hashBrevoContact(a)).toBe(hashBrevoContact(b));
+    expect(hashBrevoContact(a)).toHaveLength(32);
+
+    const changed = mapUserToBrevoContact(
+      readyUser({ phone: '0911111111' }),
+    )!;
+    expect(hashBrevoContact(changed)).not.toBe(hashBrevoContact(a));
+  });
+
+  it('withBrevoSyncHash gắn userId + syncHash', () => {
+    const contact = mapUserToBrevoContact(readyUser())!;
+    const withHash = withBrevoSyncHash('user_1', contact);
+    expect(withHash.userId).toBe('user_1');
+    expect(withHash.syncHash).toBe(hashBrevoContact(contact));
   });
 });

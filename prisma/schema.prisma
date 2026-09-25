@@ -66,8 +66,50 @@ model User {
   talentPoolLogsActed        TalentPoolLog[]     @relation("TalentPoolLogActor")
   courseEnrollments          CourseEnrollment[]
 
+  // Brevo CRM sync tracking (payload hash of mapped whitelist attrs)
+  brevoSyncedAt DateTime?
+  brevoSyncHash String?
+
   @@index([slug])
+  @@index([brevoSyncedAt])
+  @@index([brevoSyncHash])
   @@map("users")
+}
+
+
+// Brevo CRM sync run report (ops observability)
+model BrevoSyncRun {
+  id                   String   @id @default(cuid())
+  mode                 String
+  startedAt            DateTime @default(now())
+  finishedAt           DateTime?
+  contactsAttempted    Int      @default(0)
+  importOk             Int      @default(0)
+  importFailed         Int      @default(0)
+  attrChunksOk         Int      @default(0)
+  attrChunksFailed     Int      @default(0)
+  createdMissing       Int      @default(0)
+  skippedInvalidEmail  Int      @default(0)
+  cvActivateCount      Int      @default(0)
+  dirtySelected        Int      @default(0)
+  exitCode             Int      @default(0)
+  failures             BrevoSyncFailure[]
+
+  @@index([startedAt])
+  @@map("brevo_sync_runs")
+}
+
+model BrevoSyncFailure {
+  id        String   @id @default(cuid())
+  runId     String
+  email     String
+  reason    String
+  createdAt DateTime @default(now())
+  run       BrevoSyncRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([email])
+  @@map("brevo_sync_failures")
 }
 
 // Email Verification Token

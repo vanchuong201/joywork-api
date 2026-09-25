@@ -17,6 +17,19 @@ export type BrevoImportResult = {
   status: string;
 };
 
+export type BrevoEmailFailure = {
+  email: string;
+  reason: string;
+};
+
+export type BrevoAttributesBatchResult = {
+  chunksOk: number;
+  chunksFailed: number;
+  createdMissing: number;
+  succeededEmails: string[];
+  failedEmails: BrevoEmailFailure[];
+};
+
 function getClient(): BrevoClient | null {
   if (!config.BREVO_API_KEY) {
     return null;
@@ -59,7 +72,7 @@ function formatBrevoError(err: unknown): string {
       detail = ` code=${body.code ?? ''} message=${body.message ?? ''}`;
     }
   }
-  return `${anyErr.message}${status}${detail}`.trim();
+  return `${anyErr.message}${status}${detail}`.trim().slice(0, 500);
 }
 
 function getErrorStatusCode(err: unknown): number | undefined {
@@ -137,14 +150,20 @@ async function createOrUpdateContact(
 async function updateContactsChunkWithRetry(
   client: BrevoClient,
   chunk: BrevoImportContact[],
-): Promise<{ createdMissing: number }> {
+): Promise<{
+  createdMissing: number;
+  succeededEmails: string[];
+  failedEmails: BrevoEmailFailure[];
+}> {
   let remaining = [...chunk];
   let createdMissing = 0;
+  const succeededEmails: string[] = [];
+  const failedEmails: BrevoEmailFailure[] = [];
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= UPDATE_MAX_RETRIES; attempt++) {
     if (remaining.length === 0) {
-      return { createdMissing };
+      return { createdMissing, succeededEmails, failedEmails };
     }
 
     try {
@@ -154,7 +173,8 @@ async function updateContactsChunkWithRetry(
           attributes: { CV_ACTIVATE: c.attributes.CV_ACTIVATE },
         })),
       });
-      return { createdMissing };
+      succeededEmails.push(...remaining.map((c) => c.email));
+      return { createdMissing, succeededEmails, failedEmails };
     } catch (err) {
       lastError = err;
       const status = getErrorStatusCode(err);
@@ -174,11 +194,11 @@ async function updateContactsChunkWithRetry(
           try {
             await createOrUpdateContact(client, contact);
             createdMissing++;
+            succeededEmails.push(contact.email);
           } catch (createErr) {
-            // Still count as failure for this contact; continue others.
-            console.error(
-              `[brevo] createContact failed email=${contact.email}: ${formatBrevoError(createErr)}`,
-            );
+            const reason = `createContact: ${formatBrevoError(createErr)}`;
+            console.error(`[brevo] createContact failed email=${contact.email}: ${reason}`);
+            failedEmails.push({ email: contact.email, reason });
           }
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
@@ -216,38 +236,52 @@ function dedupeContactsByEmail(contacts: BrevoImportContact[]): BrevoImportConta
  */
 export async function updateContactsAttributesBatch(
   contacts: BrevoImportContact[],
-): Promise<{ chunksOk: number; chunksFailed: number; createdMissing: number }> {
+): Promise<BrevoAttributesBatchResult> {
   const client = getClient();
   if (!client) {
     throw new Error('BREVO_API_KEY is not configured');
   }
   const uniqueContacts = dedupeContactsByEmail(contacts);
   if (uniqueContacts.length === 0) {
-    return { chunksOk: 0, chunksFailed: 0, createdMissing: 0 };
+    return {
+      chunksOk: 0,
+      chunksFailed: 0,
+      createdMissing: 0,
+      succeededEmails: [],
+      failedEmails: [],
+    };
   }
 
   let chunksOk = 0;
   let chunksFailed = 0;
   let createdMissing = 0;
+  const succeededEmails: string[] = [];
+  const failedEmails: BrevoEmailFailure[] = [];
 
   for (let i = 0; i < uniqueContacts.length; i += UPDATE_BATCH_SIZE) {
     const chunk = uniqueContacts.slice(i, i + UPDATE_BATCH_SIZE);
     try {
       const result = await updateContactsChunkWithRetry(client, chunk);
       createdMissing += result.createdMissing;
+      succeededEmails.push(...result.succeededEmails);
+      failedEmails.push(...result.failedEmails);
       chunksOk++;
     } catch (err) {
       chunksFailed++;
+      const reason = formatBrevoError(err);
       console.error(
-        `[brevo] updateBatchContacts failed chunk=${Math.floor(i / UPDATE_BATCH_SIZE) + 1} size=${chunk.length}: ${formatBrevoError(err)}`,
+        `[brevo] updateBatchContacts failed chunk=${Math.floor(i / UPDATE_BATCH_SIZE) + 1} size=${chunk.length}: ${reason}`,
       );
+      for (const contact of chunk) {
+        failedEmails.push({ email: contact.email, reason });
+      }
     }
     if (i + UPDATE_BATCH_SIZE < uniqueContacts.length) {
       await new Promise((resolve) => setTimeout(resolve, UPDATE_CHUNK_DELAY_MS));
     }
   }
 
-  return { chunksOk, chunksFailed, createdMissing };
+  return { chunksOk, chunksFailed, createdMissing, succeededEmails, failedEmails };
 }
 
 export async function getImportProcessStatus(processId: number): Promise<BrevoImportResult> {
