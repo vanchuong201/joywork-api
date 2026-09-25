@@ -61,6 +61,7 @@ async function main() {
           },
         },
         experiences: { select: { id: true } },
+        companies: { select: { id: true } },
       },
     });
     if (page.length === 0) break;

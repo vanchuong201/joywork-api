@@ -30,6 +30,8 @@ export type BrevoMapperUser = {
   phone?: string | null;
   profile?: BrevoMapperProfile | null;
   experiences?: unknown[] | null;
+  /** Company memberships — presence ⇒ ISEMPLOYER. */
+  companies?: unknown[] | null;
 };
 
 /** Whitelist attributes we write to Brevo (names must exist on the account). */
@@ -41,6 +43,10 @@ export type BrevoContactAttributes = {
   JOB_TITLE?: string;
   LINKEDIN?: string;
   CV_ACTIVATE: boolean;
+  /** Always true — every JoyWork user can be a candidate. */
+  ISCANDIDATE: boolean;
+  /** True when user has ≥1 company membership. */
+  ISEMPLOYER: boolean;
 };
 
 export type BrevoImportContact = {
@@ -131,6 +137,16 @@ export function isCvActivate(user: BrevoMapperUser): boolean {
   }).isReady;
 }
 
+/** Employer = member of at least one company. */
+export function isEmployer(user: BrevoMapperUser): boolean {
+  return (user.companies || []).length > 0;
+}
+
+/** Candidate flag — always true on JoyWork (employer can also be candidate). */
+export function isCandidate(_user: BrevoMapperUser): boolean {
+  return true;
+}
+
 export function isValidEmail(email: string): boolean {
   return EMAIL_RE.test(email.trim());
 }
@@ -154,6 +170,8 @@ export function mapUserToBrevoContact(user: BrevoMapperUser): BrevoImportContact
   const attributes: BrevoContactAttributes = {
     EXT_ID: user.id,
     CV_ACTIVATE: isCvActivate(user),
+    ISCANDIDATE: isCandidate(user),
+    ISEMPLOYER: isEmployer(user),
   };
 
   if (firstName) {

@@ -27,6 +27,7 @@ function readyUser(overrides: Partial<BrevoMapperUser> = {}): BrevoMapperUser {
       linkedin: 'https://linkedin.com/in/a',
     },
     experiences: [{ id: 'exp1' }],
+    companies: [],
     ...overrides,
     profile:
       overrides.profile === null
@@ -118,7 +119,7 @@ describe('isCvActivate', () => {
 });
 
 describe('mapUserToBrevoContact', () => {
-  it('map whitelist attributes + CV_ACTIVATE', () => {
+  it('map whitelist attributes + CV_ACTIVATE + role flags', () => {
     const contact = mapUserToBrevoContact(readyUser());
     expect(contact).toEqual({
       email: 'a@example.com',
@@ -130,13 +131,24 @@ describe('mapUserToBrevoContact', () => {
         JOB_TITLE: 'Developer',
         LINKEDIN: 'https://linkedin.com/in/a',
         CV_ACTIVATE: true,
+        ISCANDIDATE: true,
+        ISEMPLOYER: false,
       },
     });
+  });
+
+  it('ISEMPLOYER true khi có company membership; ISCANDIDATE vẫn true', () => {
+    const contact = mapUserToBrevoContact(
+      readyUser({ companies: [{ id: 'cm1' }] }),
+    );
+    expect(contact?.attributes.ISEMPLOYER).toBe(true);
+    expect(contact?.attributes.ISCANDIDATE).toBe(true);
   });
 
   it('CV_ACTIVATE false khi chưa sẵn sàng apply', () => {
     const contact = mapUserToBrevoContact(readyUser({ experiences: [] }));
     expect(contact?.attributes.CV_ACTIVATE).toBe(false);
+    expect(contact?.attributes.ISCANDIDATE).toBe(true);
   });
 
   it('null khi email không hợp lệ', () => {

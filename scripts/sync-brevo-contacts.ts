@@ -66,6 +66,7 @@ const USER_SELECT = {
     },
   },
   experiences: { select: { id: true } },
+  companies: { select: { id: true } },
 } as const;
 
 type SyncMode = 'incremental' | 'full';

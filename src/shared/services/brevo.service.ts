@@ -52,8 +52,24 @@ export function getBrevoListId(): number {
 function textAttributesForImport(
   attributes: BrevoImportContact['attributes'],
 ): Record<string, unknown> {
-  const { CV_ACTIVATE: _cvActivate, ...rest } = attributes;
+  const {
+    CV_ACTIVATE: _cvActivate,
+    ISCANDIDATE: _isCandidate,
+    ISEMPLOYER: _isEmployer,
+    ...rest
+  } = attributes;
   return rest;
+}
+
+/** Boolean attrs must go through contacts/batch — import drops them. */
+function booleanAttributesForBatch(
+  attributes: BrevoImportContact['attributes'],
+): Record<string, boolean> {
+  return {
+    CV_ACTIVATE: attributes.CV_ACTIVATE,
+    ISCANDIDATE: attributes.ISCANDIDATE,
+    ISEMPLOYER: attributes.ISEMPLOYER,
+  };
 }
 
 function formatBrevoError(err: unknown): string {
@@ -140,8 +156,8 @@ async function createOrUpdateContact(
     email: contact.email,
     attributes: {
       ...textAttributesForImport(contact.attributes),
-      CV_ACTIVATE: contact.attributes.CV_ACTIVATE,
-    },
+      ...booleanAttributesForBatch(contact.attributes),
+    } as Record<string, string | number | boolean>,
     listIds: [listId],
     updateEnabled: true,
   });
@@ -170,7 +186,7 @@ async function updateContactsChunkWithRetry(
       await client.contacts.updateBatchContacts({
         contacts: remaining.map((c) => ({
           email: c.email,
-          attributes: { CV_ACTIVATE: c.attributes.CV_ACTIVATE },
+          attributes: booleanAttributesForBatch(c.attributes),
         })),
       });
       succeededEmails.push(...remaining.map((c) => c.email));
