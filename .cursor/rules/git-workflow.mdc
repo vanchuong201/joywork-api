@@ -7,6 +7,10 @@ alwaysApply: true
 
 Đọc đầy đủ: `deploy/GIT_WORKFLOW.md` (repo deploy trong workspace).
 
+## Deploy / release (bắt buộc)
+
+Khi user yêu cầu deploy hoặc release staging/production → đọc và làm theo skill Cursor `joywork-deploy` (`~/.cursor/skills/joywork-deploy/SKILL.md`) trước khi chạy `gh`. Release chuẩn không bỏ bước tag + Create Release.
+
 ## Nhánh
 
 - `develop` = làm việc hàng ngày → **push** → auto deploy **staging**
