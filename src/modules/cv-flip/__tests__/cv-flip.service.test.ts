@@ -28,8 +28,19 @@ vi.mock('@/shared/database/prisma', () => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       count: vi.fn(),
+      create: vi.fn(),
+    },
+    cvFlipUsage: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+    },
+    companyFeatureEntitlement: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
     },
     $queryRaw: vi.fn(),
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(),
   },
 }));
 
@@ -424,5 +435,73 @@ describe('CvFlipService.consumeEmailAction', () => {
       where: { id: 'req-1' },
       data: { status: 'REJECTED', respondedAt: expect.any(Date) },
     });
+  });
+});
+
+describe('CvFlipService.flipCandidate (mở trực tiếp)', () => {
+  const companyId = 'clxxxxxxxxxxxxxxxxxxxxxx1';
+  const actorId = 'clxxxxxxxxxxxxxxxxxxxxxx2';
+  const candidateUserId = 'clxxxxxxxxxxxxxxxxxxxxxx3';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.companyMember.findFirst).mockResolvedValue({ id: 'member-1' } as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: candidateUserId,
+      slug: 'ung-vien',
+      name: 'Ứng viên',
+      accountStatus: 'ACTIVE',
+      profile: { id: 'p-1', isSearchingJob: true, allowCvFlip: true, defaultCvId: 'cv-1' },
+    } as never);
+    vi.mocked(prisma.companyFeatureEntitlement.findUnique).mockResolvedValue({
+      enabled: true,
+      metadata: { monthlyTotalLimit: 2 },
+      expiresAt: null,
+    } as never);
+    vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: typeof prisma) => unknown) =>
+      fn(prisma)) as never);
+    vi.mocked(prisma.cvFlipRequest.updateMany).mockResolvedValue({ count: 0 } as never);
+  });
+
+  it('khóa lượt theo công ty và chặn khi request song song đã dùng hết lượt', async () => {
+    vi.mocked(prisma.cvFlipConnection.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.cvFlipUsage.findUnique)
+      .mockResolvedValueOnce({ totalCount: 1, requestCount: 0 } as never)
+      .mockResolvedValueOnce({ totalCount: 2 } as never);
+
+    await expect(service.flipCandidate(actorId, { companyId, candidateUserId })).rejects.toMatchObject({
+      statusCode: 429,
+      code: 'CV_FLIP_TOTAL_LIMIT_REACHED',
+    });
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(prisma.cvFlipConnection.create).not.toHaveBeenCalled();
+    expect(prisma.cvFlipUsage.upsert).not.toHaveBeenCalled();
+  });
+
+  it('không tính thêm lượt khi request song song đã mở CV', async () => {
+    vi.mocked(prisma.cvFlipConnection.findUnique)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'conn-1', flippedAt: new Date('2026-09-01') } as never);
+    vi.mocked(prisma.cvFlipUsage.findUnique).mockResolvedValue({ totalCount: 1, requestCount: 0 } as never);
+
+    const result = await service.flipCandidate(actorId, { companyId, candidateUserId });
+
+    expect(result).toMatchObject({ status: 'ALREADY_FLIPPED', connectionId: 'conn-1' });
+    expect(prisma.cvFlipConnection.create).not.toHaveBeenCalled();
+    expect(prisma.cvFlipUsage.upsert).not.toHaveBeenCalled();
+  });
+
+  it('mở thành công và tăng lượt khi còn hạn mức', async () => {
+    vi.mocked(prisma.cvFlipConnection.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.cvFlipUsage.findUnique).mockResolvedValue({ totalCount: 0, requestCount: 0 } as never);
+    vi.mocked(prisma.cvFlipConnection.create).mockResolvedValue({
+      id: 'conn-2',
+      flippedAt: new Date('2026-09-02'),
+    } as never);
+
+    const result = await service.flipCandidate(actorId, { companyId, candidateUserId });
+
+    expect(result).toMatchObject({ status: 'FLIPPED', connectionId: 'conn-2' });
+    expect(prisma.cvFlipUsage.upsert).toHaveBeenCalledTimes(1);
   });
 });

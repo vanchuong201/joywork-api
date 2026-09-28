@@ -1,10 +1,10 @@
 import { Prisma } from '@prisma/client';
+import { omitUndefined } from '@/shared/utils';
 import type { CandidateCv, CandidateCvEducation, CandidateCvExperience } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { resolveLocationsWithWards } from '@/shared/wards';
-import { removeUndefined } from '@/shared/utils';
 import {
   evaluateCandidateCvReadiness,
   type CandidateCvReadinessResult,
@@ -582,7 +582,16 @@ export class CandidateCvService {
     if (!existing) throw new AppError('Experience not found', 404, 'EXPERIENCE_NOT_FOUND');
     const updated = await prisma.candidateCvExperience.update({
       where: { id: itemId },
-      data: removeUndefined(data) as Prisma.CandidateCvExperienceUpdateInput,
+      data: omitUndefined({
+        role: data.role,
+        company: data.company,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        period: data.period,
+        desc: data.desc,
+        achievements: data.achievements,
+        order: data.order,
+      }),
     });
     await this.touchCv(cvId, userId);
     return serializeCvExperience(updated);
@@ -629,7 +638,16 @@ export class CandidateCvService {
     if (!existing) throw new AppError('Education not found', 404, 'EDUCATION_NOT_FOUND');
     const updated = await prisma.candidateCvEducation.update({
       where: { id: itemId },
-      data: removeUndefined(data) as Prisma.CandidateCvEducationUpdateInput,
+      data: omitUndefined({
+        school: data.school,
+        degree: data.degree,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        period: data.period,
+        gpa: data.gpa,
+        honors: data.honors,
+        order: data.order,
+      }),
     });
     await this.touchCv(cvId, userId);
     return serializeCvEducation(updated);

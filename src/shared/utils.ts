@@ -8,3 +8,17 @@ export function removeUndefined<T extends Record<string, any>>(obj: T): Partial<
   return result;
 }
 
+/** Bỏ key có giá trị `undefined`, giữ kiểu từng field (tương thích `exactOptionalPropertyTypes`). */
+export function omitUndefined<T extends Record<string, unknown>>(
+  obj: T
+): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  const result: { [K in keyof T]?: Exclude<T[K], undefined> } = {};
+  for (const key of Object.keys(obj) as Array<keyof T>) {
+    const value = obj[key];
+    if (value !== undefined) {
+      result[key] = value as Exclude<T[keyof T], undefined>;
+    }
+  }
+  return result;
+}
+

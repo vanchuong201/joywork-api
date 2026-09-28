@@ -81,6 +81,16 @@ const addDays = (date: Date, days: number): Date => {
   return result;
 };
 
+/** Tuần tự hóa việc tiêu lượt mở CV của một công ty trong một chu kỳ (tránh vượt giới hạn khi mở đồng thời). */
+const lockCompanyFlipUsage = async (
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  companyId: string,
+  month: number,
+  year: number
+): Promise<void> => {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`cv-flip-usage:${companyId}:${year}-${month}`}))`;
+};
+
 const profileUrl = (slug: string | null): string => {
   const base = config.FRONTEND_ORIGIN || 'https://joywork.vn';
   return slug ? `${base}/candidates/${slug}` : `${base}/account/profile`;
@@ -970,6 +980,25 @@ export class CvFlipService {
 
     if (candidate.profile.allowCvFlip) {
       const flipped = await prisma.$transaction(async (tx) => {
+        await lockCompanyFlipUsage(tx, companyId, month, year);
+
+        const lockedConnection = await tx.cvFlipConnection.findUnique({
+          where: { companyId_userId: { companyId, userId: candidateUserId } },
+          select: { id: true, flippedAt: true },
+        });
+        if (lockedConnection) {
+          return { connection: lockedConnection, created: false, nextTotal: null };
+        }
+
+        const lockedUsage = await tx.cvFlipUsage.findUnique({
+          where: { companyId_month_year: { companyId, month, year } },
+          select: { totalCount: true },
+        });
+        const lockedTotal = lockedUsage?.totalCount ?? 0;
+        if (lockedTotal >= limits.monthlyTotalLimit) {
+          throw new AppError('Doanh nghiệp đã hết tổng lượt mở CV trong tháng', 429, 'CV_FLIP_TOTAL_LIMIT_REACHED');
+        }
+
         const connection = await tx.cvFlipConnection.create({
           data: {
             companyId,
@@ -988,17 +1017,25 @@ export class CvFlipService {
           update: { totalCount: { increment: 1 } },
         });
 
-        return connection;
+        return { connection, created: true, nextTotal: lockedTotal + 1 };
       });
 
-      if (totalCount + 1 >= limits.monthlyTotalLimit) {
+      if (!flipped.created) {
+        return {
+          status: 'ALREADY_FLIPPED' as const,
+          connectionId: flipped.connection.id,
+          flippedAt: flipped.connection.flippedAt,
+        };
+      }
+
+      if (flipped.nextTotal !== null && flipped.nextTotal >= limits.monthlyTotalLimit) {
         await this.expirePendingRequestsForCompany(companyId);
       }
 
       return {
         status: 'FLIPPED' as const,
-        connectionId: flipped.id,
-        flippedAt: flipped.flippedAt,
+        connectionId: flipped.connection.id,
+        flippedAt: flipped.connection.flippedAt,
       };
     }
 
@@ -1483,6 +1520,7 @@ export class CvFlipService {
       }
 
       const { month, year } = getCyclePeriod(limits.cycleStartDay, now);
+      await lockCompanyFlipUsage(tx, request.companyId, month, year);
       const usage = await tx.cvFlipUsage.findUnique({
         where: { companyId_month_year: { companyId: request.companyId, month, year } },
         select: { totalCount: true, requestCount: true },
