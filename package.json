@@ -19,7 +19,7 @@
     "verify:email": "tsx scripts/verify-email.ts",
     "verify:cv-avatar": "tsx scripts/verify-cv-avatar.ts",
     "seed:jobs": "tsx scripts/seed-jobs.ts",
-    "es:reindex": "tsx scripts/reindex-es.ts",
+    "es:reindex": "npx tsx scripts/reindex-es.ts",
     "seed:candidates": "tsx scripts/seed-candidate-users.ts",
     "migrate:location-codes": "tsx scripts/migrate-location-codes.ts",
     "embed:backfill": "tsx scripts/backfill-embeddings.ts",
