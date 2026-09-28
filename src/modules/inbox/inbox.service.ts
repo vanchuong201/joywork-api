@@ -8,6 +8,7 @@ import {
   MarkConversationReadInput,
   GetUnreadCountInput,
 } from './inbox.schema';
+import { loadApplicationHistory, resolveReapplyInfo } from '@/shared/applications/application-snapshot';
 
 export interface Message {
   id: string;
@@ -85,6 +86,7 @@ export interface Conversation {
     id: string;
     status: string;
     appliedAt: Date;
+    reapplyIndex: number;
   };
 }
 
@@ -190,7 +192,8 @@ export class InboxService {
           sender.profile = {
             id: message.sender.profile.id,
           };
-          if (message.sender.profile.defaultCv?.avatar) sender.profile.avatar = message.sender.profile.defaultCv.avatar;
+          const avatar = message.sender.avatar ?? message.sender.profile.defaultCv?.avatar;
+          if (avatar) sender.profile.avatar = avatar;
         }
         return sender;
       })(),
@@ -324,7 +327,7 @@ export class InboxService {
           ...(message.sender.name ? { name: message.sender.name } : {}),
           profile: message.sender.profile ? {
             id: message.sender.profile.id,
-            avatar: message.sender.profile.defaultCv?.avatar ?? undefined,
+            avatar: message.sender.avatar ?? message.sender.profile.defaultCv?.avatar ?? undefined,
           } : undefined,
         },
         application: {
@@ -452,6 +455,7 @@ export class InboxService {
       },
     });
 
+    const history = await loadApplicationHistory(applications);
     const totalPages = Math.ceil(total / limit);
 
     return {
@@ -481,13 +485,14 @@ export class InboxService {
           name: app.user.name,
           email: app.user.email,
           profile: app.user.profile
-            ? { id: app.user.profile.id, avatar: app.user.profile.defaultCv?.avatar ?? undefined }
+            ? { id: app.user.profile.id, avatar: app.user.avatar ?? app.user.profile.defaultCv?.avatar ?? undefined }
             : undefined,
         },
         application: {
           id: app.id,
           status: app.status,
           appliedAt: app.appliedAt,
+          reapplyIndex: resolveReapplyInfo(history, app).reapplyIndex,
         },
       })),
       pagination: {

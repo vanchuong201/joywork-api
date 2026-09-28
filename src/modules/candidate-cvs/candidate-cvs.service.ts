@@ -32,7 +32,7 @@ type ReadinessAccount = { name: string | null; email: string | null; phone: stri
 
 export const CV_SECTION_ORDER_BY = [{ order: 'asc' as const }, { startDate: 'desc' as const }];
 
-const CV_WITH_SECTIONS_INCLUDE = {
+export const CV_WITH_SECTIONS_INCLUDE = {
   experiences: { orderBy: CV_SECTION_ORDER_BY },
   educations: { orderBy: CV_SECTION_ORDER_BY },
 } satisfies Prisma.CandidateCvInclude;
@@ -69,7 +69,7 @@ const SCALAR_CONTENT_FIELDS = [
   'specificAddress',
 ] as const;
 
-const cvNotFound = () => new AppError('CV không tồn tại', 404, 'CV_NOT_FOUND');
+export const cvNotFound = () => new AppError('CV không tồn tại', 404, 'CV_NOT_FOUND');
 
 export const cvLimitReached = () =>
   new AppError(`Bạn đã đạt giới hạn ${CV_LIMIT} CV`, 409, 'CV_LIMIT_REACHED');

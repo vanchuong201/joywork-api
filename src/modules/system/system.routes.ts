@@ -289,7 +289,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
                     companies: { type: 'number' },
                     posts: { type: 'number' },
                     jobs: { type: 'number' },
-                    applications: { type: 'number' },
+                    applications: { type: 'number', description: 'Số đơn ứng tuyển (mỗi lần ứng tuyển lại tính là 1 đơn)' },
                     follows: { type: 'number' },
                     jobFavorites: { type: 'number' },
                   },
@@ -1225,6 +1225,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
                 },
                 applications: {
                   type: 'array',
+                  description: 'Số đơn ứng tuyển theo ngày (mỗi lần ứng tuyển lại tính là 1 đơn)',
                   items: {
                     type: 'object',
                     properties: {

@@ -4,6 +4,11 @@ import { WARD_BY_CODE } from '@/shared/wards';
 import { CvFlipService } from '@/modules/cv-flip/cv-flip.service';
 import { UserProfileService } from '@/modules/users/user-profile.service';
 import {
+  applySnapshotVisibility,
+  ensureApplicationSnapshot,
+  findReviewableApplication,
+} from '@/shared/applications/application-snapshot';
+import {
   CvPdfContactItem,
   CvPdfDocument,
   CvPdfEducationItem,
@@ -651,6 +656,83 @@ export class CvExportsService {
       buffer,
       fileName: buildCvFileName(fileNameBase, document.title),
       masked: identityMasked,
+    };
+  }
+
+  /** DN xuất CV của đơn ứng tuyển — nội dung từ snapshot lúc ứng tuyển, liên hệ đầy đủ. */
+  async exportApplicationCvPdf(params: {
+    applicationId: string;
+    viewerUserId: string;
+  }): Promise<ExportPdfResult> {
+    const application = await findReviewableApplication(params.applicationId, params.viewerUserId);
+    const rawSnapshot = await ensureApplicationSnapshot(application);
+    if (!rawSnapshot) {
+      throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'PROFILE_NOT_FOUND');
+    }
+    const snapshot = applySnapshotVisibility(rawSnapshot);
+    const content = snapshot.content as unknown as LooseRecord;
+
+    const displayName =
+      toOptionalSanitized(snapshot.content.fullName) ??
+      toOptionalSanitized(snapshot.account.name) ??
+      'Ứng viên';
+
+    const contactItems: CvPdfContactItem[] = [];
+    const contactEmail =
+      toOptionalSanitized(snapshot.content.contactEmail) ??
+      toOptionalSanitized(snapshot.account.email);
+    if (contactEmail) {
+      contactItems.push({ label: 'Email', value: contactEmail });
+    }
+    const contactPhone =
+      toOptionalSanitized(snapshot.content.contactPhone) ??
+      toOptionalSanitized(snapshot.account.phone);
+    if (contactPhone) {
+      contactItems.push({ label: 'Điện thoại', value: contactPhone });
+    }
+    const links: Array<[string, string | null]> = [
+      ['Website/Portfolio', snapshot.content.website],
+      ['LinkedIn', snapshot.content.linkedin],
+      ['GitHub', snapshot.content.github],
+    ];
+    for (const [label, raw] of links) {
+      const value = toOptionalSanitized(raw);
+      if (value && isLikelyHttpUrl(value)) {
+        contactItems.push({ label, value });
+      }
+    }
+    const addressValue = buildAddressValue(content);
+    if (addressValue) {
+      contactItems.push({ label: 'Khu vực', value: addressValue });
+    }
+    const birthDate = formatBirthDate(content);
+    if (birthDate) {
+      contactItems.push({ label: 'Ngày sinh', value: birthDate });
+    }
+
+    const document: CvPdfDocument = {
+      generatedAt: new Date(),
+      displayName,
+      title: toOptionalSanitized(snapshot.content.title),
+      headline: toOptionalSanitized(snapshot.content.headline),
+      masked: false,
+      privacyNote: null,
+      contactItems,
+      summary: toOptionalSanitized(snapshot.content.bio),
+      knowledge: asStringArray(snapshot.content.knowledge),
+      skills: asStringArray(snapshot.content.skills),
+      attitude: asStringArray(snapshot.content.attitude),
+      expectations: buildExpectations(content),
+      careerGoals: asStringArray(snapshot.content.careerGoals),
+      experiences: mapExperiences(snapshot.experiences),
+      educations: mapEducations(snapshot.educations),
+    };
+
+    const buffer = await renderCvPdf(document);
+    return {
+      buffer,
+      fileName: buildCvFileName(displayName, document.title),
+      masked: false,
     };
   }
 }

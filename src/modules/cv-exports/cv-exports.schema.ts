@@ -20,3 +20,7 @@ export const exportOwnPdfQuerySchema = z.object({
 });
 
 export type ExportOwnPdfQuery = z.infer<typeof exportOwnPdfQuerySchema>;
+
+export const exportApplicationPdfParamsSchema = z.object({
+  applicationId: z.string().trim().min(1).max(64),
+});

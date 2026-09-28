@@ -173,6 +173,7 @@ export const searchJobsSchema = z.object({
 // Apply job schema
 export const applyJobSchema = z.object({
   jobId: z.string().cuid('Invalid job ID'),
+  cvId: z.string().trim().min(1).max(64).optional(),
   coverLetter: z.string().max(2000, 'Cover letter must be less than 2000 characters').optional(),
   resumeUrl: z.string().url('Invalid resume URL').optional(),
 });
@@ -184,6 +185,10 @@ export const getApplicationsSchema = z.object({
   status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
+});
+
+export const applicationIdParamsSchema = z.object({
+  applicationId: z.string().trim().min(1).max(64),
 });
 
 // Update application status schema

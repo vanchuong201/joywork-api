@@ -455,6 +455,18 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       },
                     },
                     hasApplied: { type: 'boolean' },
+                    openApplications: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          sourceCvId: { type: 'string', nullable: true },
+                          status: { type: 'string' },
+                          appliedAt: { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -626,6 +638,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           jobId: { type: 'string', description: 'Job ID to apply for' },
           coverLetter: { type: 'string', maxLength: 2000, description: 'Cover letter' },
           resumeUrl: { type: 'string', format: 'uri', description: 'Resume URL' },
+          cvId: { type: 'string', maxLength: 64, description: 'CV dùng để ứng tuyển (mặc định: CV mặc định)' },
         },
       },
       response: {
@@ -636,6 +649,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
               type: 'object',
               properties: {
                 message: { type: 'string' },
+                applicationId: { type: 'string' },
               },
             },
           },
@@ -686,10 +700,29 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       notes: { type: 'string', nullable: true },
                       appliedAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      sourceCvId: { type: 'string', nullable: true },
+                      sourceCvName: { type: 'string', nullable: true },
+                      snapshotAt: { type: 'string', nullable: true },
+                      snapshotSource: { type: 'string', nullable: true },
+                      reapplyIndex: { type: 'number' },
+                      previousApplications: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            status: { type: 'string' },
+                            appliedAt: { type: 'string', format: 'date-time' },
+                            sourceCvId: { type: 'string', nullable: true },
+                            sourceCvName: { type: 'string', nullable: true },
+                          },
+                        },
+                      },
                       job: {
                         type: 'object',
                         properties: {
                           id: { type: 'string' },
+                          slug: { type: 'string' },
                           title: { type: 'string' },
                           company: {
                             type: 'object',
@@ -718,6 +751,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                               headline: { type: 'string', nullable: true },
                               avatar: { type: 'string', nullable: true },
                               cvUrl: { type: 'string', nullable: true },
+                              title: { type: 'string', nullable: true },
                             },
                           },
                         },
@@ -741,6 +775,86 @@ export async function jobsRoutes(fastify: FastifyInstance) {
       },
     },
   }, jobsController.getApplications.bind(jobsController));
+
+  // Get application detail (company)
+  fastify.get('/applications/:applicationId', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Chi tiết đơn ứng tuyển kèm snapshot CV tại thời điểm ứng tuyển',
+      tags: ['Jobs'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          applicationId: { type: 'string', description: 'Application ID' },
+        },
+        required: ['applicationId'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                application: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    jobId: { type: 'string' },
+                    userId: { type: 'string' },
+                    status: { type: 'string' },
+                    coverLetter: { type: 'string', nullable: true },
+                    resumeUrl: { type: 'string', nullable: true },
+                    notes: { type: 'string', nullable: true },
+                    appliedAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' },
+                    sourceCvId: { type: 'string', nullable: true },
+                    reapplyIndex: { type: 'number' },
+                    job: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        slug: { type: 'string' },
+                        title: { type: 'string' },
+                        company: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            name: { type: 'string' },
+                            slug: { type: 'string' },
+                            logoUrl: { type: 'string', nullable: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                snapshot: {
+                  type: 'object',
+                  nullable: true,
+                  additionalProperties: true,
+                },
+                previousApplications: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      status: { type: 'string' },
+                      appliedAt: { type: 'string', format: 'date-time' },
+                      sourceCvId: { type: 'string', nullable: true },
+                      sourceCvName: { type: 'string', nullable: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, jobsController.getApplicationDetail.bind(jobsController));
 
   // Update application status
   fastify.patch('/applications/:applicationId/status', {
@@ -824,6 +938,9 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       notes: { type: 'string', nullable: true },
                       appliedAt: { type: 'string', format: 'date-time' },
                       updatedAt: { type: 'string', format: 'date-time' },
+                      sourceCvId: { type: 'string', nullable: true },
+                      sourceCvName: { type: 'string', nullable: true },
+                      reapplyIndex: { type: 'number' },
                       job: {
                         type: 'object',
                         properties: {

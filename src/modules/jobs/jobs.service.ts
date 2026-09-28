@@ -1,4 +1,4 @@
-import { NotificationType, Prisma, CompanyBadgeType } from '@prisma/client';
+import { ApplicationStatus, NotificationType, Prisma, CompanyBadgeType } from '@prisma/client';
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
@@ -13,7 +13,22 @@ import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/ser
 import { notificationService } from '@/shared/services/notification.service';
 import { slugifyVietnamese } from '@/shared/job-slug';
 import { generateAndStoreJobEmbedding, generateEmbedding } from '@/shared/services/embedding.service';
-import { evaluateCandidateCvReadiness } from '@/shared/candidates/cv-readiness';
+import {
+  CandidateCvService,
+  CV_WITH_SECTIONS_INCLUDE,
+  cvNotFound,
+  evaluateCvReadiness,
+} from '@/modules/candidate-cvs/candidate-cvs.service';
+import { buildCvSnapshot, CV_SNAPSHOT_VERSION, parseCvSnapshot } from '@/modules/candidate-cvs/cv-snapshot';
+import {
+  applySnapshotVisibility,
+  canReviewCompanyApplications,
+  ensureApplicationSnapshot,
+  findReviewableApplication,
+  loadApplicationHistory,
+  resolveReapplyInfo,
+  summarizeSnapshot,
+} from '@/shared/applications/application-snapshot';
 import { companyBadgesSelect, parseCompanyBadgeTypes, toBadgeTypes } from '@/shared/company-badges';
 import {
   CreateJobInput,
@@ -135,58 +150,19 @@ export interface JobFavorite {
   };
 }
 
+const CLOSED_APPLICATION_STATUSES: ApplicationStatus[] = ['NOT_SUITABLE', 'HIRED'];
+
 export class JobsService {
-  private async assertApplicantCvReady(userId: string): Promise<void> {
-    const userCvData = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        name: true,
-        email: true,
-        phone: true,
-        profile: {
-          select: {
-            defaultCv: {
-              select: {
-                avatar: true,
-                fullName: true,
-                title: true,
-                bio: true,
-                contactEmail: true,
-                contactPhone: true,
-                locations: true,
-                knowledge: true,
-                skills: true,
-                attitude: true,
-                _count: { select: { experiences: true } },
-              },
-            },
-          },
-        },
-      },
+  constructor(private cvService: CandidateCvService = new CandidateCvService()) {}
+
+  private async getAppliedJobIds(userId: string | undefined, jobIds: string[]): Promise<Set<string>> {
+    if (!userId || jobIds.length === 0) return new Set();
+    const rows = await prisma.application.findMany({
+      where: { userId, jobId: { in: jobIds } },
+      select: { jobId: true },
+      distinct: ['jobId'],
     });
-
-    if (!userCvData) {
-      throw new AppError('Không tìm thấy ứng viên', 404, 'USER_NOT_FOUND');
-    }
-
-    const cv = userCvData.profile?.defaultCv ?? null;
-    const readiness = evaluateCandidateCvReadiness({
-      name: userCvData.name,
-      email: userCvData.email,
-      phone: userCvData.phone,
-      profile: cv,
-      experiencesCount: cv?._count.experiences ?? 0,
-    });
-
-    if (readiness.isReady) {
-      return;
-    }
-
-    throw new AppError(
-      `Bạn cần cập nhật ${readiness.missingSections.join(', ')} trước khi ứng tuyển`,
-      400,
-      'CV_PROFILE_INCOMPLETE'
-    );
+    return new Set(rows.map((row) => row.jobId));
   }
 
   // Create job
@@ -636,19 +612,17 @@ export class JobsService {
       return null;
     }
 
-    // Check if user has applied for this job
-    let hasApplied = false;
-    if (userId) {
-      const application = await prisma.application.findUnique({
-        where: {
-          userId_jobId: {
-            userId,
-            jobId,
-          },
-        },
-      });
-      hasApplied = !!application;
-    }
+    const myApplications = userId
+      ? await prisma.application.findMany({
+          where: { userId, jobId },
+          orderBy: { appliedAt: 'asc' },
+          select: { id: true, sourceCvId: true, status: true, appliedAt: true },
+        })
+      : [];
+    const hasApplied = myApplications.length > 0;
+    const openApplications = myApplications.filter(
+      (app) => !CLOSED_APPLICATION_STATUSES.includes(app.status)
+    );
 
     const result: any = {
       id: job.id,
@@ -675,6 +649,7 @@ export class JobsService {
       },
       _count: job._count,
       hasApplied,
+      ...(userId ? { openApplications } : {}),
       // Header fields
       department: job.department,
       jobLevel: job.jobLevel,
@@ -1136,21 +1111,10 @@ export class JobsService {
 
     const totalPages = Math.ceil(total / limit);
 
-    // Check if user has applied for each job
+    const appliedJobIds = await this.getAppliedJobIds(userId, jobs.map((job) => job.id));
     const jobsWithApplications: JobWithApplication[] = [];
     for (const job of jobs) {
-      let hasApplied = false;
-      if (userId) {
-        const application = await prisma.application.findUnique({
-          where: {
-            userId_jobId: {
-              userId,
-              jobId: job.id,
-            },
-          },
-        });
-        hasApplied = !!application;
-      }
+      const hasApplied = appliedJobIds.has(job.id);
 
       const jobResult: any = {
         id: job.id,
@@ -1223,7 +1187,7 @@ export class JobsService {
   }
 
   // Apply for job
-  async applyForJob(userId: string, data: ApplyJobInput): Promise<void> {
+  async applyForJob(userId: string, data: ApplyJobInput): Promise<{ applicationId: string }> {
     // Check if job exists and is active
     const job = await prisma.job.findUnique({
       where: { id: data.jobId },
@@ -1250,40 +1214,67 @@ export class JobsService {
       throw new AppError('Đã hết hạn ứng tuyển cho việc làm này', 400, 'APPLICATION_DEADLINE_PASSED');
     }
 
-    // Check if user has already applied
-    const existingApplication = await prisma.application.findUnique({
-      where: {
-        userId_jobId: {
+    const targetCvId = await this.cvService.resolveTargetCvId(userId, data.cvId);
+
+    const { createdApplication, applicant, previousApplicationIds } = await prisma.$transaction(async (tx) => {
+      // Không còn unique (userId, jobId): khóa theo cặp để chặn double-submit.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`apply:${userId}:${job.id}`}))`;
+
+      const cv = await tx.candidateCv.findFirst({
+        where: { id: targetCvId, userId },
+        include: CV_WITH_SECTIONS_INCLUDE,
+      });
+      if (!cv) throw cvNotFound();
+
+      const account = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, phone: true, slug: true },
+      });
+
+      const readiness = evaluateCvReadiness(cv, account, cv.experiences.length);
+      if (!readiness.isReady) {
+        throw new AppError(
+          `Bạn cần cập nhật ${readiness.missingSections.join(', ')} trước khi ứng tuyển`,
+          400,
+          'CV_PROFILE_INCOMPLETE'
+        );
+      }
+
+      const previous = await tx.application.findMany({
+        where: { userId, jobId: job.id },
+        orderBy: { appliedAt: 'asc' },
+        select: { id: true, status: true, sourceCvId: true },
+      });
+      const hasOpenWithSameCv = previous.some(
+        (app) => app.sourceCvId === cv.id && !CLOSED_APPLICATION_STATUSES.includes(app.status)
+      );
+      if (hasOpenWithSameCv) {
+        throw new AppError(
+          'Bạn đã ứng tuyển vị trí này bằng CV này. Hãy chọn CV khác hoặc chờ nhà tuyển dụng phản hồi.',
+          409,
+          'ALREADY_APPLIED_SAME_CV'
+        );
+      }
+
+      const snapshot = buildCvSnapshot({ cv, account, source: 'apply' });
+      const created = await tx.application.create({
+        data: {
           userId,
-          jobId: data.jobId,
+          jobId: job.id,
+          coverLetter: data.coverLetter ?? null,
+          resumeUrl: data.resumeUrl ?? null,
+          status: 'RECEIVED',
+          sourceCvId: cv.id,
+          cvSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+          cvSnapshotVersion: CV_SNAPSHOT_VERSION,
         },
-      },
-    });
+      });
 
-    if (existingApplication) {
-      throw new AppError('Lỗi: Bạn đã từng ứng tuyển cho vị trí này rồi', 409, 'ALREADY_APPLIED');
-    }
-
-    await this.assertApplicantCvReady(userId);
-
-    const applicant = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
-    });
-
-    // Create application
-    const createdApplication = await prisma.application.create({
-      data: {
-        userId,
-        jobId: data.jobId,
-        coverLetter: data.coverLetter ?? null,
-        resumeUrl: data.resumeUrl ?? null,
-        status: 'RECEIVED',
-      },
+      return {
+        createdApplication: created,
+        applicant: account,
+        previousApplicationIds: previous.map((app) => app.id),
+      };
     });
 
     const interactionData: Record<string, unknown> = {
@@ -1314,6 +1305,7 @@ export class JobsService {
     const companyAdminIds = companyAdmins.map((member) => member.userId);
     const applicantName = applicant?.name || applicant?.email || 'Ứng viên';
     const manageApplicationsUrl = `${config.FRONTEND_ORIGIN}/companies/${job.company.slug}/manage?tab=applications&jobId=${job.id}`;
+    const applicationDetailPath = `/companies/${job.company.slug}/manage/applications/${createdApplication.id}`;
     const appliedAtLabel = createdApplication.appliedAt.toLocaleString('vi-VN');
 
     if (companyAdminIds.length > 0) {
@@ -1327,6 +1319,9 @@ export class JobsService {
             jobId: job.id,
             companyId: job.company.id,
             applicantId: userId,
+            reapplyIndex: previousApplicationIds.length + 1,
+            previousApplicationIds,
+            targetUrl: applicationDetailPath,
           },
           relatedEntityType: 'APPLICATION',
           relatedEntityId: createdApplication.id,
@@ -1355,9 +1350,11 @@ export class JobsService {
         );
       }
     }
+
+    return { applicationId: createdApplication.id };
   }
 
-  // Get applications
+  // Get applications (DN) — bắt buộc companyId hoặc jobId; hiển thị theo snapshot đơn.
   async getApplications(data: GetApplicationsInput, userId: string): Promise<{
     applications: Application[];
     pagination: {
@@ -1370,37 +1367,27 @@ export class JobsService {
     const { jobId, companyId, status, page, limit } = data;
     const skip = (page - 1) * limit;
 
-    // Build where clause
-    const where: any = {};
-
-    if (jobId) {
-      where.jobId = jobId;
-    }
-
-    if (companyId) {
-      // Check if user is member of company
-      const membership = await prisma.companyMember.findFirst({
-        where: {
-          userId,
-          companyId,
-          role: { in: ['OWNER', 'ADMIN', 'MEMBER'] },
-        },
-      });
-
-      if (!membership) {
+    let scopeCompanyId = companyId;
+    if (!scopeCompanyId) {
+      if (!jobId) {
+        throw new AppError('companyId hoặc jobId là bắt buộc', 400, 'COMPANY_OR_JOB_REQUIRED');
+      }
+      const job = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true } });
+      if (!job) {
         throw new AppError('You do not have permission to view applications for this company', 403, 'FORBIDDEN');
       }
-
-      where.job = {
-        companyId,
-      };
+      scopeCompanyId = job.companyId;
+    }
+    if (!(await canReviewCompanyApplications(userId, scopeCompanyId))) {
+      throw new AppError('You do not have permission to view applications for this company', 403, 'FORBIDDEN');
     }
 
-    if (status) {
-      where.status = status;
-    }
+    const where: Prisma.ApplicationWhereInput = {
+      job: { companyId: scopeCompanyId },
+      ...(jobId ? { jobId } : {}),
+      ...(status ? { status } : {}),
+    };
 
-    // Get applications with pagination
     const [applications, total] = await Promise.all([
       prisma.application.findMany({
         where,
@@ -1436,50 +1423,100 @@ export class JobsService {
       prisma.application.count({ where }),
     ]);
 
+    const history = await loadApplicationHistory(applications);
     const totalPages = Math.ceil(total / limit);
 
     return {
-      applications: applications.map((app): any => ({
-        id: app.id,
-        jobId: app.jobId,
-        userId: app.userId,
-        status: app.status,
-        ...(app.coverLetter ? { coverLetter: app.coverLetter } : {}),
-        ...(app.resumeUrl ? { resumeUrl: app.resumeUrl } : {}),
-        ...(app.notes ? { notes: app.notes } : {}),
-        appliedAt: app.appliedAt,
-        updatedAt: app.updatedAt,
-        job: {
-          id: app.job.id,
-          slug: app.job.slug,
-          title: app.job.title,
-          company: {
-            id: app.job.company.id,
-            name: app.job.company.name,
-            slug: app.job.company.slug,
-            ...(app.job.company.logoUrl ? { logoUrl: app.job.company.logoUrl } : {}),
-            badges: toBadgeTypes(app.job.company.badges),
+      applications: applications.map((app): any => {
+        const summary = summarizeSnapshot(parseCvSnapshot(app.cvSnapshot));
+        const fallbackCv = app.user.profile?.defaultCv ?? null;
+        const { reapplyIndex, previousApplications } = resolveReapplyInfo(history, app);
+        return {
+          id: app.id,
+          jobId: app.jobId,
+          userId: app.userId,
+          status: app.status,
+          ...(app.coverLetter ? { coverLetter: app.coverLetter } : {}),
+          ...(app.resumeUrl ? { resumeUrl: app.resumeUrl } : {}),
+          ...(app.notes ? { notes: app.notes } : {}),
+          appliedAt: app.appliedAt,
+          updatedAt: app.updatedAt,
+          sourceCvId: app.sourceCvId,
+          sourceCvName: summary?.cvName ?? null,
+          snapshotAt: summary?.capturedAt ?? null,
+          snapshotSource: summary?.source ?? null,
+          reapplyIndex,
+          previousApplications,
+          job: {
+            id: app.job.id,
+            slug: app.job.slug,
+            title: app.job.title,
+            company: {
+              id: app.job.company.id,
+              name: app.job.company.name,
+              slug: app.job.company.slug,
+              ...(app.job.company.logoUrl ? { logoUrl: app.job.company.logoUrl } : {}),
+              badges: toBadgeTypes(app.job.company.badges),
+            },
           },
-        },
-        user: {
-          id: app.user.id,
-          name: app.user.name ?? undefined,
-          email: app.user.email,
-          slug: app.user.slug ?? undefined,
-          profile: app.user.profile ? {
-            id: app.user.profile.id,
-            headline: app.user.profile.defaultCv?.headline ?? undefined,
-            avatar: app.user.profile.defaultCv?.avatar ?? undefined,
-            cvUrl: app.user.profile.defaultCv?.cvUrl ?? undefined,
-          } : undefined,
-        },
-      })),
+          user: {
+            id: app.user.id,
+            name: summary?.name ?? app.user.name ?? undefined,
+            email: app.user.email,
+            slug: app.user.slug ?? undefined,
+            profile: app.user.profile
+              ? {
+                  id: app.user.profile.id,
+                  headline: (summary ? summary.headline : fallbackCv?.headline) ?? undefined,
+                  avatar: (summary ? summary.avatar : fallbackCv?.avatar) ?? undefined,
+                  cvUrl: (summary ? summary.cvUrl : fallbackCv?.cvUrl) ?? undefined,
+                  ...(summary?.title ? { title: summary.title } : {}),
+                }
+              : undefined,
+          },
+        };
+      }),
       pagination: {
         page,
         limit,
         total,
         totalPages,
       },
+    };
+  }
+
+  // Chi tiết đơn (DN): snapshot CV tại thời điểm ứng tuyển + các đơn trước của cùng job.
+  async getApplicationDetail(applicationId: string, userId: string) {
+    const application = await findReviewableApplication(applicationId, userId);
+
+    const [snapshot, history] = await Promise.all([
+      ensureApplicationSnapshot(application),
+      loadApplicationHistory([application]),
+    ]);
+    const { reapplyIndex, previousApplications } = resolveReapplyInfo(history, application);
+
+    return {
+      application: {
+        id: application.id,
+        jobId: application.jobId,
+        userId: application.userId,
+        status: application.status,
+        coverLetter: application.coverLetter,
+        resumeUrl: application.resumeUrl,
+        notes: application.notes,
+        appliedAt: application.appliedAt,
+        updatedAt: application.updatedAt,
+        sourceCvId: application.sourceCvId,
+        reapplyIndex,
+        job: {
+          id: application.job.id,
+          slug: application.job.slug,
+          title: application.job.title,
+          company: application.job.company,
+        },
+      },
+      snapshot: snapshot ? applySnapshotVisibility(snapshot) : null,
+      previousApplications,
     };
   }
 
@@ -1651,6 +1688,7 @@ export class JobsService {
       prisma.application.count({ where }),
     ]);
 
+    const history = await loadApplicationHistory(applications);
     const totalPages = Math.ceil(total / limit);
 
     return {
@@ -1664,6 +1702,9 @@ export class JobsService {
         ...(app.notes ? { notes: app.notes } : {}),
         appliedAt: app.appliedAt,
         updatedAt: app.updatedAt,
+        sourceCvId: app.sourceCvId,
+        sourceCvName: parseCvSnapshot(app.cvSnapshot)?.cvName ?? null,
+        reapplyIndex: resolveReapplyInfo(history, app).reapplyIndex,
         job: {
           id: app.job.id,
           slug: app.job.slug,
@@ -1987,15 +2028,10 @@ export class JobsService {
     const jobMap = new Map(jobs.map(j => [j.id, j]));
     const orderedJobs = ids.map(id => jobMap.get(id)).filter(Boolean) as typeof jobs;
 
+    const appliedJobIds = await this.getAppliedJobIds(userId, orderedJobs.map((job) => job.id));
     const jobsWithApplications: JobWithApplication[] = [];
     for (const job of orderedJobs) {
-      let hasApplied = false;
-      if (userId) {
-        const application = await prisma.application.findUnique({
-          where: { userId_jobId: { userId, jobId: job.id } },
-        });
-        hasApplied = !!application;
-      }
+      const hasApplied = appliedJobIds.has(job.id);
 
       const jobResult: any = {
         id: job.id, companyId: job.companyId, title: job.title, slug: job.slug,

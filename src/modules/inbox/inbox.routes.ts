@@ -294,6 +294,7 @@ export async function inboxRoutes(fastify: FastifyInstance) {
                           id: { type: 'string' },
                           status: { type: 'string' },
                           appliedAt: { type: 'string', format: 'date-time' },
+                          reapplyIndex: { type: 'number' },
                         },
                       },
                     },

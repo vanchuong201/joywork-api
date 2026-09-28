@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
 import { AppError } from '@/shared/errors/errorHandler';
 import { CvExportsService } from './cv-exports.service';
 import {
+  exportApplicationPdfParamsSchema,
   exportCandidatePdfParamsSchema,
   exportCandidatePdfQuerySchema,
   exportOwnPdfQuerySchema,
@@ -99,6 +100,25 @@ export class CvExportsController {
       slug: paramsParsed.data.slug,
       viewerUserId: userId,
       companyId: queryParsed.data.companyId,
+    });
+    return this.sendPdf(reply, result);
+  }
+
+  async exportApplicationPdf(request: AuthenticatedRequest, reply: FastifyReply) {
+    const userId = this.getUserId(request);
+    const paramsParsed = exportApplicationPdfParamsSchema.safeParse(request.params);
+    if (!paramsParsed.success) {
+      throw new AppError(
+        'Tham số không hợp lệ',
+        400,
+        'VALIDATION_ERROR',
+        paramsParsed.error.flatten()
+      );
+    }
+
+    const result = await this.service.exportApplicationCvPdf({
+      applicationId: paramsParsed.data.applicationId,
+      viewerUserId: userId,
     });
     return this.sendPdf(reply, result);
   }

@@ -10,6 +10,7 @@ import {
   searchJobsSchema,
   applyJobSchema,
   getApplicationsSchema,
+  applicationIdParamsSchema,
   updateApplicationStatusSchema,
   getMyApplicationsSchema,
   getMyFavoritesSchema,
@@ -150,11 +151,12 @@ export class JobsController {
     const userId = (request as any).user?.userId;
     const data = applyJobSchema.parse(request.body);
     
-    await this.jobsService.applyForJob(userId, data);
+    const { applicationId } = await this.jobsService.applyForJob(userId, data);
     
     return reply.status(201).send({
       data: {
         message: 'Ứng tuyển thành công',
+        applicationId,
       },
     });
   }
@@ -169,6 +171,16 @@ export class JobsController {
     return reply.send({
       data: result,
     });
+  }
+
+  // Get application detail (company)
+  async getApplicationDetail(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user?.userId;
+    const { applicationId } = applicationIdParamsSchema.parse(request.params);
+
+    const result = await this.jobsService.getApplicationDetail(applicationId, userId);
+
+    return reply.send({ data: result });
   }
 
   // Update applicationStatus

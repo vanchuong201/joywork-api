@@ -72,4 +72,32 @@ export async function cvExportsRoutes(fastify: FastifyInstance) {
     },
     controller.exportCandidatePdf.bind(controller)
   );
+
+  fastify.get(
+    '/applications/:applicationId/pdf',
+    {
+      preHandler: secured,
+      schema: {
+        description:
+          'Doanh nghiệp xuất CV PDF của đơn ứng tuyển (nội dung CV tại thời điểm ứng tuyển).',
+        tags: ['CV Export'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['applicationId'],
+          properties: {
+            applicationId: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            description: 'PDF file',
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+    controller.exportApplicationPdf.bind(controller)
+  );
 }

@@ -170,6 +170,13 @@ SET "defaultCvId" = c."id"
 FROM "candidate_cvs" c
 WHERE c."id" = 'cv_' || p."userId";
 
+-- DataCopy: đơn cũ gắn với CV vừa copy (rule apply lại theo CV; snapshot backfill bằng script sau deploy)
+UPDATE "applications" a
+SET "sourceCvId" = c."id"
+FROM "candidate_cvs" c
+WHERE c."id" = 'cv_' || a."userId"
+  AND a."sourceCvId" IS NULL;
+
 -- AddForeignKey
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_defaultCvId_fkey" FOREIGN KEY ("defaultCvId") REFERENCES "candidate_cvs"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
