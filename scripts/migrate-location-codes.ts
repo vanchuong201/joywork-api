@@ -1,19 +1,19 @@
 import { prisma } from '@/shared/database/prisma';
 import { resolveProvinceCode } from '@/shared/provinces';
 
-async function migrateUserProfileLocations() {
-  const profiles = await prisma.userProfile.findMany({
+async function migrateCandidateCvLocations() {
+  const cvs = await prisma.candidateCv.findMany({
     select: { id: true, locations: true },
   });
 
-  for (const profile of profiles) {
-    const mapped = (profile.locations ?? [])
+  for (const cv of cvs) {
+    const mapped = (cv.locations ?? [])
       .map((value) => resolveProvinceCode(value))
       .filter((value): value is string => Boolean(value));
 
     const unique = Array.from(new Set(mapped));
-    await prisma.userProfile.update({
-      where: { id: profile.id },
+    await prisma.candidateCv.update({
+      where: { id: cv.id },
       data: { locations: unique },
     });
   }
@@ -55,7 +55,7 @@ async function migrateCompanyLocation() {
 }
 
 async function main() {
-  await migrateUserProfileLocations();
+  await migrateCandidateCvLocations();
   await migrateJobLocations();
   await migrateCompanyLocation();
   console.log('Location codes migration completed.');

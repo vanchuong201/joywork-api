@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '@/shared/database/prisma';
-import { hasUserAppliedToCompany } from '@/shared/applications/has-applied-to-company';
+import { canViewLiveCandidateCv } from '@/shared/candidates/employer-candidate-visibility';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
 import { syncCandidateToEs } from '@/shared/candidates/candidate-search-sync';
@@ -18,7 +18,6 @@ import {
   UpdateProfileInput,
 } from './users.schema';
 
-const TALENT_POOL_FEATURE_KEY = 'TALENT_POOL';
 
 // Helper: Generate slug from name — uses slugify package with Vietnamese locale
 export function generateSlug(name: string): string {
@@ -75,8 +74,8 @@ export class UserProfileService {
   /**
    * Ẩn contactEmail / contactPhone / cvUrl / website / linkedin / github trên API public trừ khi:
    * - viewer là chủ hồ sơ, hoặc
-   * - có companyId + viewer là OWNER/ADMIN công ty + đã có CvFlipConnection,
-   * - hoặc ứng viên đã chủ động apply vào job của công ty đó (không cần mở CV).
+   * - có companyId + viewer là OWNER/ADMIN công ty + đã có CvFlipConnection.
+   * DN đã nhận đơn xem liên hệ qua snapshot của đơn, không qua CV live.
    */
   private async shouldRedactPublicContactFields(params: {
     profileUserId: string;
@@ -107,14 +106,6 @@ export class UserProfileService {
       return true;
     }
 
-    const hasAppliedToCompany = await hasUserAppliedToCompany({
-      userId: profileUserId,
-      companyId: cid,
-    });
-    if (hasAppliedToCompany) {
-      return false;
-    }
-
     const connection = await prisma.cvFlipConnection.findUnique({
       where: {
         companyId_userId: {
@@ -128,136 +119,31 @@ export class UserProfileService {
     return !connection;
   }
 
-  /**
-   * Cho phép DN (OWNER/ADMIN) xem shell hồ sơ ứng viên đã apply vào công ty dù `isPublic === false`.
-   */
-  private async canViewerSeePrivateProfileViaApplication(params: {
-    viewerUserId: string | null | undefined;
-    profileUserId: string;
-    companyId: string | null | undefined;
-  }): Promise<boolean> {
-    const { viewerUserId, profileUserId, companyId } = params;
-    if (!viewerUserId || viewerUserId === profileUserId) {
-      return false;
-    }
-    const cid = typeof companyId === 'string' ? companyId.trim() : '';
-    if (!cid) {
-      return false;
-    }
-
-    const membership = await prisma.companyMember.findFirst({
-      where: {
-        userId: viewerUserId,
-        companyId: cid,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
-      select: { id: true },
-    });
-    if (!membership) {
-      return false;
-    }
-
-    return hasUserAppliedToCompany({ userId: profileUserId, companyId: cid });
-  }
-
-  /**
-   * Cho phép DN (OWNER/ADMIN, công ty bật Talent Pool) xem shell hồ sơ ứng viên
-   * đang ACTIVE trong Talent Pool dù `isPublic === false`, để khớp với list `/talent-pool/candidates`.
-   * Contact vẫn qua `shouldRedactPublicContactFields`.
-   */
-  private async canViewerSeePrivateProfileViaTalentPool(params: {
-    viewerUserId: string | null | undefined;
-    profileUserId: string;
-    companyId: string | null | undefined;
-  }): Promise<boolean> {
-    const { viewerUserId, profileUserId, companyId } = params;
-    if (!viewerUserId || viewerUserId === profileUserId) {
-      return false;
-    }
-    const cid = typeof companyId === 'string' ? companyId.trim() : '';
-    if (!cid) {
-      return false;
-    }
-
-    const membership = await prisma.companyMember.findFirst({
-      where: {
-        userId: viewerUserId,
-        companyId: cid,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
-      select: { id: true },
-    });
-    if (!membership) {
-      return false;
-    }
-
-    const entitlement = await prisma.companyFeatureEntitlement.findUnique({
-      where: {
-        companyId_featureKey: {
-          companyId: cid,
-          featureKey: TALENT_POOL_FEATURE_KEY,
-        },
-      },
-      select: { enabled: true },
-    });
-    if (!entitlement?.enabled) {
-      return false;
-    }
-
-    const member = await prisma.talentPoolMember.findUnique({
-      where: { userId: profileUserId },
-      select: { status: true },
-    });
-    return member?.status === 'ACTIVE';
-  }
-
-  // Get public profile by slug (or ID as fallback).
-  // Khi viewerUserId trùng chủ hồ sơ, vẫn trả về dù isPublic = false (xem trước khi đăng nhập).
+  // Get public profile by slug (or ID as fallback) — nội dung từ CV mặc định.
+  // Không phải chủ hồ sơ: chỉ trả khi ứng viên đang bật tìm việc (null → 404).
   async getPublicProfileBySlug(
     slug: string,
     viewerUserId?: string | null,
     options?: { companyId?: string | null }
   ): Promise<any | null> {
-    // Try to find by slug first
-    let user = await prisma.user.findUnique({
-      where: { slug },
-      include: {
-        profile: true,
-        experiences: {
-          orderBy: [
-            { order: 'asc' },
-            { startDate: 'desc' },
-          ],
-        },
-        educations: {
-          orderBy: [
-            { order: 'asc' },
-            { startDate: 'desc' },
-          ],
+    const include = {
+      profile: {
+        include: {
+          defaultCv: {
+            include: {
+              experiences: { orderBy: CV_SECTION_ORDER_BY },
+              educations: { orderBy: CV_SECTION_ORDER_BY },
+            },
+          },
         },
       },
-    });
+    } as const;
+
+    let user = await prisma.user.findUnique({ where: { slug }, include });
 
     // If not found by slug, try to find by ID (for backward compatibility)
     if (!user) {
-      user = await prisma.user.findUnique({
-        where: { id: slug },
-        include: {
-          profile: true,
-          experiences: {
-            orderBy: [
-              { order: 'asc' },
-              { startDate: 'desc' },
-            ],
-          },
-          educations: {
-            orderBy: [
-              { order: 'asc' },
-              { startDate: 'desc' },
-            ],
-          },
-        },
-      });
+      user = await prisma.user.findUnique({ where: { id: slug }, include });
 
       // If found by ID but user doesn't have slug, generate one
       if (user && !user.slug) {
@@ -272,8 +158,7 @@ export class UserProfileService {
           data: { slug: newSlug },
         });
         
-        // Update the user object with new slug (need to cast to include slug)
-        user = { ...user, slug: newSlug } as typeof user & { slug: string };
+        user = { ...user, slug: newSlug };
       }
     }
 
@@ -281,26 +166,21 @@ export class UserProfileService {
       return null;
     }
 
-    // Check if profile is public (chủ hồ sơ xem được khi đã đăng nhập)
-    if (user.profile && !user.profile.isPublic) {
-      if (!viewerUserId || viewerUserId !== user.id) {
-        const allowTalentPoolEmployer = await this.canViewerSeePrivateProfileViaTalentPool({
-          viewerUserId,
-          profileUserId: user.id,
-          companyId: options?.companyId ?? null,
-        });
-        const allowApplicationEmployer = await this.canViewerSeePrivateProfileViaApplication({
-          viewerUserId,
-          profileUserId: user.id,
-          companyId: options?.companyId ?? null,
-        });
-        if (!allowTalentPoolEmployer && !allowApplicationEmployer) {
-          return null;
-        }
-      }
+    const isOwner = Boolean(viewerUserId) && viewerUserId === user.id;
+    if (
+      !canViewLiveCandidateCv({
+        isOwner,
+        isSearchingJob: user.profile?.isSearchingJob,
+        accountActive: user.accountStatus === 'ACTIVE',
+      })
+    ) {
+      return null;
     }
 
-    const visibility = (user.profile?.visibility as any) || {
+    const settings = user.profile;
+    const cv = settings?.defaultCv ?? null;
+
+    const visibility = (cv?.visibility as any) || {
       bio: true,
       experience: true,
       education: true,
@@ -321,89 +201,85 @@ export class UserProfileService {
       isTalentPoolMember: talentPoolMember?.status === 'ACTIVE',
     };
 
-    if (user.profile) {
+    if (settings && cv) {
       result.profile = {
-        id: user.profile.id,
-        avatar: user.profile.avatar,
-        fullName: user.profile.fullName,
-        title: user.profile.title,
-        headline: user.profile.headline,
-        locations: user.profile.locations,
-        wardCodes: user.profile.wardCodes,
-        specificAddress: user.profile.specificAddress,
-        ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
-        website: user.profile.website,
-        linkedin: user.profile.linkedin,
-        github: user.profile.github,
-        cvUrl: user.profile.cvUrl,
-        contactEmail: user.profile.contactEmail,
-        contactPhone: user.profile.contactPhone,
-        status: user.profile.status,
-        isSearchingJob: user.profile.isSearchingJob,
-        allowCvFlip: user.profile.allowCvFlip,
-        gender: user.profile.gender,
-        dayOfBirth: user.profile.dayOfBirth,
-        monthOfBirth: user.profile.monthOfBirth,
-        yearOfBirth: user.profile.yearOfBirth,
-        educationLevel: user.profile.educationLevel,
-        createdAt: user.profile.createdAt,
-        updatedAt: user.profile.updatedAt,
+        id: settings.id,
+        defaultCvId: cv.id,
+        visibility,
+        avatar: cv.avatar,
+        fullName: cv.fullName,
+        title: cv.title,
+        headline: cv.headline,
+        locations: cv.locations,
+        wardCodes: cv.wardCodes,
+        specificAddress: cv.specificAddress,
+        ...(cv.locations.length > 0 ? { location: getProvinceNameByCode(cv.locations[0]) ?? cv.locations[0] } : {}),
+        website: cv.website,
+        linkedin: cv.linkedin,
+        github: cv.github,
+        cvUrl: cv.cvUrl,
+        contactEmail: cv.contactEmail,
+        contactPhone: cv.contactPhone,
+        status: settings.status,
+        isSearchingJob: settings.isSearchingJob,
+        allowCvFlip: settings.allowCvFlip,
+        gender: cv.gender,
+        dayOfBirth: cv.dayOfBirth,
+        monthOfBirth: cv.monthOfBirth,
+        yearOfBirth: cv.yearOfBirth,
+        educationLevel: cv.educationLevel,
+        createdAt: settings.createdAt,
+        updatedAt: cv.updatedAt,
       };
 
       // Only include visible sections
-      if (visibility.bio && user.profile.bio) {
-        result.profile.bio = user.profile.bio;
+      if (visibility.bio && cv.bio) {
+        result.profile.bio = cv.bio;
       }
 
       if (visibility.ksa) {
-        if (user.profile.knowledge && user.profile.knowledge.length > 0) {
-          result.profile.knowledge = user.profile.knowledge;
-        }
-        if (user.profile.skills && user.profile.skills.length > 0) {
-          result.profile.skills = user.profile.skills;
-        }
-        if (user.profile.attitude && user.profile.attitude.length > 0) {
-          result.profile.attitude = user.profile.attitude;
-        }
+        if (cv.knowledge.length > 0) result.profile.knowledge = cv.knowledge;
+        if (cv.skills.length > 0) result.profile.skills = cv.skills;
+        if (cv.attitude.length > 0) result.profile.attitude = cv.attitude;
       }
 
       if (visibility.expectations) {
-        if (user.profile.expectedSalaryMin != null) result.profile.expectedSalaryMin = user.profile.expectedSalaryMin;
-        if (user.profile.expectedSalaryMax != null) result.profile.expectedSalaryMax = user.profile.expectedSalaryMax;
-        if (user.profile.salaryCurrency) result.profile.salaryCurrency = user.profile.salaryCurrency;
-        if (user.profile.workMode) result.profile.workMode = user.profile.workMode;
-        if (user.profile.expectedCulture) result.profile.expectedCulture = user.profile.expectedCulture;
+        if (cv.expectedSalaryMin != null) result.profile.expectedSalaryMin = cv.expectedSalaryMin;
+        if (cv.expectedSalaryMax != null) result.profile.expectedSalaryMax = cv.expectedSalaryMax;
+        if (cv.salaryCurrency) result.profile.salaryCurrency = cv.salaryCurrency;
+        if (cv.workMode) result.profile.workMode = cv.workMode;
+        if (cv.expectedCulture) result.profile.expectedCulture = cv.expectedCulture;
       }
 
-      if (user.profile.careerGoals && user.profile.careerGoals.length > 0) {
-        result.profile.careerGoals = user.profile.careerGoals;
+      if (cv.careerGoals.length > 0) {
+        result.profile.careerGoals = cv.careerGoals;
       }
-    }
 
-    if (visibility.experience && user.experiences && user.experiences.length > 0) {
-      result.experiences = user.experiences.map((exp: any) => ({
-        id: exp.id,
-        role: exp.role,
-        company: exp.company,
-        period: exp.period,
-        desc: exp.desc,
-        achievements: exp.achievements,
-        startDate: exp.startDate,
-        endDate: exp.endDate,
-      }));
-    }
+      if (visibility.experience && cv.experiences.length > 0) {
+        result.experiences = cv.experiences.map((exp) => ({
+          id: exp.id,
+          role: exp.role,
+          company: exp.company,
+          period: exp.period,
+          desc: exp.desc,
+          achievements: exp.achievements,
+          startDate: exp.startDate,
+          endDate: exp.endDate,
+        }));
+      }
 
-    if (visibility.education && user.educations && user.educations.length > 0) {
-      result.educations = user.educations.map((edu: any) => ({
-        id: edu.id,
-        school: edu.school,
-        degree: edu.degree,
-        period: edu.period,
-        gpa: edu.gpa,
-        honors: edu.honors,
-        startDate: edu.startDate,
-        endDate: edu.endDate,
-      }));
+      if (visibility.education && cv.educations.length > 0) {
+        result.educations = cv.educations.map((edu) => ({
+          id: edu.id,
+          school: edu.school,
+          degree: edu.degree,
+          period: edu.period,
+          gpa: edu.gpa,
+          honors: edu.honors,
+          startDate: edu.startDate,
+          endDate: edu.endDate,
+        }));
+      }
     }
 
     const redactContacts = await this.shouldRedactPublicContactFields({
@@ -423,9 +299,9 @@ export class UserProfileService {
     }
 
     if (identityMasked) {
-      result.name = maskNameToInitials(user.profile?.fullName || user.name);
-      result.maskedInitials = maskNameToInitials(user.profile?.fullName || user.name);
-      result.maskedFields = buildMaskedFieldPresence(user.profile);
+      result.name = maskNameToInitials(cv?.fullName || user.name);
+      result.maskedInitials = maskNameToInitials(cv?.fullName || user.name);
+      result.maskedFields = buildMaskedFieldPresence(cv);
       if (result.profile) {
         result.profile.avatar = null;
         result.profile.fullName = null;
@@ -445,35 +321,24 @@ export class UserProfileService {
 
   // Get own profile (with full data including email/phone).
   // Settings lấy từ UserProfile, nội dung + kinh nghiệm/học vấn lấy từ CV mặc định.
-  async getOwnProfile(userId: string): Promise<any | null> {
+  /** `cvId` (tuỳ chọn): đọc nội dung CV cụ thể của chính user thay vì CV mặc định. */
+  async getOwnProfile(userId: string, cvId?: string | null): Promise<any | null> {
     const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!exists) {
       return null;
     }
-    await this.cvService.ensureDefaultCv(userId);
+    const defaultCvId = await this.cvService.ensureDefaultCv(userId);
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        profile: {
-          include: {
-            defaultCv: {
-              include: {
-                experiences: { orderBy: CV_SECTION_ORDER_BY },
-                educations: { orderBy: CV_SECTION_ORDER_BY },
-              },
-            },
-          },
-        },
-      },
-    });
+    const [user, cv] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, include: { profile: true } }),
+      this.cvService.getOwnedCv(userId, cvId ?? defaultCvId),
+    ]);
 
-    if (!user?.profile?.defaultCv) {
+    if (!user?.profile) {
       return null;
     }
 
     const { profile } = user;
-    const cv = profile.defaultCv!;
 
     return {
       id: user.id,
@@ -486,7 +351,7 @@ export class UserProfileService {
       createdAt: user.createdAt,
       profile: {
         id: profile.id,
-        defaultCvId: cv.id,
+        defaultCvId,
         ...serializeCvContent(cv),
         status: profile.status,
         isPublic: profile.isPublic,

@@ -216,7 +216,7 @@ export class TicketsService {
         orderBy: { createdAt: 'asc' },
         include: {
           sender: {
-            select: { id: true, name: true, email: true, profile: { select: { avatar: true } } },
+            select: { id: true, name: true, email: true, profile: { select: { defaultCv: { select: { avatar: true } } } } },
           },
         },
       }),
@@ -242,7 +242,7 @@ export class TicketsService {
           id: message.sender.id,
           email: message.sender.email,
           ...(message.sender.name ? { name: message.sender.name } : {}),
-          ...(message.sender.profile?.avatar ? { avatar: message.sender.profile.avatar } : {}),
+          ...(message.sender.profile?.defaultCv?.avatar ? { avatar: message.sender.profile.defaultCv.avatar } : {}),
         },
       })),
       pagination: {
@@ -265,7 +265,7 @@ export class TicketsService {
       },
       include: {
         sender: {
-          select: { id: true, name: true, email: true, profile: { select: { avatar: true } } },
+          select: { id: true, name: true, email: true, profile: { select: { defaultCv: { select: { avatar: true } } } } },
         },
       },
     });
@@ -309,7 +309,7 @@ export class TicketsService {
         id: message.sender.id,
         email: message.sender.email,
         ...(message.sender.name ? { name: message.sender.name } : {}),
-        ...(message.sender.profile?.avatar ? { avatar: message.sender.profile.avatar } : {}),
+        ...(message.sender.profile?.defaultCv?.avatar ? { avatar: message.sender.profile.defaultCv.avatar } : {}),
       },
     };
   }

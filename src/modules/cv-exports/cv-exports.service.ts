@@ -385,8 +385,8 @@ export class CvExportsService {
     this.cvFlipService = cvFlipService ?? new CvFlipService();
   }
 
-  async exportOwnCvPdf(userId: string): Promise<ExportPdfResult> {
-    const ownProfile = await this.userProfileService.getOwnProfile(userId);
+  async exportOwnCvPdf(userId: string, cvId?: string): Promise<ExportPdfResult> {
+    const ownProfile = await this.userProfileService.getOwnProfile(userId, cvId);
     const root = asRecord(ownProfile);
     if (!root) {
       throw new AppError(

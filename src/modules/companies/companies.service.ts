@@ -377,7 +377,7 @@ export class CompaniesService {
               id: true,
               email: true,
               name: true,
-              profile: { select: { avatar: true } },
+              profile: { select: { defaultCv: { select: { avatar: true } } } },
             },
           },
         },
@@ -393,7 +393,7 @@ export class CompaniesService {
         id: f.user.id,
         email: f.user.email,
         name: f.user.name ?? null,
-        avatar: f.user.profile?.avatar ?? null,
+        avatar: f.user.profile?.defaultCv?.avatar ?? null,
       },
     }));
 
@@ -641,7 +641,7 @@ export class CompaniesService {
                 id: true,
                 email: true,
                 name: true,
-                profile: { select: { avatar: true } },
+                profile: { select: { defaultCv: { select: { avatar: true } } } },
               },
             },
           },
@@ -757,7 +757,7 @@ export class CompaniesService {
           id: member.user.id,
           email: member.user.email,
           ...(member.user.name != null ? { name: member.user.name } : {}),
-          avatar: member.user.profile?.avatar ?? null,
+          avatar: member.user.profile?.defaultCv?.avatar ?? null,
         },
       })),
       invitations: company.invitations.map(inv => ({

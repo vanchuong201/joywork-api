@@ -139,7 +139,7 @@ export class InboxService {
             profile: {
               select: {
                 id: true,
-                avatar: true,
+                defaultCv: { select: { avatar: true } },
               },
             },
           },
@@ -190,7 +190,7 @@ export class InboxService {
           sender.profile = {
             id: message.sender.profile.id,
           };
-          if (message.sender.profile.avatar) sender.profile.avatar = message.sender.profile.avatar;
+          if (message.sender.profile.defaultCv?.avatar) sender.profile.avatar = message.sender.profile.defaultCv.avatar;
         }
         return sender;
       })(),
@@ -272,7 +272,7 @@ export class InboxService {
               profile: {
                 select: {
                   id: true,
-                  avatar: true,
+                  defaultCv: { select: { avatar: true } },
                 },
               },
             },
@@ -324,7 +324,7 @@ export class InboxService {
           ...(message.sender.name ? { name: message.sender.name } : {}),
           profile: message.sender.profile ? {
             id: message.sender.profile.id,
-            avatar: message.sender.profile.avatar ?? undefined,
+            avatar: message.sender.profile.defaultCv?.avatar ?? undefined,
           } : undefined,
         },
         application: {
@@ -402,7 +402,7 @@ export class InboxService {
             profile: {
               select: {
                 id: true,
-                avatar: true,
+                defaultCv: { select: { avatar: true } },
               },
             },
           },
@@ -480,7 +480,9 @@ export class InboxService {
           id: app.user.id,
           name: app.user.name,
           email: app.user.email,
-          profile: app.user.profile,
+          profile: app.user.profile
+            ? { id: app.user.profile.id, avatar: app.user.profile.defaultCv?.avatar ?? undefined }
+            : undefined,
         },
         application: {
           id: app.id,

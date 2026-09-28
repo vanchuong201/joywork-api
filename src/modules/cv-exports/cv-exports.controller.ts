@@ -5,6 +5,7 @@ import { CvExportsService } from './cv-exports.service';
 import {
   exportCandidatePdfParamsSchema,
   exportCandidatePdfQuerySchema,
+  exportOwnPdfQuerySchema,
 } from './cv-exports.schema';
 
 export class CvExportsController {
@@ -57,7 +58,16 @@ export class CvExportsController {
 
   async exportOwnPdf(request: AuthenticatedRequest, reply: FastifyReply) {
     const userId = this.getUserId(request);
-    const result = await this.service.exportOwnCvPdf(userId);
+    const queryParsed = exportOwnPdfQuerySchema.safeParse(request.query ?? {});
+    if (!queryParsed.success) {
+      throw new AppError(
+        'Tham số không hợp lệ',
+        400,
+        'VALIDATION_ERROR',
+        queryParsed.error.flatten()
+      );
+    }
+    const result = await this.service.exportOwnCvPdf(userId, queryParsed.data.cvId);
     return this.sendPdf(reply, result);
   }
 

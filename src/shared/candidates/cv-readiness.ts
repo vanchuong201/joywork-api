@@ -87,75 +87,75 @@ export const evaluateCandidateCvReadiness = (
   };
 };
 
+/** Điều kiện trên CV mặc định của user. */
+export const defaultCvIs = (where: Prisma.CandidateCvWhereInput): Prisma.UserWhereInput => ({
+  profile: { is: { defaultCv: { is: where } } },
+});
+
+/** CV mặc định của user đủ điều kiện (bản Prisma where của `evaluateCandidateCvReadiness`). */
 export const buildCvReadyUserWhere = (): Prisma.UserWhereInput => ({
   AND: [
     {
-      OR: [
-        { name: NON_EMPTY_NULLABLE_TEXT },
-        { profile: { is: { fullName: NON_EMPTY_NULLABLE_TEXT } } },
-      ],
+      OR: [{ name: NON_EMPTY_NULLABLE_TEXT }, defaultCvIs({ fullName: NON_EMPTY_NULLABLE_TEXT })],
     },
-    { profile: { is: { title: NON_EMPTY_NULLABLE_TEXT } } },
-    { profile: { is: { bio: NON_EMPTY_NULLABLE_TEXT } } },
+    defaultCvIs({ title: NON_EMPTY_NULLABLE_TEXT }),
+    defaultCvIs({ bio: NON_EMPTY_NULLABLE_TEXT }),
     {
-      OR: [
-        { email: NON_EMPTY_TEXT },
-        { profile: { is: { contactEmail: NON_EMPTY_NULLABLE_TEXT } } },
-      ],
+      OR: [{ email: NON_EMPTY_TEXT }, defaultCvIs({ contactEmail: NON_EMPTY_NULLABLE_TEXT })],
     },
     {
-      OR: [
-        { phone: NON_EMPTY_NULLABLE_TEXT },
-        { profile: { is: { contactPhone: NON_EMPTY_NULLABLE_TEXT } } },
-      ],
+      OR: [{ phone: NON_EMPTY_NULLABLE_TEXT }, defaultCvIs({ contactPhone: NON_EMPTY_NULLABLE_TEXT })],
     },
-    { profile: { is: { locations: { isEmpty: false } } } },
+    defaultCvIs({ locations: { isEmpty: false } }),
     {
       OR: [
-        { profile: { is: { knowledge: { isEmpty: false } } } },
-        { profile: { is: { skills: { isEmpty: false } } } },
-        { profile: { is: { attitude: { isEmpty: false } } } },
+        defaultCvIs({ knowledge: { isEmpty: false } }),
+        defaultCvIs({ skills: { isEmpty: false } }),
+        defaultCvIs({ attitude: { isEmpty: false } }),
       ],
     },
-    { experiences: { some: {} } },
+    defaultCvIs({ experiences: { some: {} } }),
   ],
 });
 
+/**
+ * Bản raw SQL của readiness. Yêu cầu alias: `u` = users, `c` = candidate_cvs (CV mặc định).
+ */
 export const cvReadyRawSqlCondition = Prisma.sql`
   (
     (
-      NULLIF(BTRIM(COALESCE(p."fullName", u.name)), '') IS NOT NULL
-      AND NULLIF(BTRIM(p.title), '') IS NOT NULL
-      AND NULLIF(BTRIM(p.bio), '') IS NOT NULL
-      AND NULLIF(BTRIM(COALESCE(p."contactEmail", u.email)), '') IS NOT NULL
-      AND NULLIF(BTRIM(COALESCE(p."contactPhone", u.phone)), '') IS NOT NULL
+      NULLIF(BTRIM(COALESCE(c."fullName", u.name)), '') IS NOT NULL
+      AND NULLIF(BTRIM(c.title), '') IS NOT NULL
+      AND NULLIF(BTRIM(c.bio), '') IS NOT NULL
+      AND NULLIF(BTRIM(COALESCE(c."contactEmail", u.email)), '') IS NOT NULL
+      AND NULLIF(BTRIM(COALESCE(c."contactPhone", u.phone)), '') IS NOT NULL
       AND EXISTS (
         SELECT 1
-        FROM unnest(COALESCE(p.locations, ARRAY[]::text[])) AS location_item
+        FROM unnest(COALESCE(c.locations, ARRAY[]::text[])) AS location_item
         WHERE NULLIF(BTRIM(location_item), '') IS NOT NULL
       )
     )
     AND (
       EXISTS (
         SELECT 1
-        FROM unnest(COALESCE(p.knowledge, ARRAY[]::text[])) AS knowledge_item
+        FROM unnest(COALESCE(c.knowledge, ARRAY[]::text[])) AS knowledge_item
         WHERE NULLIF(BTRIM(knowledge_item), '') IS NOT NULL
       )
       OR EXISTS (
         SELECT 1
-        FROM unnest(COALESCE(p.skills, ARRAY[]::text[])) AS skill_item
+        FROM unnest(COALESCE(c.skills, ARRAY[]::text[])) AS skill_item
         WHERE NULLIF(BTRIM(skill_item), '') IS NOT NULL
       )
       OR EXISTS (
         SELECT 1
-        FROM unnest(COALESCE(p.attitude, ARRAY[]::text[])) AS attitude_item
+        FROM unnest(COALESCE(c.attitude, ARRAY[]::text[])) AS attitude_item
         WHERE NULLIF(BTRIM(attitude_item), '') IS NOT NULL
       )
     )
     AND EXISTS (
       SELECT 1
-      FROM user_experiences ue
-      WHERE ue."userId" = u.id
+      FROM candidate_cv_experiences ce
+      WHERE ce."cvId" = c.id
     )
   )
 `;

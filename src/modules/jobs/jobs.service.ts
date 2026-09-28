@@ -143,24 +143,23 @@ export class JobsService {
         name: true,
         email: true,
         phone: true,
-        avatar: true,
         profile: {
           select: {
-            avatar: true,
-            fullName: true,
-            title: true,
-            bio: true,
-            contactEmail: true,
-            contactPhone: true,
-            locations: true,
-            knowledge: true,
-            skills: true,
-            attitude: true,
-          },
-        },
-        _count: {
-          select: {
-            experiences: true,
+            defaultCv: {
+              select: {
+                avatar: true,
+                fullName: true,
+                title: true,
+                bio: true,
+                contactEmail: true,
+                contactPhone: true,
+                locations: true,
+                knowledge: true,
+                skills: true,
+                attitude: true,
+                _count: { select: { experiences: true } },
+              },
+            },
           },
         },
       },
@@ -170,13 +169,13 @@ export class JobsService {
       throw new AppError('Không tìm thấy ứng viên', 404, 'USER_NOT_FOUND');
     }
 
+    const cv = userCvData.profile?.defaultCv ?? null;
     const readiness = evaluateCandidateCvReadiness({
       name: userCvData.name,
       email: userCvData.email,
       phone: userCvData.phone,
-      avatar: userCvData.avatar,
-      profile: userCvData.profile,
-      experiencesCount: userCvData._count.experiences,
+      profile: cv,
+      experiencesCount: cv?._count.experiences ?? 0,
     });
 
     if (readiness.isReady) {
@@ -1427,9 +1426,7 @@ export class JobsService {
               profile: {
                 select: {
                   id: true,
-                  headline: true,
-                  avatar: true,
-                  cvUrl: true,
+                  defaultCv: { select: { headline: true, avatar: true, cvUrl: true } },
                 },
               },
             },
@@ -1471,9 +1468,9 @@ export class JobsService {
           slug: app.user.slug ?? undefined,
           profile: app.user.profile ? {
             id: app.user.profile.id,
-            headline: app.user.profile.headline ?? undefined,
-            avatar: app.user.profile.avatar ?? undefined,
-            cvUrl: app.user.profile.cvUrl ?? undefined,
+            headline: app.user.profile.defaultCv?.headline ?? undefined,
+            avatar: app.user.profile.defaultCv?.avatar ?? undefined,
+            cvUrl: app.user.profile.defaultCv?.cvUrl ?? undefined,
           } : undefined,
         },
       })),
@@ -1644,9 +1641,7 @@ export class JobsService {
               profile: {
                 select: {
                   id: true,
-                  headline: true,
-                  avatar: true,
-                  cvUrl: true,
+                  defaultCv: { select: { headline: true, avatar: true, cvUrl: true } },
                 },
               },
             },
@@ -1687,9 +1682,9 @@ export class JobsService {
           email: app.user.email,
           profile: app.user.profile ? {
             id: app.user.profile.id,
-            headline: app.user.profile.headline ?? undefined,
-            avatar: app.user.profile.avatar ?? undefined,
-            cvUrl: app.user.profile.cvUrl ?? undefined,
+            headline: app.user.profile.defaultCv?.headline ?? undefined,
+            avatar: app.user.profile.defaultCv?.avatar ?? undefined,
+            cvUrl: app.user.profile.defaultCv?.cvUrl ?? undefined,
           } : undefined,
         },
       })),

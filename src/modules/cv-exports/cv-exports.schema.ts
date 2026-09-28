@@ -14,3 +14,9 @@ export type ExportCandidatePdfParams = z.infer<
 export type ExportCandidatePdfQuery = z.infer<
   typeof exportCandidatePdfQuerySchema
 >;
+
+export const exportOwnPdfQuerySchema = z.object({
+  cvId: z.string().trim().min(1).optional(),
+});
+
+export type ExportOwnPdfQuery = z.infer<typeof exportOwnPdfQuerySchema>;

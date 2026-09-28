@@ -27,6 +27,8 @@ import { prisma } from '../src/shared/database/prisma';
 import { config } from '../src/config/env';
 import {
   mapUserToBrevoContact,
+  brevoUserFromRow,
+  BREVO_USER_SELECT,
   withBrevoSyncHash,
   type BrevoMappedContact,
 } from '../src/shared/services/brevo-contact.mapper';
@@ -51,22 +53,8 @@ const USER_SELECT = {
   phone: true,
   brevoSyncedAt: true,
   brevoSyncHash: true,
-  profile: {
-    select: {
-      fullName: true,
-      title: true,
-      bio: true,
-      contactEmail: true,
-      contactPhone: true,
-      locations: true,
-      knowledge: true,
-      skills: true,
-      attitude: true,
-      linkedin: true,
-    },
-  },
-  experiences: { select: { id: true } },
-  companies: { select: { id: true } },
+  profile: BREVO_USER_SELECT.profile,
+  companies: BREVO_USER_SELECT.companies,
 } as const;
 
 type SyncMode = 'incremental' | 'full';
@@ -416,7 +404,7 @@ async function main() {
       stats.contactsAttempted += page.length;
 
       for (const user of page) {
-        const mapped = mapUserToBrevoContact(user);
+        const mapped = mapUserToBrevoContact(brevoUserFromRow(user));
         if (!mapped) {
           stats.skippedInvalidEmail++;
           continue;

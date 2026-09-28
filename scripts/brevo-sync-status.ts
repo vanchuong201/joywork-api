@@ -9,6 +9,8 @@ loadEnv();
 import { prisma } from '../src/shared/database/prisma';
 import {
   mapUserToBrevoContact,
+  brevoUserFromRow,
+  BREVO_USER_SELECT,
   withBrevoSyncHash,
 } from '../src/shared/services/brevo-contact.mapper';
 
@@ -46,29 +48,15 @@ async function main() {
         phone: true,
         brevoSyncedAt: true,
         brevoSyncHash: true,
-        profile: {
-          select: {
-            fullName: true,
-            title: true,
-            bio: true,
-            contactEmail: true,
-            contactPhone: true,
-            locations: true,
-            knowledge: true,
-            skills: true,
-            attitude: true,
-            linkedin: true,
-          },
-        },
-        experiences: { select: { id: true } },
-        companies: { select: { id: true } },
+        profile: BREVO_USER_SELECT.profile,
+        companies: BREVO_USER_SELECT.companies,
       },
     });
     if (page.length === 0) break;
 
     for (const user of page) {
       total++;
-      const mapped = mapUserToBrevoContact(user);
+      const mapped = mapUserToBrevoContact(brevoUserFromRow(user));
       if (!mapped) {
         invalidEmail++;
         continue;

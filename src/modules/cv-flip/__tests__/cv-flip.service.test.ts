@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CvFlipService } from '../cv-flip.service';
 import { signCvFlipEmailActionToken } from '../cv-flip-email-token';
+import { buildDiscoverableUserWhere } from '@/shared/candidates/discoverable';
 
 vi.mock('@/shared/database/prisma', () => ({
   prisma: {
@@ -8,6 +9,10 @@ vi.mock('@/shared/database/prisma', () => ({
       count: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    application: {
+      findFirst: vi.fn(),
     },
     companyMember: {
       findFirst: vi.fn(),
@@ -21,6 +26,7 @@ vi.mock('@/shared/database/prisma', () => ({
     },
     cvFlipConnection: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       count: vi.fn(),
     },
     $queryRaw: vi.fn(),
@@ -58,37 +64,33 @@ const baseUser = {
   name: 'Ẩn danh',
   slug: 'ung-vien-1',
   profile: {
-    avatar: 'https://cdn/avatar.jpg',
-    fullName: 'Ứng viên A',
-    headline: 'Senior Backend Engineer',
-    title: 'Backend Engineer',
-    skills: ['Node.js'],
-    locations: ['ha-noi'],
-    wardCodes: ['ha-noi/00004'],
-    specificAddress: 'Cầu Giấy',
-    expectedSalaryMin: 15000000n,
-    expectedSalaryMax: 25000000n,
-    salaryCurrency: 'VND',
-    workMode: 'ONSITE',
-    gender: 'MALE',
-    dayOfBirth: 1,
-    monthOfBirth: 1,
-    yearOfBirth: 1995,
-    educationLevel: 'BACHELOR',
     status: 'OPEN_TO_WORK',
-  },
-  experiences: [
-    {
-      id: 'exp-1',
-      role: 'Backend Developer',
-      company: 'JoyWork',
-      period: '2022-2024',
-      desc: 'Build APIs',
-      achievements: [],
-      order: 1,
+    defaultCv: {
+      fullName: 'Ứng viên A',
+      headline: 'Senior Backend Engineer',
+      title: 'Backend Engineer',
+      skills: ['Node.js'],
+      locations: ['ha-noi'],
+      expectedSalaryMin: 15000000n,
+      expectedSalaryMax: 25000000n,
+      salaryCurrency: 'VND',
+      workMode: 'ONSITE',
+      gender: 'MALE',
+      educationLevel: 'BACHELOR',
+      experiences: [
+        {
+          id: 'exp-1',
+          role: 'Backend Developer',
+          company: 'JoyWork',
+          period: '2022-2024',
+          desc: 'Build APIs',
+          achievements: [],
+          order: 1,
+        },
+      ],
+      educations: [],
     },
-  ],
-  educations: [],
+  },
 };
 
 beforeEach(() => {
@@ -109,12 +111,11 @@ describe('CvFlipService.listCandidates', () => {
     expect(result.pagination.total).toBe(1);
     expect(result.candidates).toHaveLength(1);
 
-    const countWhere = vi.mocked(prisma.user.count).mock.calls[0][0]?.where as {
-      AND?: Array<Record<string, unknown>>;
-    };
-    const readinessCondition = (countWhere.AND ?? []).find((condition) => Array.isArray(condition.AND));
-    expect(readinessCondition).toBeTruthy();
-    expect(readinessCondition?.AND).toContainEqual({ experiences: { some: {} } });
+    const countWhere = vi.mocked(prisma.user.count).mock.calls[0][0]?.where;
+    expect(countWhere).toEqual(expect.objectContaining({ AND: expect.arrayContaining([buildDiscoverableUserWhere()]) }));
+    expect(JSON.stringify(countWhere)).toContain('"defaultCv":{"is":{"experiences":{"some":{}}}}');
+    expect(JSON.stringify(countWhere)).toContain('"isSearchingJob":true');
+    expect(result.candidates[0]).toMatchObject({ title: 'Backend Engineer', expectedSalaryMin: 15000000 });
   });
 
   it('giữ keyword ranking và vẫn lọc theo điều kiện CV đủ chuẩn', async () => {
@@ -132,6 +133,94 @@ describe('CvFlipService.listCandidates', () => {
     expect(prisma.user.count).not.toHaveBeenCalled();
     expect(result.pagination.total).toBe(1);
     expect(result.candidates[0]?.userId).toBe('user-1');
+  });
+});
+
+describe('CvFlipService.getCandidateDetail', () => {
+  const companyId = 'clxxxxxxxxxxxxxxxxxxxxxx1';
+  const detailUser = (isSearchingJob: boolean) => ({
+    id: 'cand-1',
+    name: 'Ứng viên A',
+    slug: 'ung-vien-a',
+    email: 'a@example.com',
+    phone: '0900000000',
+    avatar: null,
+    accountStatus: 'ACTIVE',
+    profile: {
+      status: 'OPEN_TO_WORK',
+      isSearchingJob,
+      allowCvFlip: true,
+      defaultCv: {
+        ...baseUser.profile.defaultCv,
+        avatar: null,
+        bio: 'Bio',
+        cvUrl: 'https://cdn/cv.pdf',
+        wardCodes: [],
+        specificAddress: null,
+        website: null,
+        linkedin: null,
+        github: null,
+        contactEmail: 'contact@example.com',
+        contactPhone: '0911111111',
+        knowledge: [],
+        attitude: [],
+        careerGoals: [],
+        expectedCulture: null,
+        dayOfBirth: null,
+        monthOfBirth: null,
+        yearOfBirth: 1995,
+        experiences: [],
+        educations: [],
+      },
+    },
+  });
+
+  it('404 khi ứng viên tắt tìm việc, kể cả DN đã nhận đơn', async () => {
+    vi.mocked(prisma.user.findFirst).mockResolvedValue(detailUser(false) as never);
+
+    await expect(
+      service.getCandidateDetail('ung-vien-a', 'hr-1', { companyId })
+    ).rejects.toMatchObject({ statusCode: 404, code: 'CANDIDATE_NOT_FOUND' });
+    expect(prisma.application.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('DN đã nhận đơn nhưng chưa mở CV vẫn bị ẩn liên hệ', async () => {
+    vi.mocked(prisma.user.findFirst).mockResolvedValue(detailUser(true) as never);
+    vi.mocked(prisma.companyMember.findFirst).mockResolvedValue({ id: 'member-1' } as never);
+    vi.mocked(prisma.application.findFirst).mockResolvedValue({ id: 'app-1' } as never);
+    vi.mocked(prisma.cvFlipConnection.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.cvFlipRequest.findUnique).mockResolvedValue(null);
+
+    const result = await service.getCandidateDetail('ung-vien-a', 'hr-1', { companyId });
+
+    expect(result.access).toMatchObject({ isFlipped: false, hasAppliedToCompany: true });
+    expect(result.candidate.profile).toMatchObject({
+      contactEmail: null,
+      contactPhone: null,
+      cvUrl: null,
+      title: 'Backend Engineer',
+      isSearchingJob: true,
+    });
+  });
+
+  it('đã có connection thì mở liên hệ từ CV mặc định', async () => {
+    vi.mocked(prisma.user.findFirst).mockResolvedValue(detailUser(true) as never);
+    vi.mocked(prisma.companyMember.findFirst).mockResolvedValue({ id: 'member-1' } as never);
+    vi.mocked(prisma.application.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.cvFlipConnection.findUnique).mockResolvedValue({
+      id: 'conn-1',
+      flippedAt: new Date('2026-09-01T00:00:00.000Z'),
+    } as never);
+    vi.mocked(prisma.cvFlipRequest.findUnique).mockResolvedValue(null);
+
+    const result = await service.getCandidateDetail('ung-vien-a', 'hr-1', { companyId });
+
+    expect(result.access.isFlipped).toBe(true);
+    expect(result.candidate.profile).toMatchObject({
+      contactEmail: 'contact@example.com',
+      contactPhone: '0911111111',
+      cvUrl: 'https://cdn/cv.pdf',
+    });
   });
 });
 

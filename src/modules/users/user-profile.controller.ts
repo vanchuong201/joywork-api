@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { UserProfileService } from './user-profile.service';
 import { getUserProfileBySlugSchema, publicProfileQuerySchema, updateProfileSchema } from './users.schema';
 import type { AuthenticatedRequest } from '@/modules/auth/auth.middleware';
+import { CANDIDATE_CV_UNAVAILABLE_MESSAGE } from '@/shared/candidates/employer-candidate-visibility';
 
 export class UserProfileController {
   constructor(private userProfileService: UserProfileService) {}
@@ -20,7 +21,7 @@ export class UserProfileController {
       return reply.status(404).send({
         error: {
           code: 'PROFILE_NOT_FOUND',
-          message: 'Profile not found or is private',
+          message: CANDIDATE_CV_UNAVAILABLE_MESSAGE,
         },
       });
     }

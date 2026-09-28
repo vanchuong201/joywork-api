@@ -31,7 +31,7 @@ async function main() {
       select: { id: true, userId: true },
     });
     if (batch.length === 0) break;
-    cursor = batch[batch.length - 1].id;
+    cursor = batch[batch.length - 1]!.id;
     scanned += batch.length;
 
     const userIds = [...new Set(batch.map((a) => a.userId))];

@@ -9,6 +9,7 @@
 import { config as loadEnv } from 'dotenv';
 loadEnv();
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../src/shared/database/prisma';
 
 const BATCH_SIZE = 200;
@@ -38,7 +39,7 @@ async function main() {
       },
     });
     if (batch.length === 0) break;
-    cursor = batch[batch.length - 1].id;
+    cursor = batch[batch.length - 1]!.id;
 
     for (const profile of batch) {
       const cv = profile.defaultCv;
@@ -67,7 +68,7 @@ async function main() {
             contactPhone: cv.contactPhone,
             fullName: cv.fullName,
             title: cv.title,
-            visibility: cv.visibility ?? undefined,
+            visibility: cv.visibility ?? Prisma.DbNull,
             knowledge: cv.knowledge,
             attitude: cv.attitude,
             expectedSalaryMin: cv.expectedSalaryMin,

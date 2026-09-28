@@ -1,31 +1,30 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
-import { syncUserToEs } from '@/shared/elasticsearch/sync';
+import { syncUserToEs, type UserForEs } from '@/shared/elasticsearch/sync';
 
-/** Đồng bộ doc ứng viên trên ES từ settings trên profile + nội dung CV mặc định. */
-export async function syncCandidateToEs(userId: string): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+/** Select cho doc ứng viên trên ES: settings trên profile + nội dung CV mặc định. */
+export const CANDIDATE_ES_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  slug: true,
+  createdAt: true,
+  profile: {
     select: {
-      id: true,
-      name: true,
-      email: true,
-      slug: true,
-      createdAt: true,
-      profile: {
-        select: {
-          isPublic: true,
-          isSearchingJob: true,
-          defaultCv: {
-            select: { headline: true, bio: true, skills: true, locations: true },
-          },
-        },
+      isPublic: true,
+      isSearchingJob: true,
+      defaultCv: {
+        select: { headline: true, bio: true, skills: true, locations: true },
       },
     },
-  });
-  if (!user) return;
+  },
+} satisfies Prisma.UserSelect;
 
+export type CandidateEsRow = Prisma.UserGetPayload<{ select: typeof CANDIDATE_ES_SELECT }>;
+
+export function toUserForEs(user: CandidateEsRow): UserForEs {
   const cv = user.profile?.defaultCv ?? null;
-  await syncUserToEs({
+  return {
     id: user.id,
     name: user.name,
     email: user.email,
@@ -41,5 +40,15 @@ export async function syncCandidateToEs(userId: string): Promise<void> {
           isSearchingJob: user.profile.isSearchingJob,
         }
       : null,
+  };
+}
+
+/** Đồng bộ doc ứng viên trên ES từ settings trên profile + nội dung CV mặc định. */
+export async function syncCandidateToEs(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: CANDIDATE_ES_SELECT,
   });
+  if (!user) return;
+  await syncUserToEs(toUserForEs(user));
 }

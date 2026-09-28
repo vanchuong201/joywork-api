@@ -1,12 +1,18 @@
 import { config } from '@/config/env';
 import { prisma } from '@/shared/database/prisma';
+import { canViewLiveCandidateCv } from '@/shared/candidates/employer-candidate-visibility';
+import { defaultCvIs } from '@/shared/candidates/cv-readiness';
 import {
-  canEmployerViewCandidateShell,
-  canEmployerViewInCompanyCvFlipContext,
-  getLatestApplicationResumeUrl,
-  resolveEmployerCandidateVisibility,
-} from '@/shared/candidates/employer-candidate-visibility';
-import { buildCvReadyUserWhere, cvReadyRawSqlCondition } from '@/shared/candidates/cv-readiness';
+  buildDiscoverableUserWhere,
+  discoverableJoinSql,
+  discoverableRawSqlCondition,
+} from '@/shared/candidates/discoverable';
+import { hasUserAppliedToCompany } from '@/shared/applications/has-applied-to-company';
+import {
+  CV_SECTION_ORDER_BY,
+  serializeCvEducation,
+  serializeCvExperience,
+} from '@/modules/candidate-cvs/candidate-cvs.service';
 import {
   getCyclePeriod,
   parseCvFlipLimitMetadata,
@@ -125,8 +131,8 @@ export class CvFlipService {
       max: expanded.max !== undefined ? this.convertSalary(expanded.max, inputCurrency, 'USD') : undefined,
     };
 
-    const buildRangeConditions = (range: { min: number | undefined; max: number | undefined }): Prisma.UserProfileWhereInput[] => {
-      const conditions: Prisma.UserProfileWhereInput[] = [];
+    const buildRangeConditions = (range: { min: number | undefined; max: number | undefined }): Prisma.CandidateCvWhereInput[] => {
+      const conditions: Prisma.CandidateCvWhereInput[] = [];
       if (range.min !== undefined) {
         conditions.push({ expectedSalaryMax: { gte: BigInt(Math.floor(range.min)) } });
       }
@@ -140,41 +146,16 @@ export class CvFlipService {
     const usdConditions = buildRangeConditions(usdRange);
 
     // Không khai báo mức lương mong muốn → coi như thỏa thuận, khớp mọi khoảng lọc lương.
-    const negotiableSalary: Prisma.UserWhereInput = {
-      profile: {
-        is: {
-          expectedSalaryMin: null,
-          expectedSalaryMax: null,
-        },
-      },
-    };
+    const negotiableSalary: Prisma.UserWhereInput = defaultCvIs({
+      expectedSalaryMin: null,
+      expectedSalaryMax: null,
+    });
 
     const statedSalaryRange: Prisma.UserWhereInput = {
       OR: [
-        {
-          profile: {
-            is: {
-              salaryCurrency: 'VND',
-              AND: vndConditions,
-            },
-          },
-        },
-        {
-          profile: {
-            is: {
-              salaryCurrency: null,
-              AND: vndConditions,
-            },
-          },
-        },
-        {
-          profile: {
-            is: {
-              salaryCurrency: 'USD',
-              AND: usdConditions,
-            },
-          },
-        },
+        defaultCvIs({ salaryCurrency: 'VND', AND: vndConditions }),
+        defaultCvIs({ salaryCurrency: null, AND: vndConditions }),
+        defaultCvIs({ salaryCurrency: 'USD', AND: usdConditions }),
       ],
     };
 
@@ -194,14 +175,15 @@ export class CvFlipService {
     const likeClauses = normalizedSkills.map((skill) =>
       Prisma.sql`EXISTS (
         SELECT 1
-        FROM unnest(up."skills") AS skill_item
+        FROM unnest(c."skills") AS skill_item
         WHERE skill_item ILIKE ${`%${skill}%`}
       )`
     );
 
     const rows = await prisma.$queryRaw<Array<{ userId: string }>>(Prisma.sql`
-      SELECT DISTINCT up."userId"
-      FROM "user_profiles" up
+      SELECT DISTINCT p."userId"
+      FROM "user_profiles" p
+      JOIN "candidate_cvs" c ON c.id = p."defaultCvId"
       WHERE ${Prisma.join(likeClauses, ' OR ')}
     `);
 
@@ -368,29 +350,21 @@ export class CvFlipService {
       educationLevels,
     } = query;
 
-    const where: Prisma.UserWhereInput = {
-      accountStatus: 'ACTIVE',
-      profile: {
-        is: {
-          isPublic: true,
-          isSearchingJob: true,
-        },
-      },
-    };
+    const where: Prisma.UserWhereInput = {};
 
-    const andConditions: Prisma.UserWhereInput[] = [buildCvReadyUserWhere()];
+    const andConditions: Prisma.UserWhereInput[] = [buildDiscoverableUserWhere()];
 
     if (keyword) {
       andConditions.push({
         OR: [
           // Ưu tiên match trên vị trí ứng tuyển (title) trước, rồi đến tiêu đề nghề nghiệp (headline).
-          { profile: { is: { title: { contains: keyword, mode: 'insensitive' } } } },
-          { profile: { is: { headline: { contains: keyword, mode: 'insensitive' } } } },
-          { profile: { is: { fullName: { contains: keyword, mode: 'insensitive' } } } },
+          defaultCvIs({ title: { contains: keyword, mode: 'insensitive' } }),
+          defaultCvIs({ headline: { contains: keyword, mode: 'insensitive' } }),
+          defaultCvIs({ fullName: { contains: keyword, mode: 'insensitive' } }),
           { name: { contains: keyword, mode: 'insensitive' } },
-          { profile: { is: { bio: { contains: keyword, mode: 'insensitive' } } } },
-          { profile: { is: { skills: { hasSome: [keyword] } } } },
-          { profile: { is: { knowledge: { hasSome: [keyword] } } } },
+          defaultCvIs({ bio: { contains: keyword, mode: 'insensitive' } }),
+          defaultCvIs({ skills: { hasSome: [keyword] } }),
+          defaultCvIs({ knowledge: { hasSome: [keyword] } }),
         ],
       });
     }
@@ -419,33 +393,35 @@ export class CvFlipService {
       );
       if (normalizedLocations.length > 0) {
         andConditions.push({
-          profile: { is: { locations: { hasSome: normalizedLocations } } },
+          ...defaultCvIs({ locations: { hasSome: normalizedLocations } }),
         });
       }
     }
 
     if (ward) {
       andConditions.push({
-        profile: { is: { wardCodes: { has: ward } } },
+        ...defaultCvIs({ wardCodes: { has: ward } }),
       });
     }
 
     if (education) {
-      andConditions.push({
-        educations: {
-          some: {
-            OR: [
-              { degree: { contains: education, mode: 'insensitive' } },
-              { school: { contains: education, mode: 'insensitive' } },
-            ],
+      andConditions.push(
+        defaultCvIs({
+          educations: {
+            some: {
+              OR: [
+                { degree: { contains: education, mode: 'insensitive' } },
+                { school: { contains: education, mode: 'insensitive' } },
+              ],
+            },
           },
-        },
-      });
+        })
+      );
     }
 
     if (workMode) {
       andConditions.push({
-        profile: { is: { workMode: { equals: workMode, mode: 'insensitive' } } },
+        ...defaultCvIs({ workMode: { equals: workMode, mode: 'insensitive' } }),
       });
     }
 
@@ -459,27 +435,23 @@ export class CvFlipService {
     }
 
     if (gender) {
-      andConditions.push({
-        profile: { is: { gender } },
-      });
+      andConditions.push(defaultCvIs({ gender }));
     }
 
     if (yearOfBirthMin !== undefined || yearOfBirthMax !== undefined) {
-      andConditions.push({
-        profile: {
-          is: {
-            yearOfBirth: {
-              ...(yearOfBirthMin !== undefined ? { gte: yearOfBirthMin } : {}),
-              ...(yearOfBirthMax !== undefined ? { lte: yearOfBirthMax } : {}),
-            },
+      andConditions.push(
+        defaultCvIs({
+          yearOfBirth: {
+            ...(yearOfBirthMin !== undefined ? { gte: yearOfBirthMin } : {}),
+            ...(yearOfBirthMax !== undefined ? { lte: yearOfBirthMax } : {}),
           },
-        },
-      });
+        })
+      );
     }
 
     if (educationLevels && educationLevels.length > 0) {
       andConditions.push({
-        profile: { is: { educationLevel: { in: educationLevels } } },
+        ...defaultCvIs({ educationLevel: { in: educationLevels } }),
       });
     }
 
@@ -516,28 +488,25 @@ export class CvFlipService {
         const rankedUsers = await prisma.$queryRaw<{ id: string }[]>`
           SELECT u.id
           FROM users u
-          LEFT JOIN user_profiles p ON p."userId" = u.id
-          WHERE u."accountStatus" = 'ACTIVE'
-            AND p."isPublic" = true
-            AND p."isSearchingJob" = true
-            AND ${cvReadyRawSqlCondition}
+          ${discoverableJoinSql}
+          WHERE ${discoverableRawSqlCondition}
             AND (
-              p.title ILIKE ${`%${escapedKeyword}%`}
-              OR p.headline ILIKE ${`%${escapedKeyword}%`}
-              OR p."fullName" ILIKE ${`%${escapedKeyword}%`}
+              c.title ILIKE ${`%${escapedKeyword}%`}
+              OR c.headline ILIKE ${`%${escapedKeyword}%`}
+              OR c."fullName" ILIKE ${`%${escapedKeyword}%`}
               OR u.name ILIKE ${`%${escapedKeyword}%`}
-              OR p.bio ILIKE ${`%${escapedKeyword}%`}
-              OR p.skills::text ILIKE ${`%${escapedKeyword}%`}
-              OR p.knowledge::text ILIKE ${`%${escapedKeyword}%`}
+              OR c.bio ILIKE ${`%${escapedKeyword}%`}
+              OR c.skills::text ILIKE ${`%${escapedKeyword}%`}
+              OR c.knowledge::text ILIKE ${`%${escapedKeyword}%`}
             )
           ORDER BY
             CASE
-              WHEN p.title ILIKE ${`%${escapedKeyword}%`} THEN 7
-              WHEN p.headline ILIKE ${`%${escapedKeyword}%`} THEN 6
-              WHEN p."fullName" ILIKE ${`%${escapedKeyword}%`} THEN 5
+              WHEN c.title ILIKE ${`%${escapedKeyword}%`} THEN 7
+              WHEN c.headline ILIKE ${`%${escapedKeyword}%`} THEN 6
+              WHEN c."fullName" ILIKE ${`%${escapedKeyword}%`} THEN 5
               WHEN u.name ILIKE ${`%${escapedKeyword}%`} THEN 4
-              WHEN p.bio ILIKE ${`%${escapedKeyword}%`} THEN 3
-              WHEN p.skills::text ILIKE ${`%${escapedKeyword}%`} OR p.knowledge::text ILIKE ${`%${escapedKeyword}%`} THEN 2
+              WHEN c.bio ILIKE ${`%${escapedKeyword}%`} THEN 3
+              WHEN c.skills::text ILIKE ${`%${escapedKeyword}%`} OR c.knowledge::text ILIKE ${`%${escapedKeyword}%`} THEN 2
               ELSE 1
             END DESC,
             u."updatedAt" DESC
@@ -576,37 +545,35 @@ export class CvFlipService {
       id: true,
       name: true,
       slug: true,
-      experiences: {
-        orderBy: [{ order: 'asc' as const }, { startDate: 'desc' as const }],
-        select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
-      },
-      educations: {
-        orderBy: [{ order: 'asc' as const }, { startDate: 'desc' as const }],
-        select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
-      },
       profile: {
         select: {
-          avatar: true,
-          fullName: true,
-          headline: true,
-          title: true,
-          skills: true,
-          locations: true,
-          wardCodes: true,
-          specificAddress: true,
-          expectedSalaryMin: true,
-          expectedSalaryMax: true,
-          salaryCurrency: true,
-          workMode: true,
-          gender: true,
-          dayOfBirth: true,
-          monthOfBirth: true,
-          yearOfBirth: true,
-          educationLevel: true,
           status: true,
+          defaultCv: {
+            select: {
+              fullName: true,
+              headline: true,
+              title: true,
+              skills: true,
+              locations: true,
+              expectedSalaryMin: true,
+              expectedSalaryMax: true,
+              salaryCurrency: true,
+              workMode: true,
+              gender: true,
+              educationLevel: true,
+              experiences: {
+                orderBy: CV_SECTION_ORDER_BY,
+                select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
+              },
+              educations: {
+                orderBy: CV_SECTION_ORDER_BY,
+                select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
+              },
+            },
+          },
         },
       },
-    };
+    } satisfies Prisma.UserSelect;
 
     const users = pageIds
       ? await prisma.user.findMany({
@@ -631,48 +598,51 @@ export class CvFlipService {
     }
 
     return {
-      candidates: orderedUsers.map((user) => ({
-        maskedInitials: maskNameToInitials(user.profile?.fullName || user.name),
-        identityMasked: true,
-        userId: user.id,
-        slug: user.slug,
-        name: maskNameToInitials(user.profile?.fullName || user.name),
-        avatar: null,
-        headline: user.profile?.headline ?? null,
-        title: user.profile?.title ?? null,
-        skills: user.profile?.skills ?? [],
-        locations: user.profile?.locations ?? [],
-        wardCodes: [],
-        specificAddress: null,
-        expectedSalaryMin: user.profile?.expectedSalaryMin != null ? Number(user.profile.expectedSalaryMin) : null,
-        expectedSalaryMax: user.profile?.expectedSalaryMax != null ? Number(user.profile.expectedSalaryMax) : null,
-        salaryCurrency: user.profile?.salaryCurrency ?? null,
-        workMode: user.profile?.workMode ?? null,
-        gender: user.profile?.gender ?? null,
-        dayOfBirth: null,
-        monthOfBirth: null,
-        yearOfBirth: null,
-        educationLevel: user.profile?.educationLevel ?? null,
-        status: user.profile?.status ?? null,
-        experiences: user.experiences.map((e) => ({
-          id: e.id,
-          role: e.role,
-          company: e.company,
-          period: e.period,
-          desc: e.desc,
-          achievements: e.achievements,
-          order: e.order,
-        })),
-        educations: user.educations.map((e) => ({
-          id: e.id,
-          school: e.school,
-          degree: e.degree,
-          period: e.period,
-          gpa: e.gpa,
-          honors: e.honors,
-          order: e.order,
-        })),
-      })),
+      candidates: orderedUsers.map((user) => {
+        const cv = user.profile?.defaultCv ?? null;
+        return {
+          maskedInitials: maskNameToInitials(cv?.fullName || user.name),
+          identityMasked: true,
+          userId: user.id,
+          slug: user.slug,
+          name: maskNameToInitials(cv?.fullName || user.name),
+          avatar: null,
+          headline: cv?.headline ?? null,
+          title: cv?.title ?? null,
+          skills: cv?.skills ?? [],
+          locations: cv?.locations ?? [],
+          wardCodes: [],
+          specificAddress: null,
+          expectedSalaryMin: cv?.expectedSalaryMin != null ? Number(cv.expectedSalaryMin) : null,
+          expectedSalaryMax: cv?.expectedSalaryMax != null ? Number(cv.expectedSalaryMax) : null,
+          salaryCurrency: cv?.salaryCurrency ?? null,
+          workMode: cv?.workMode ?? null,
+          gender: cv?.gender ?? null,
+          dayOfBirth: null,
+          monthOfBirth: null,
+          yearOfBirth: null,
+          educationLevel: cv?.educationLevel ?? null,
+          status: user.profile?.status ?? null,
+          experiences: (cv?.experiences ?? []).map((e) => ({
+            id: e.id,
+            role: e.role,
+            company: e.company,
+            period: e.period,
+            desc: e.desc,
+            achievements: e.achievements,
+            order: e.order,
+          })),
+          educations: (cv?.educations ?? []).map((e) => ({
+            id: e.id,
+            school: e.school,
+            degree: e.degree,
+            period: e.period,
+            gpa: e.gpa,
+            honors: e.honors,
+            order: e.order,
+          })),
+        };
+      }),
       pagination: {
         page,
         limit,
@@ -696,12 +666,19 @@ export class CvFlipService {
         email: true,
         phone: true,
         avatar: true,
-        profile: true,
-        experiences: {
-          orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
-        },
-        educations: {
-          orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
+        accountStatus: true,
+        profile: {
+          select: {
+            status: true,
+            isSearchingJob: true,
+            allowCvFlip: true,
+            defaultCv: {
+              include: {
+                experiences: { orderBy: CV_SECTION_ORDER_BY },
+                educations: { orderBy: CV_SECTION_ORDER_BY },
+              },
+            },
+          },
         },
       },
     });
@@ -712,55 +689,29 @@ export class CvFlipService {
 
     const isOwner = viewerUserId === candidate.id;
     const normalizedCompanyId = companyId?.trim() || null;
-    const profileVisibility = candidate.profile
-      ? {
-          isPublic: candidate.profile.isPublic,
-          isSearchingJob: candidate.profile.isSearchingJob,
-        }
-      : null;
+
+    if (
+      !isOwner &&
+      !canViewLiveCandidateCv({
+        isOwner,
+        isSearchingJob: candidate.profile?.isSearchingJob,
+        accountActive: candidate.accountStatus === 'ACTIVE',
+      })
+    ) {
+      throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
+    }
 
     let hasAppliedToCompany = false;
-    let canViewViaTalentPool = false;
-
     if (!isOwner && normalizedCompanyId) {
       await this.assertCanManageCompany(viewerUserId, normalizedCompanyId);
-      const visibility = await resolveEmployerCandidateVisibility({
-        viewerUserId,
-        candidateUserId: candidate.id,
+      hasAppliedToCompany = await hasUserAppliedToCompany({
+        userId: candidate.id,
         companyId: normalizedCompanyId,
-        isOwner,
       });
-      hasAppliedToCompany = visibility.hasAppliedToCompany;
-      canViewViaTalentPool = visibility.canViewViaTalentPool;
     }
 
-    const visibilityParams = {
-      isOwner,
-      profile: profileVisibility,
-      hasAppliedToCompany,
-      canViewViaTalentPool,
-    };
-
-    if (!isOwner) {
-      if (!canEmployerViewCandidateShell(visibilityParams)) {
-        throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
-      }
-      if (
-        normalizedCompanyId &&
-        !canEmployerViewInCompanyCvFlipContext({
-          ...visibilityParams,
-          hasCompanyContext: true,
-        })
-      ) {
-        throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
-      }
-    }
-
-    const profile = candidate.profile;
-    const applicationResumeUrl =
-      !profile && normalizedCompanyId && hasAppliedToCompany
-        ? await getLatestApplicationResumeUrl(candidate.id, normalizedCompanyId)
-        : null;
+    const settings = candidate.profile;
+    const profile = settings?.defaultCv ?? null;
 
     const buildCandidatePayload = (opts: {
       contactEmail: string | null;
@@ -796,7 +747,7 @@ export class CvFlipService {
           website: opts.website,
           linkedin: opts.linkedin,
           github: opts.github,
-          status: profile?.status ?? null,
+          status: settings?.status ?? null,
           knowledge: profile?.knowledge ?? [],
           attitude: profile?.attitude ?? [],
           expectedSalaryMin:
@@ -813,11 +764,11 @@ export class CvFlipService {
           dayOfBirth: opts.maskIdentity ? null : profile?.dayOfBirth ?? null,
           monthOfBirth: opts.maskIdentity ? null : profile?.monthOfBirth ?? null,
           yearOfBirth: opts.maskIdentity ? null : profile?.yearOfBirth ?? null,
-          isSearchingJob: profile?.isSearchingJob ?? false,
-          allowCvFlip: profile?.allowCvFlip ?? false,
+          isSearchingJob: settings?.isSearchingJob ?? false,
+          allowCvFlip: settings?.allowCvFlip ?? false,
         },
-        experiences: candidate.experiences,
-        educations: candidate.educations,
+        experiences: (profile?.experiences ?? []).map(serializeCvExperience),
+        educations: (profile?.educations ?? []).map(serializeCvEducation),
       },
     });
 
@@ -881,11 +832,11 @@ export class CvFlipService {
       pendingRequest?.status === 'PENDING' &&
       pendingRequest.expiresAt.getTime() > now.getTime();
 
-    const isFlipped = Boolean(connection) || hasAppliedToCompany;
+    const isFlipped = Boolean(connection);
     const shouldMaskContact = !isOwner && !isFlipped;
     const revealedEmail = profile?.contactEmail ?? candidate.email;
     const revealedPhone = profile?.contactPhone ?? candidate.phone;
-    const revealedCvUrl = profile?.cvUrl ?? applicationResumeUrl;
+    const revealedCvUrl = profile?.cvUrl ?? null;
 
     return {
       ...buildCandidatePayload({
@@ -954,18 +905,25 @@ export class CvFlipService {
         id: true,
         slug: true,
         name: true,
+        accountStatus: true,
         profile: {
           select: {
             id: true,
-            isPublic: true,
             isSearchingJob: true,
             allowCvFlip: true,
+            defaultCvId: true,
           },
         },
       },
     });
 
-    if (!candidate || !candidate.profile || !candidate.profile.isPublic || !candidate.profile.isSearchingJob) {
+    if (
+      !candidate ||
+      candidate.accountStatus !== 'ACTIVE' ||
+      !candidate.profile ||
+      !candidate.profile.isSearchingJob ||
+      !candidate.profile.defaultCvId
+    ) {
       throw new AppError('Không tìm thấy hồ sơ ứng viên', 404, 'CANDIDATE_NOT_FOUND');
     }
 

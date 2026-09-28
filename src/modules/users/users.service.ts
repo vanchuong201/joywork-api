@@ -3,6 +3,48 @@ import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { SearchUsersInput } from './users.schema';
 import { getEsClient } from '@/shared/elasticsearch/client';
 import { USERS_INDEX } from '@/shared/elasticsearch/indices';
+import { Prisma } from '@prisma/client';
+import { defaultCvIs } from '@/shared/candidates/cv-readiness';
+import { buildDiscoverableUserWhere } from '@/shared/candidates/discoverable';
+
+const PUBLIC_USER_INCLUDE = {
+  profile: { include: { defaultCv: true } },
+} satisfies Prisma.UserInclude;
+
+type PublicUserRow = Prisma.UserGetPayload<{ include: typeof PUBLIC_USER_INCLUDE }>;
+
+function serializePublicUser(
+  user: PublicUserRow,
+  opts: { includeLinks: boolean; includeAddress?: boolean }
+): any {
+  const result: any = { id: user.id, role: user.role, createdAt: user.createdAt };
+  if (user.name) result.name = user.name;
+  const cv = user.profile?.defaultCv;
+  if (user.profile && cv) {
+    result.profile = {
+      id: user.profile.id,
+      userId: user.profile.userId,
+      skills: cv.skills,
+      createdAt: user.profile.createdAt,
+      updatedAt: cv.updatedAt,
+    };
+    if (cv.avatar) result.profile.avatar = cv.avatar;
+    if (cv.headline) result.profile.headline = cv.headline;
+    if (cv.bio) result.profile.bio = cv.bio;
+    result.profile.locations = cv.locations;
+    result.profile.wardCodes = cv.wardCodes;
+    if (opts.includeAddress) result.profile.specificAddress = cv.specificAddress;
+    if (cv.locations.length > 0) {
+      result.profile.location = getProvinceNameByCode(cv.locations[0]) ?? cv.locations[0];
+    }
+    if (opts.includeLinks) {
+      if (cv.website) result.profile.website = cv.website;
+      if (cv.linkedin) result.profile.linkedin = cv.linkedin;
+      if (cv.github) result.profile.github = cv.github;
+    }
+  }
+  return result;
+}
 
 export interface UserProfile {
   id: string;
@@ -84,7 +126,7 @@ export class UsersService {
     return result;
   }
 
-  // Search users
+  // Search users — chỉ ứng viên đang bật tìm việc với CV mặc định đủ điều kiện.
   async searchUsers(data: SearchUsersInput): Promise<{
     users: UserWithProfile[];
     pagination: {
@@ -102,77 +144,53 @@ export class UsersService {
           if (ids.length === 0) {
             return { users: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
           }
-          const users = await prisma.user.findMany({ where: { id: { in: ids } }, include: { profile: true } });
+          const users = await prisma.user.findMany({
+            where: { AND: [{ id: { in: ids } }, buildDiscoverableUserWhere()] },
+            include: PUBLIC_USER_INCLUDE,
+          });
           const userMap = new Map(users.map(u => [u.id, u]));
           const ordered = ids.map(id => userMap.get(id)).filter(Boolean) as typeof users;
           return {
-            users: ordered.map(user => {
-              const result: any = { id: user.id, role: user.role, createdAt: user.createdAt };
-              if (user.name) result.name = user.name;
-              if (user.profile) {
-                result.profile = {
-                  id: user.profile.id, userId: user.profile.userId,
-                  skills: user.profile.skills, createdAt: user.profile.createdAt, updatedAt: user.profile.updatedAt,
-                };
-                if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
-                if (user.profile.headline) result.profile.headline = user.profile.headline;
-                if (user.profile.bio) result.profile.bio = user.profile.bio;
-                result.profile.locations = user.profile.locations;
-                result.profile.wardCodes = user.profile.wardCodes;
-                if (user.profile.locations.length > 0) {
-                  result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
-                }
-              }
-              return result;
-            }),
-            pagination: { page: data.page, limit: data.limit, total: ids.length, totalPages: Math.ceil(ids.length / data.limit) },
+            users: ordered.map(user => serializePublicUser(user, { includeLinks: false })),
+            pagination: { page: data.page, limit: data.limit, total: ordered.length, totalPages: Math.ceil(ordered.length / data.limit) },
           };
         }
-      } catch (err) {
-        console.warn('[ES] User search failed, falling back to Prisma:', err);
+      } catch {
+        // ES lỗi → fallback Prisma
       }
     }
 
     const { q, skills, location, page, limit } = data;
     const skip = (page - 1) * limit;
 
-    // Build where clause
-    const where: any = {};
+    const conditions: Prisma.UserWhereInput[] = [buildDiscoverableUserWhere()];
 
     if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { profile: { headline: { contains: q, mode: 'insensitive' } } },
-        { profile: { bio: { contains: q, mode: 'insensitive' } } },
-      ];
+      conditions.push({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          defaultCvIs({ headline: { contains: q, mode: 'insensitive' } }),
+          defaultCvIs({ bio: { contains: q, mode: 'insensitive' } }),
+        ],
+      });
     }
 
     if (skills) {
       const skillArray = skills.split(',').map(s => s.trim());
-      where.profile = {
-        ...where.profile,
-        skills: {
-          hasSome: skillArray,
-        },
-      };
+      conditions.push(defaultCvIs({ skills: { hasSome: skillArray } }));
     }
 
     if (location) {
       const normalizedLocation = resolveProvinceCode(location) ?? location;
-      where.profile = {
-        ...where.profile,
-        locations: { has: normalizedLocation },
-      };
+      conditions.push(defaultCvIs({ locations: { has: normalizedLocation } }));
     }
 
-    // Get users with pagination
+    const where: Prisma.UserWhereInput = { AND: conditions };
+
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        include: {
-          profile: true,
-        },
+        include: PUBLIC_USER_INCLUDE,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -183,35 +201,7 @@ export class UsersService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      users: users.map(user => {
-        const result: any = {
-          id: user.id,
-          role: user.role,
-          createdAt: user.createdAt,
-        };
-        if (user.name) result.name = user.name;
-        if (user.profile) {
-          result.profile = {
-          id: user.profile.id,
-          userId: user.profile.userId,
-          skills: user.profile.skills,
-          createdAt: user.profile.createdAt,
-          updatedAt: user.profile.updatedAt,
-          };
-          if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
-          if (user.profile.headline) result.profile.headline = user.profile.headline;
-          if (user.profile.bio) result.profile.bio = user.profile.bio;
-          result.profile.locations = user.profile.locations;
-          result.profile.wardCodes = user.profile.wardCodes;
-          if (user.profile.locations.length > 0) {
-            result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
-          }
-          if (user.profile.website) result.profile.website = user.profile.website;
-          if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
-          if (user.profile.github) result.profile.github = user.profile.github;
-        }
-        return result;
-      }),
+      users: users.map(user => serializePublicUser(user, { includeLinks: true })),
       pagination: {
         page,
         limit,
@@ -221,49 +211,22 @@ export class UsersService {
     };
   }
 
-  // Get user by ID (public profile)
+  // Get user by ID (public profile) — chỉ khi ứng viên đang bật tìm việc.
   async getPublicProfile(userId: string): Promise<UserWithProfile | null> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        profile: true,
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        accountStatus: 'ACTIVE',
+        profile: { is: { isSearchingJob: true } },
       },
+      include: PUBLIC_USER_INCLUDE,
     });
 
     if (!user) {
       return null;
     }
 
-    const result: any = {
-      id: user.id,
-      role: user.role,
-      createdAt: user.createdAt,
-    };
-    
-    if (user.name) result.name = user.name;
-    if (user.profile) {
-      result.profile = {
-        id: user.profile.id,
-        userId: user.profile.userId,
-        skills: user.profile.skills,
-        createdAt: user.profile.createdAt,
-        updatedAt: user.profile.updatedAt,
-      };
-      if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
-      if (user.profile.headline) result.profile.headline = user.profile.headline;
-      if (user.profile.bio) result.profile.bio = user.profile.bio;
-      result.profile.locations = user.profile.locations;
-      result.profile.wardCodes = user.profile.wardCodes;
-      result.profile.specificAddress = user.profile.specificAddress;
-      if (user.profile.locations.length > 0) {
-        result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
-      }
-      if (user.profile.website) result.profile.website = user.profile.website;
-      if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
-      if (user.profile.github) result.profile.github = user.profile.github;
-    }
-    
-    return result;
+    return serializePublicUser(user, { includeLinks: true, includeAddress: true });
   }
 
   // ─── Elasticsearch search helpers ─────────────────────────────────────────
@@ -279,7 +242,7 @@ export class UsersService {
       must.push({
         multi_match: {
           query: data.q,
-          fields: ['name^3', 'headline^2', 'bio', 'email'],
+          fields: ['name^3', 'headline^2', 'bio'],
           type: 'best_fields',
           fuzziness: 'AUTO',
         },
@@ -295,6 +258,8 @@ export class UsersService {
       const code = resolveProvinceCode(data.location) ?? data.location;
       filter.push({ term: { profileLocations: code } });
     }
+
+    filter.push({ term: { isSearchingJob: true } });
 
     const response = await client.search({
       index: USERS_INDEX,

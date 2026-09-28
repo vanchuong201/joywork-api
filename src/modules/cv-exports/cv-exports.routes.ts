@@ -17,9 +17,15 @@ export async function cvExportsRoutes(fastify: FastifyInstance) {
     {
       preHandler: secured,
       schema: {
-        description: 'Ứng viên xuất CV PDF của chính mình',
+        description: 'Ứng viên xuất CV PDF của chính mình (mặc định CV mặc định, hoặc theo cvId)',
         tags: ['CV Export'],
         security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            cvId: { type: 'string' },
+          },
+        },
         response: {
           200: {
             description: 'PDF file',

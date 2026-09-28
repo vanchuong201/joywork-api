@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { buildDiscoverableUserWhere } from '@/shared/candidates/discoverable';
 import { TalentPoolService } from '../talent-pool.service';
 
 vi.mock('@/shared/database/prisma', () => ({
@@ -335,42 +336,43 @@ describe('TalentPoolService', () => {
             name: 'Candidate One',
             slug: 'candidate-one',
             profile: {
-              avatar: 'https://cdn/avatar.jpg',
-              headline: 'Backend',
-              bio: 'Ready for work',
-              skills: ['Node.js'],
-              locations: ['ha-noi'],
-              wardCodes: [],
-              knowledge: ['API'],
-              attitude: [],
-              expectedSalaryMin: 10_000_000n,
-              expectedSalaryMax: 20_000_000n,
-              salaryCurrency: 'VND',
-              workMode: 'ONSITE',
-              expectedCulture: null,
-              isPublic: true,
-              visibility: null,
-              title: 'Backend Engineer',
-              fullName: 'Candidate One',
-              gender: 'MALE',
-              dayOfBirth: 1,
-              monthOfBirth: 1,
-              yearOfBirth: 1995,
-              educationLevel: 'BACHELOR',
               status: 'OPEN_TO_WORK',
-            },
-            experiences: [
-              {
-                id: 'exp-1',
-                role: 'Developer',
-                company: 'JoyWork',
-                period: '2022-2024',
-                desc: 'Build APIs',
-                achievements: [],
-                order: 1,
+              defaultCv: {
+                avatar: 'https://cdn/avatar.jpg',
+                headline: 'Backend',
+                bio: 'Ready for work',
+                skills: ['Node.js'],
+                locations: ['ha-noi'],
+                wardCodes: [],
+                knowledge: ['API'],
+                attitude: [],
+                expectedSalaryMin: 10_000_000n,
+                expectedSalaryMax: 20_000_000n,
+                salaryCurrency: 'VND',
+                workMode: 'ONSITE',
+                expectedCulture: null,
+                visibility: null,
+                title: 'Backend Engineer',
+                fullName: 'Candidate One',
+                gender: 'MALE',
+                dayOfBirth: 1,
+                monthOfBirth: 1,
+                yearOfBirth: 1995,
+                educationLevel: 'BACHELOR',
+                experiences: [
+                  {
+                    id: 'exp-1',
+                    role: 'Developer',
+                    company: 'JoyWork',
+                    period: '2022-2024',
+                    desc: 'Build APIs',
+                    achievements: [],
+                    order: 1,
+                  },
+                ],
+                educations: [],
               },
-            ],
-            educations: [],
+            },
           },
         },
       ] as never);
@@ -384,9 +386,12 @@ describe('TalentPoolService', () => {
       const findManyWhere = vi.mocked(prisma.talentPoolMember.findMany).mock.calls[0][0]?.where as {
         user?: { AND?: Array<Record<string, unknown>> };
       };
-      const readinessCondition = (findManyWhere.user?.AND ?? []).find((condition) => Array.isArray(condition.AND));
-      expect(readinessCondition).toBeTruthy();
-      expect(readinessCondition?.AND).toContainEqual({ experiences: { some: {} } });
+      expect(findManyWhere.user?.AND).toContainEqual(buildDiscoverableUserWhere());
+      expect(result.candidates[0]).toMatchObject({
+        name: 'Candidate One',
+        profile: { title: 'Backend Engineer', status: 'OPEN_TO_WORK', expectedSalaryMin: 10_000_000 },
+        experiences: [{ id: 'exp-1' }],
+      });
     });
   });
 });

@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, CompanyMemberRole, PostType, PostVisibility, EmploymentType, ExperienceLevel, ApplicationStatus, MessageType, TalentPoolRequestSource, TalentPoolMemberStatus, TalentPoolRequestStatus, TalentPoolLogAction } from "@prisma/client";
+import { Prisma, PrismaClient, UserRole, CompanyMemberRole, PostType, PostVisibility, EmploymentType, ExperienceLevel, ApplicationStatus, MessageType, TalentPoolRequestSource, TalentPoolMemberStatus, TalentPoolRequestStatus, TalentPoolLogAction } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -22,6 +22,14 @@ function uniqueBy<T>(arr: T[], key: (x: T) => string): T[] {
     }
   }
   return out;
+}
+
+async function createDefaultCv(userId: string, content: Omit<Prisma.CandidateCvUncheckedCreateInput, "userId" | "name" | "nameNormalized">) {
+  const cv = await prisma.candidateCv.create({
+    data: { ...content, userId, name: "CV của tôi", nameNormalized: "cv của tôi" },
+    select: { id: true },
+  });
+  await prisma.userProfile.create({ data: { userId, defaultCvId: cv.id } });
 }
 
 async function main() {
@@ -85,20 +93,18 @@ async function main() {
         password: passwordHash,
         role: nu.role,
         name: nu.name,
-        profile: {
-          create: {
-            avatar: `https://i.pravatar.cc/150?u=${nu.email}`,
-            headline: sample(["Software Engineer", "Product Manager", "Designer", "Data Analyst"]),
-            bio: "This is a sample user for testing UI.",
-            skills: ["TypeScript", "React", "Node.js", "SQL"].slice(0, randInt(1, 4)),
-            location: sample(locations),
-            website: "https://joywork.dev",
-            github: "https://github.com/joywork",
-            linkedin: "https://linkedin.com/company/joywork",
-          },
-        },
       },
       select: { id: true, email: true },
+    });
+    await createDefaultCv(u.id, {
+        avatar: `https://i.pravatar.cc/150?u=${nu.email}`,
+        headline: sample(["Software Engineer", "Product Manager", "Designer", "Data Analyst"]),
+        bio: "This is a sample user for testing UI.",
+        skills: ["TypeScript", "React", "Node.js", "SQL"].slice(0, randInt(1, 4)),
+        locations: [sample(locations)],
+        website: "https://joywork.dev",
+        github: "https://github.com/joywork",
+        linkedin: "https://linkedin.com/company/joywork",
     });
     users.push(u);
   }
@@ -114,20 +120,18 @@ async function main() {
         password: passwordHash,
         role: UserRole.USER,
         name,
-        profile: {
-          create: {
-            avatar: `https://i.pravatar.cc/150?u=${email}`,
-            headline: sample(["Frontend Engineer", "Backend Engineer", "QA Engineer", "HR Specialist", "Marketing Executive", "Operations"]),
-            bio: "Sample candidate profile.",
-            skills: uniqueBy(["React", "Next.js", "NestJS", "PostgreSQL", "Prisma", "AWS", "K8s", "Figma", "Storybook", "Cypress"].sort(() => 0.5 - Math.random()).slice(0, randInt(2, 6)), (x) => x),
-            location: sample(locations),
-            website: `https://portfolio.example.com/${i + 1}`,
-            github: i % 3 === 0 ? `https://github.com/user${i + 1}` : null,
-            linkedin: `https://linkedin.com/in/user${i + 1}`,
-          },
-        },
       },
       select: { id: true, email: true },
+    });
+    await createDefaultCv(u.id, {
+        avatar: `https://i.pravatar.cc/150?u=${email}`,
+        headline: sample(["Frontend Engineer", "Backend Engineer", "QA Engineer", "HR Specialist", "Marketing Executive", "Operations"]),
+        bio: "Sample candidate profile.",
+        skills: uniqueBy(["React", "Next.js", "NestJS", "PostgreSQL", "Prisma", "AWS", "K8s", "Figma", "Storybook", "Cypress"].sort(() => 0.5 - Math.random()).slice(0, randInt(2, 6)), (x) => x),
+        locations: [sample(locations)],
+        website: `https://portfolio.example.com/${i + 1}`,
+        github: i % 3 === 0 ? `https://github.com/user${i + 1}` : null,
+        linkedin: `https://linkedin.com/in/user${i + 1}`,
     });
     users.push(u);
   }

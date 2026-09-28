@@ -1,5 +1,20 @@
 import { prisma } from '@/shared/database/prisma';
-import { buildCvReadyUserWhere } from '@/shared/candidates/cv-readiness';
+import { defaultCvIs } from '@/shared/candidates/cv-readiness';
+import { buildDiscoverableUserWhere } from '@/shared/candidates/discoverable';
+import { CV_SECTION_ORDER_BY } from '@/modules/candidate-cvs/candidate-cvs.service';
+
+const DEFAULT_CV_BRIEF_SELECT = {
+  defaultCv: { select: { avatar: true, headline: true, locations: true, wardCodes: true } },
+} satisfies Prisma.UserProfileSelect;
+
+type WithDefaultCvBrief<T extends { profile: { defaultCv: unknown } | null }> = Omit<T, 'profile'> & {
+  profile: NonNullable<T['profile']>['defaultCv'] | null;
+};
+
+function flattenDefaultCvBrief<T extends { profile: { defaultCv: unknown } | null }>(user: T): WithDefaultCvBrief<T> {
+  const { profile, ...rest } = user;
+  return { ...rest, profile: (profile?.defaultCv ?? null) as NonNullable<T['profile']>['defaultCv'] | null };
+}
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { emailService } from '@/shared/services/email.service';
@@ -119,7 +134,7 @@ export class TalentPoolService {
           user: {
             select: {
               id: true, email: true, name: true, slug: true,
-              profile: { select: { avatar: true, headline: true } },
+              profile: { select: DEFAULT_CV_BRIEF_SELECT },
             },
           },
           reviewedBy: { select: { id: true, name: true, email: true } },
@@ -129,7 +144,7 @@ export class TalentPoolService {
     ]);
 
     return {
-      requests,
+      requests: requests.map((r) => ({ ...r, user: flattenDefaultCvBrief(r.user) })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -284,7 +299,7 @@ export class TalentPoolService {
           user: {
             select: {
               id: true, email: true, name: true, slug: true,
-              profile: { select: { avatar: true, headline: true, locations: true, wardCodes: true } },
+              profile: { select: DEFAULT_CV_BRIEF_SELECT },
             },
           },
           addedBy: { select: { id: true, name: true, email: true } },
@@ -294,7 +309,7 @@ export class TalentPoolService {
     ]);
 
     return {
-      members,
+      members: members.map((m) => ({ ...m, user: flattenDefaultCvBrief(m.user) })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -304,12 +319,12 @@ export class TalentPoolService {
       where: { email },
       select: {
         id: true, email: true, name: true, slug: true, accountStatus: true,
-        profile: { select: { avatar: true, headline: true, locations: true, wardCodes: true } },
+        profile: { select: DEFAULT_CV_BRIEF_SELECT },
         talentPoolMember: { select: { id: true, status: true } },
       },
     });
     if (!user) throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
-    return user;
+    return flattenDefaultCvBrief(user);
   }
 
   async adminAddMember(adminId: string, body: AdminAddMemberBody) {
@@ -563,63 +578,52 @@ export class TalentPoolService {
       status: 'ACTIVE',
     };
 
-    const conditions: Prisma.UserWhereInput[] = [buildCvReadyUserWhere()];
+    const conditions: Prisma.UserWhereInput[] = [buildDiscoverableUserWhere()];
 
     if (q) {
       conditions.push({
         OR: [
-          { profile: { headline: { contains: q, mode: 'insensitive' } } },
-          { profile: { bio: { contains: q, mode: 'insensitive' } } },
+          defaultCvIs({ headline: { contains: q, mode: 'insensitive' } }),
+          defaultCvIs({ bio: { contains: q, mode: 'insensitive' } }),
         ],
       });
     }
 
     if (location) {
       const normalizedLocation = resolveProvinceCode(location) ?? location;
-      conditions.push({
-        profile: { locations: { has: normalizedLocation } },
-      });
+      conditions.push(defaultCvIs({ locations: { has: normalizedLocation } }));
     }
 
     if (ward) {
-      conditions.push({
-        profile: { wardCodes: { has: ward } },
-      });
+      conditions.push(defaultCvIs({ wardCodes: { has: ward } }));
     }
 
     if (gender) {
-      conditions.push({
-        profile: { gender },
-      });
+      conditions.push(defaultCvIs({ gender }));
     }
 
     if (yearOfBirthMin !== undefined || yearOfBirthMax !== undefined) {
-      conditions.push({
-        profile: {
+      conditions.push(
+        defaultCvIs({
           yearOfBirth: {
             ...(yearOfBirthMin !== undefined ? { gte: yearOfBirthMin } : {}),
             ...(yearOfBirthMax !== undefined ? { lte: yearOfBirthMax } : {}),
           },
-        },
-      });
+        })
+      );
     }
 
     if (educationLevels && educationLevels.length > 0) {
-      conditions.push({
-        profile: { educationLevel: { in: educationLevels } },
-      });
+      conditions.push(defaultCvIs({ educationLevel: { in: educationLevels } }));
     }
 
     // Salary filter: overlap với khoảng lọc, hoặc ứng viên không khai báo lương (thỏa thuận → khớp mọi lọc).
     // Overlap: candidate.salaryMin <= filter.salaryMax AND candidate.salaryMax >= filter.salaryMin
     if (salaryMin !== undefined || salaryMax !== undefined) {
-      const negotiableSalary: Prisma.UserWhereInput = {
-        profile: {
-          AND: [{ expectedSalaryMin: null }, { expectedSalaryMax: null }],
-        },
-      };
-      const statedSalaryOverlap: Prisma.UserWhereInput = {
-        profile: {
+      const negotiableSalary: Prisma.UserWhereInput = defaultCvIs({
+        AND: [{ expectedSalaryMin: null }, { expectedSalaryMax: null }],
+      });
+      const statedSalaryOverlap: Prisma.UserWhereInput = defaultCvIs({
           AND: [
             {
               OR: [
@@ -635,8 +639,7 @@ export class TalentPoolService {
               : []),
             ...(salaryCurrency ? [{ salaryCurrency }] : []),
           ],
-        },
-      };
+      });
       conditions.push({
         OR: [negotiableSalary, statedSalaryOverlap],
       });
@@ -660,22 +663,26 @@ export class TalentPoolService {
               id: true, name: true, slug: true,
               profile: {
                 select: {
-                  avatar: true, headline: true, bio: true, skills: true,
-                  locations: true, wardCodes: true, knowledge: true, attitude: true,
-                  expectedSalaryMin: true, expectedSalaryMax: true, salaryCurrency: true, workMode: true, expectedCulture: true,
-                  isPublic: true, visibility: true,
-                  title: true, fullName: true,
-                  gender: true, dayOfBirth: true, monthOfBirth: true, yearOfBirth: true, educationLevel: true,
                   status: true,
+                  defaultCv: {
+                    select: {
+                      avatar: true, headline: true, bio: true, skills: true,
+                      locations: true, wardCodes: true, knowledge: true, attitude: true,
+                      expectedSalaryMin: true, expectedSalaryMax: true, salaryCurrency: true, workMode: true, expectedCulture: true,
+                      visibility: true,
+                      title: true, fullName: true,
+                      gender: true, dayOfBirth: true, monthOfBirth: true, yearOfBirth: true, educationLevel: true,
+                      experiences: {
+                        orderBy: CV_SECTION_ORDER_BY,
+                        select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
+                      },
+                      educations: {
+                        orderBy: CV_SECTION_ORDER_BY,
+                        select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
+                      },
+                    },
+                  },
                 },
-              },
-              experiences: {
-                orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
-                select: { id: true, role: true, company: true, period: true, desc: true, achievements: true, order: true },
-              },
-              educations: {
-                orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
-                select: { id: true, school: true, degree: true, period: true, gpa: true, honors: true, order: true },
               },
             },
           },
@@ -686,22 +693,22 @@ export class TalentPoolService {
 
     const candidates = members.map((m) => {
       const u = m.user;
-      const p = u.profile;
+      const p = u.profile?.defaultCv ?? null;
 
-      if (!p || !p.isPublic) {
+      if (!p) {
         return {
           memberId: m.id,
           joinedAt: m.createdAt,
           userId: u.id,
           name: u.name,
           slug: u.slug,
-          isPublic: p?.isPublic ?? false,
+          isPublic: false,
           profile: null,
-          gender: p?.gender ?? null,
-          dayOfBirth: p?.dayOfBirth ?? null,
-          monthOfBirth: p?.monthOfBirth ?? null,
-          yearOfBirth: p?.yearOfBirth ?? null,
-          educationLevel: p?.educationLevel ?? null,
+          gender: null,
+          dayOfBirth: null,
+          monthOfBirth: null,
+          yearOfBirth: null,
+          educationLevel: null,
           experiences: [],
           educations: [],
         };
@@ -713,7 +720,7 @@ export class TalentPoolService {
         memberId: m.id,
         joinedAt: m.createdAt,
         userId: u.id,
-        name: u.profile?.fullName || u.name,
+        name: p.fullName || u.name,
         slug: u.slug,
         isPublic: true,
         profile: {
@@ -738,10 +745,10 @@ export class TalentPoolService {
           monthOfBirth: p.monthOfBirth,
           yearOfBirth: p.yearOfBirth,
           educationLevel: p.educationLevel,
-          status: p.status ?? null,
+          status: u.profile?.status ?? null,
         },
-        experiences: vis['experience'] !== false ? u.experiences : [],
-        educations: vis['education'] !== false ? u.educations : [],
+        experiences: vis['experience'] !== false ? p.experiences : [],
+        educations: vis['education'] !== false ? p.educations : [],
       };
     });
 

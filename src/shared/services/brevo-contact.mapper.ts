@@ -6,6 +6,7 @@
  */
 
 import { createHash } from 'crypto';
+import type { Prisma } from '@prisma/client';
 import { evaluateCandidateCvReadiness } from '@/shared/candidates/cv-readiness';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,6 +34,46 @@ export type BrevoMapperUser = {
   /** Company memberships — presence ⇒ ISEMPLOYER. */
   companies?: unknown[] | null;
 };
+
+/** Select Prisma cho mapper: nội dung lấy từ CV mặc định. */
+export const BREVO_USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  profile: {
+    select: {
+      defaultCv: {
+        select: {
+          fullName: true,
+          title: true,
+          bio: true,
+          contactEmail: true,
+          contactPhone: true,
+          locations: true,
+          knowledge: true,
+          skills: true,
+          attitude: true,
+          linkedin: true,
+          experiences: { select: { id: true } },
+        },
+      },
+    },
+  },
+  companies: { select: { id: true } },
+} satisfies Prisma.UserSelect;
+
+export type BrevoUserRow = Prisma.UserGetPayload<{ select: typeof BREVO_USER_SELECT }>;
+
+export function brevoUserFromRow<T extends BrevoUserRow>(
+  row: T
+): Omit<T, 'profile'> & BrevoMapperUser {
+  const { profile, ...rest } = row;
+  const cv = profile?.defaultCv ?? null;
+  if (!cv) return { ...rest, profile: null, experiences: [] };
+  const { experiences, ...content } = cv;
+  return { ...rest, profile: content, experiences };
+}
 
 /** Whitelist attributes we write to Brevo (names must exist on the account). */
 export type BrevoContactAttributes = {

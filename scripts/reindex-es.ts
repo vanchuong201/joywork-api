@@ -10,6 +10,7 @@ loadEnv();
 import { prisma } from '../src/shared/database/prisma';
 import { initializeIndices } from '../src/shared/elasticsearch/indices';
 import { syncJobToEs, syncCompanyToEs, syncUserToEs } from '../src/shared/elasticsearch/sync';
+import { CANDIDATE_ES_SELECT, toUserForEs } from '../src/shared/candidates/candidate-search-sync';
 
 const BATCH_SIZE = 500;
 
@@ -89,14 +90,11 @@ async function reindexUsers(): Promise<void> {
     const users = await prisma.user.findMany({
       skip,
       take: BATCH_SIZE,
-      select: {
-        id: true, name: true, email: true, slug: true, createdAt: true,
-        profile: { select: { headline: true, bio: true, skills: true, locations: true, isPublic: true, isSearchingJob: true } },
-      },
+      select: CANDIDATE_ES_SELECT,
     });
     if (users.length === 0) break;
 
-    await Promise.all(users.map(user => syncUserToEs(user)));
+    await Promise.all(users.map(user => syncUserToEs(toUserForEs(user))));
 
     total += users.length;
     skip += BATCH_SIZE;

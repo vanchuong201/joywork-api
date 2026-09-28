@@ -8,7 +8,7 @@ loadEnv();
 import { BrevoClient } from '@getbrevo/brevo';
 import { prisma } from '../src/shared/database/prisma';
 import { config } from '../src/config/env';
-import { mapUserToBrevoContact } from '../src/shared/services/brevo-contact.mapper';
+import { BREVO_USER_SELECT, brevoUserFromRow, mapUserToBrevoContact } from '../src/shared/services/brevo-contact.mapper';
 
 async function main() {
   if (!config.BREVO_API_KEY) {
@@ -24,26 +24,13 @@ async function main() {
       email: true,
       name: true,
       phone: true,
-      profile: {
-        select: {
-          fullName: true,
-          title: true,
-          bio: true,
-          contactEmail: true,
-          contactPhone: true,
-          locations: true,
-          knowledge: true,
-          skills: true,
-          attitude: true,
-          linkedin: true,
-        },
-      },
-      experiences: { select: { id: true } },
+      profile: BREVO_USER_SELECT.profile,
+      companies: BREVO_USER_SELECT.companies,
     },
   });
 
   const mapped = users
-    .map((u) => mapUserToBrevoContact(u))
+    .map((u) => mapUserToBrevoContact(brevoUserFromRow(u)))
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
   const trueSample = mapped.find((c) => c.attributes.CV_ACTIVATE);

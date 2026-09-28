@@ -210,7 +210,6 @@ const locationSets: { locations: string[]; wardCodes: string[] }[] = [
 ];
 
 const workModes = ['Remote', 'Hybrid', 'On-site', 'Hybrid — 2 ngày/tuần tại văn phòng'];
-const userStatuses = [UserStatus.OPEN_TO_WORK, UserStatus.LOOKING, UserStatus.NOT_AVAILABLE];
 
 function buildFullName(i: number) {
   const h = sample(ho);
@@ -220,7 +219,7 @@ function buildFullName(i: number) {
   return `${h} ${mid}${t}`.replace(/\s+/g, ' ').trim();
 }
 
-function buildExperiences(userId: string, vertical: (typeof verticals)[number], count: number) {
+function buildExperiences(vertical: (typeof verticals)[number], count: number) {
   const exp = [];
   let cursorEnd = new Date(2026, randInt(0, 3), 1);
   for (let e = 0; e < count; e++) {
@@ -233,7 +232,6 @@ function buildExperiences(userId: string, vertical: (typeof verticals)[number], 
     cursorEnd.setMonth(cursorEnd.getMonth() - randInt(1, 3));
 
     exp.push({
-      userId,
       role:
         e === 0
           ? vertical.headline
@@ -255,7 +253,7 @@ function buildExperiences(userId: string, vertical: (typeof verticals)[number], 
   return exp;
 }
 
-function buildEducations(userId: string, count: number) {
+function buildEducations(count: number) {
   const ed = [];
   const endYear = randInt(2016, 2024);
   for (let k = 0; k < count; k++) {
@@ -264,7 +262,6 @@ function buildEducations(userId: string, count: number) {
     const startDate = new Date(endDate);
     startDate.setFullYear(startDate.getFullYear() - span);
     ed.push({
-      userId,
       school: sample(schools),
       degree: sample(degrees),
       startDate,
@@ -336,59 +333,67 @@ async function main() {
         slug: baseSlug,
         phone: `0${[3, 5, 7, 8, 9][randInt(0, 4)]}${String(randInt(0, 99_999_999)).padStart(8, '0')}`,
         emailVerified: true,
-        profile: {
-          create: {
-            fullName,
-            headline: vertical.headline,
-            title: vertical.title,
-            bio,
-            skills,
-            knowledge,
-            attitude,
-            careerGoals,
-            locations: loc.locations,
-            wardCodes: loc.wardCodes,
-            avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(email)}`,
-            status: sample(userStatuses),
-            isSearchingJob: Math.random() < 0.85,
-            isPublic: Math.random() < 0.9,
-            allowCvFlip: Math.random() < 0.75,
-            contactEmail: email,
-            contactPhone: `+84${randInt(3, 9)}${String(randInt(0, 99_999_999)).padStart(8, '0')}`,
-            linkedin: Math.random() < 0.7 ? `https://linkedin.com/in/${baseSlug}` : null,
-            github: Math.random() < 0.65 ? `https://github.com/${baseSlug}` : null,
-            website: Math.random() < 0.4 ? `https://portfolio.example.dev/${baseSlug}` : null,
-            expectedSalaryMin: salaryMin,
-            expectedSalaryMax: salaryMax,
-            salaryCurrency: 'VND',
-            workMode: sample(workModes),
-            expectedCulture: sample([
-              'Môi trường cởi mở, feedback hai chiều.',
-              'Tôn trọng work-life balance, kết quả quan trọng hơn giờ ngồi máy.',
-              'Được học và thử nghiệm công nghệ mới trong giới hạn an toàn.',
-              'Lộ trình thăng tiến minh bạch, đánh giá định kỳ rõ ràng.',
-            ]),
-            visibility: {
-              bio: true,
-              experience: true,
-              education: true,
-              ksa: true,
-              expectations: Math.random() < 0.85,
-            },
-          },
-        },
       },
       select: { id: true },
     });
 
     const expCount = randInt(1, 3);
     const eduCount = randInt(1, 2);
+    const isSearchingJob = Math.random() < 0.85;
 
-    await prisma.userExperience.createMany({
-      data: buildExperiences(user.id, vertical, expCount),
+    const cv = await prisma.candidateCv.create({
+      data: {
+        userId: user.id,
+        name: 'CV của tôi',
+        nameNormalized: 'cv của tôi',
+        fullName,
+        headline: vertical.headline,
+        title: vertical.title,
+        bio,
+        skills,
+        knowledge,
+        attitude,
+        careerGoals,
+        locations: loc.locations,
+        wardCodes: loc.wardCodes,
+        avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(email)}`,
+        contactEmail: email,
+        contactPhone: `+84${randInt(3, 9)}${String(randInt(0, 99_999_999)).padStart(8, '0')}`,
+        linkedin: Math.random() < 0.7 ? `https://linkedin.com/in/${baseSlug}` : null,
+        github: Math.random() < 0.65 ? `https://github.com/${baseSlug}` : null,
+        website: Math.random() < 0.4 ? `https://portfolio.example.dev/${baseSlug}` : null,
+        expectedSalaryMin: salaryMin,
+        expectedSalaryMax: salaryMax,
+        salaryCurrency: 'VND',
+        workMode: sample(workModes),
+        expectedCulture: sample([
+          'Môi trường cởi mở, feedback hai chiều.',
+          'Tôn trọng work-life balance, kết quả quan trọng hơn giờ ngồi máy.',
+          'Được học và thử nghiệm công nghệ mới trong giới hạn an toàn.',
+          'Lộ trình thăng tiến minh bạch, đánh giá định kỳ rõ ràng.',
+        ]),
+        visibility: {
+          bio: true,
+          experience: true,
+          education: true,
+          ksa: true,
+          expectations: Math.random() < 0.85,
+        },
+        experiences: { create: buildExperiences(vertical, expCount) },
+        educations: { create: buildEducations(eduCount) },
+      },
+      select: { id: true },
     });
-    await prisma.userEducation.createMany({
-      data: buildEducations(user.id, eduCount),
+
+    await prisma.userProfile.create({
+      data: {
+        userId: user.id,
+        defaultCvId: cv.id,
+        status: isSearchingJob ? UserStatus.OPEN_TO_WORK : UserStatus.NOT_AVAILABLE,
+        isSearchingJob,
+        isPublic: isSearchingJob,
+        allowCvFlip: Math.random() < 0.75,
+      },
     });
 
     if ((i + 1) % 25 === 0) {

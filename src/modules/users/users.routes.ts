@@ -27,7 +27,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
   
   const authMiddleware = new AuthMiddleware(authService);
 
-  // Get public profile by slug (optional auth: chủ hồ sơ xem được cả khi tạm tắt công khai)
+  // Get public profile by slug (optional auth: chủ hồ sơ xem được cả khi tắt tìm việc)
   fastify.get('/profile/:slug', {
     preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
     schema: {
@@ -86,6 +86,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                       nullable: true,
                       properties: {
                         id: { type: 'string' },
+                        defaultCvId: { type: 'string', nullable: true },
                         avatar: { type: 'string', nullable: true },
                         fullName: { type: 'string', nullable: true },
                         title: { type: 'string', nullable: true },
@@ -105,7 +106,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         isPublic: { type: 'boolean' },
                         isSearchingJob: { type: 'boolean' },
                         allowCvFlip: { type: 'boolean' },
-                        visibility: { type: 'object', nullable: true },
+                        visibility: { type: 'object', nullable: true, additionalProperties: { type: 'boolean' } },
                         knowledge: { type: 'array', items: { type: 'string' }, nullable: true },
                         skills: { type: 'array', items: { type: 'string' }, nullable: true },
                         attitude: { type: 'array', items: { type: 'string' }, nullable: true },
@@ -286,7 +287,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         isPublic: { type: 'boolean' },
                         isSearchingJob: { type: 'boolean' },
                         allowCvFlip: { type: 'boolean' },
-                        visibility: { type: 'object', nullable: true },
+                        visibility: { type: 'object', nullable: true, additionalProperties: { type: 'boolean' } },
                         knowledge: { type: 'array', items: { type: 'string' } },
                         attitude: { type: 'array', items: { type: 'string' } },
                         expectedSalaryMin: { type: 'integer', nullable: true },
@@ -443,7 +444,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                         isPublic: { type: 'boolean' },
                         isSearchingJob: { type: 'boolean' },
                         allowCvFlip: { type: 'boolean' },
-                        visibility: { type: 'object', nullable: true },
+                        visibility: { type: 'object', nullable: true, additionalProperties: { type: 'boolean' } },
                         knowledge: { type: 'array', items: { type: 'string' } },
                         attitude: { type: 'array', items: { type: 'string' } },
                         expectedSalaryMin: { type: 'integer', nullable: true },
