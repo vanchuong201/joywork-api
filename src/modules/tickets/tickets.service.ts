@@ -17,6 +17,9 @@ const MAX_OPEN_TICKETS_PER_COMPANY = 5;
 const MAX_TICKETS_PER_DAY = 5;
 const DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+const senderAvatar = (sender: { avatar: string | null; profile: { defaultCv: { avatar: string | null } | null } | null }) =>
+  sender.avatar ?? sender.profile?.defaultCv?.avatar ?? null;
+
 export class TicketsService {
   async createTicket(userId: string, data: CreateTicketInput) {
     const [company, applicant, userMembership] = await Promise.all([
@@ -216,7 +219,7 @@ export class TicketsService {
         orderBy: { createdAt: 'asc' },
         include: {
           sender: {
-            select: { id: true, name: true, email: true, profile: { select: { defaultCv: { select: { avatar: true } } } } },
+            select: { id: true, name: true, email: true, avatar: true, profile: { select: { defaultCv: { select: { avatar: true } } } } },
           },
         },
       }),
@@ -242,7 +245,7 @@ export class TicketsService {
           id: message.sender.id,
           email: message.sender.email,
           ...(message.sender.name ? { name: message.sender.name } : {}),
-          ...(message.sender.profile?.defaultCv?.avatar ? { avatar: message.sender.profile.defaultCv.avatar } : {}),
+          ...(senderAvatar(message.sender) ? { avatar: senderAvatar(message.sender)! } : {}),
         },
       })),
       pagination: {
@@ -265,7 +268,7 @@ export class TicketsService {
       },
       include: {
         sender: {
-          select: { id: true, name: true, email: true, profile: { select: { defaultCv: { select: { avatar: true } } } } },
+          select: { id: true, name: true, email: true, avatar: true, profile: { select: { defaultCv: { select: { avatar: true } } } } },
         },
       },
     });
@@ -309,7 +312,7 @@ export class TicketsService {
         id: message.sender.id,
         email: message.sender.email,
         ...(message.sender.name ? { name: message.sender.name } : {}),
-        ...(message.sender.profile?.defaultCv?.avatar ? { avatar: message.sender.profile.defaultCv.avatar } : {}),
+        ...(senderAvatar(message.sender) ? { avatar: senderAvatar(message.sender)! } : {}),
       },
     };
   }

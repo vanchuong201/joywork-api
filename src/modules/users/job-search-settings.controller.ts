@@ -8,13 +8,13 @@ export class JobSearchSettingsController {
   async get(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const settings = await this.settingsService.get(userId);
-    return reply.send({ data: { settings } });
+    return reply.send({ data: settings });
   }
 
   async update(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user?.userId;
     const input = jobSearchSettingsSchema.parse(request.body ?? {});
     const settings = await this.settingsService.update(userId, input);
-    return reply.send({ data: { settings } });
+    return reply.send({ data: settings });
   }
 }

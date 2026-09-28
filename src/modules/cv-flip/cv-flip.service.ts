@@ -467,7 +467,7 @@ export class CvFlipService {
     let useRelevanceOrdering = Boolean(keyword);
 
     if (keyword) {
-      const escapedKeyword = keyword.replace(/'/g, "''");
+      const escapedKeyword = keyword.replace(/[\\%_]/g, (char) => `\\${char}`);
 
       // Only use relevance ordering if there are no additional complex filters
       // that would cause mismatch between raw query results and actual filtered results

@@ -514,14 +514,9 @@ export async function usersRoutes(fastify: FastifyInstance) {
       data: {
         type: 'object',
         properties: {
-          settings: {
-            type: 'object',
-            properties: {
-              isSearchingJob: { type: 'boolean' },
-              allowCvFlip: { type: 'boolean' },
-              defaultCvId: { type: 'string', nullable: true },
-            },
-          },
+          isSearchingJob: { type: 'boolean' },
+          allowCvFlip: { type: 'boolean' },
+          defaultCvId: { type: 'string', nullable: true },
         },
       },
     },

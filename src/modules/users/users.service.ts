@@ -139,10 +139,11 @@ export class UsersService {
     // Try Elasticsearch first for text queries
     if (data.q) {
       try {
-        const ids = await this.searchUsersInEs(data);
-        if (ids !== null) {
+        const esResult = await this.searchUsersInEs(data);
+        if (esResult !== null) {
+          const { ids, total } = esResult;
           if (ids.length === 0) {
-            return { users: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
+            return { users: [], pagination: { page: data.page, limit: data.limit, total, totalPages: Math.ceil(total / data.limit) } };
           }
           const users = await prisma.user.findMany({
             where: { AND: [{ id: { in: ids } }, buildDiscoverableUserWhere()] },
@@ -152,7 +153,7 @@ export class UsersService {
           const ordered = ids.map(id => userMap.get(id)).filter(Boolean) as typeof users;
           return {
             users: ordered.map(user => serializePublicUser(user, { includeLinks: false })),
-            pagination: { page: data.page, limit: data.limit, total: ordered.length, totalPages: Math.ceil(ordered.length / data.limit) },
+            pagination: { page: data.page, limit: data.limit, total, totalPages: Math.ceil(total / data.limit) },
           };
         }
       } catch {
@@ -231,7 +232,7 @@ export class UsersService {
 
   // ─── Elasticsearch search helpers ─────────────────────────────────────────
 
-  private async searchUsersInEs(data: SearchUsersInput): Promise<string[] | null> {
+  private async searchUsersInEs(data: SearchUsersInput): Promise<{ ids: string[]; total: number } | null> {
     const client = getEsClient();
     if (!client) return null;
 
@@ -265,6 +266,7 @@ export class UsersService {
       index: USERS_INDEX,
       query: { bool: { must, filter } },
       _source: ['id'],
+      track_total_hits: true,
       size: data.limit,
       from: (data.page - 1) * data.limit,
       sort: must.length > 0
@@ -272,6 +274,9 @@ export class UsersService {
         : [{ createdAt: { order: 'desc' } }],
     });
 
-    return (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
+    const ids = (response.hits.hits as Array<{ _source: { id: string } }>).map(h => h._source.id);
+    const rawTotal = response.hits.total;
+    const total = typeof rawTotal === 'number' ? rawTotal : (rawTotal?.value ?? ids.length);
+    return { ids, total };
   }
 }

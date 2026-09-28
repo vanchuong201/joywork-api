@@ -325,7 +325,7 @@ async function main() {
         data: {
           userId: u.id,
           jobId: j.id,
-          status: sample([ApplicationStatus.PENDING, ApplicationStatus.REVIEWING, ApplicationStatus.SHORTLISTED, ApplicationStatus.REJECTED]),
+          status: sample([ApplicationStatus.RECEIVED, ApplicationStatus.SUITABLE, ApplicationStatus.INTERVIEW_SCHEDULED, ApplicationStatus.NOT_SUITABLE]),
           coverLetter: Math.random() < 0.7 ? "I am very interested in this role and believe I am a strong fit." : null,
           resumeUrl: Math.random() < 0.8 ? `https://files.example.com/resume/${u.id}.pdf` : null,
           notes: Math.random() < 0.3 ? "Internal note for application." : null,
