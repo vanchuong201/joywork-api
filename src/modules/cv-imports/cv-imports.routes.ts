@@ -58,7 +58,8 @@ export async function cvImportsRoutes(fastify: FastifyInstance) {
     {
       preHandler: secured,
       schema: {
-        description: 'Áp dụng phiên import CV vào hồ sơ. Chọn mode và các section muốn cập nhật.',
+        description:
+          'Áp dụng phiên import CV. Mặc định vào CV mặc định; targetCvId chọn CV khác; createNewCv tạo CV mới (409 CV_LIMIT_REACHED khi đủ 5).',
         tags: ['CV Import'],
         security: [{ bearerAuth: [] }],
         params: {
@@ -78,6 +79,9 @@ export async function cvImportsRoutes(fastify: FastifyInstance) {
               items: { type: 'string', enum: [...CV_IMPORT_SECTIONS] },
               minItems: 1,
             },
+            targetCvId: { type: 'string' },
+            createNewCv: { type: 'boolean' },
+            newCvName: { type: 'string', minLength: 1, maxLength: 60 },
           },
         },
       },

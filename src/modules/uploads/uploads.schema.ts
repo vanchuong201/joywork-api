@@ -35,7 +35,8 @@ export const uploadProfileAvatarSchema = z.object({
       }
     }, 'Invalid base64 data'),
   previousKey: z.string().optional(),
-  target: z.enum(['account', 'profile']).default('profile'), // 'account' for User.avatar, 'profile' for UserProfile.avatar
+  target: z.enum(['account', 'profile']).default('profile'), // 'account' for User.avatar, 'profile' for avatar CV
+  cvId: z.string().min(1).optional(), // target=profile: CV đích, mặc định CV mặc định
 });
 
 export const uploadCompanyPostImageSchema = z.object({
@@ -119,6 +120,7 @@ export const uploadProfileCVSchema = z.object({
       }
     }, 'Invalid base64 data'),
   previousKey: z.string().optional(),
+  cvId: z.string().min(1).optional(), // CV đích, mặc định CV mặc định
 });
 
 export const uploadCompanyVerificationSchema = z.object({

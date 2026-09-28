@@ -7,6 +7,8 @@ import { UserExperienceController } from './user-experience.controller';
 import { UserExperienceService } from './user-experience.service';
 import { UserEducationController } from './user-education.controller';
 import { UserEducationService } from './user-education.service';
+import { JobSearchSettingsController } from './job-search-settings.controller';
+import { JobSearchSettingsService } from './job-search-settings.service';
 import { AuthMiddleware } from '@/modules/auth/auth.middleware';
 import { AuthService } from '@/modules/auth/auth.service';
 
@@ -21,6 +23,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
   const userProfileController = new UserProfileController(userProfileService);
   const experienceController = new UserExperienceController(experienceService);
   const educationController = new UserEducationController(educationService);
+  const jobSearchSettingsController = new JobSearchSettingsController(new JobSearchSettingsService());
   
   const authMiddleware = new AuthMiddleware(authService);
 
@@ -263,6 +266,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                       nullable: true,
                       properties: {
                         id: { type: 'string' },
+                        defaultCvId: { type: 'string', nullable: true },
                         avatar: { type: 'string', nullable: true },
                         fullName: { type: 'string', nullable: true },
                         title: { type: 'string', nullable: true },
@@ -421,6 +425,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                       nullable: true,
                       properties: {
                         id: { type: 'string' },
+                        defaultCvId: { type: 'string', nullable: true },
                         avatar: { type: 'string', nullable: true },
                         fullName: { type: 'string', nullable: true },
                         title: { type: 'string', nullable: true },
@@ -499,6 +504,55 @@ export async function usersRoutes(fastify: FastifyInstance) {
       },
     },
   }, userProfileController.updateOwnProfile.bind(userProfileController));
+
+  // ========== JOB SEARCH SETTINGS ==========
+
+  const jobSearchSettingsResponse = {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'object',
+        properties: {
+          settings: {
+            type: 'object',
+            properties: {
+              isSearchingJob: { type: 'boolean' },
+              allowCvFlip: { type: 'boolean' },
+              defaultCvId: { type: 'string', nullable: true },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  fastify.get('/me/job-search-settings', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description: 'Cài đặt tìm việc: toggle "Bật/Tắt tìm việc", cho phép CV Flip, CV mặc định',
+      tags: ['Users'],
+      security: [{ bearerAuth: [] }],
+      response: { 200: jobSearchSettingsResponse },
+    },
+  }, jobSearchSettingsController.get.bind(jobSearchSettingsController));
+
+  fastify.patch('/me/job-search-settings', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware)],
+    schema: {
+      description:
+        'Cập nhật cài đặt tìm việc. isSearchingJob đồng bộ status (OPEN_TO_WORK/NOT_AVAILABLE) và isPublic.',
+      tags: ['Users'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        properties: {
+          isSearchingJob: { type: 'boolean' },
+          allowCvFlip: { type: 'boolean' },
+        },
+      },
+      response: { 200: jobSearchSettingsResponse },
+    },
+  }, jobSearchSettingsController.update.bind(jobSearchSettingsController));
 
   // ========== EXPERIENCE ROUTES ==========
   

@@ -3,7 +3,15 @@ import { prisma } from '@/shared/database/prisma';
 import { hasUserAppliedToCompany } from '@/shared/applications/has-applied-to-company';
 import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode } from '@/shared/provinces';
-import { resolveLocationsWithWards } from '@/shared/wards';
+import { syncCandidateToEs } from '@/shared/candidates/candidate-search-sync';
+import {
+  CandidateCvService,
+  CV_SECTION_ORDER_BY,
+  serializeCvContent,
+  serializeCvEducation,
+  serializeCvExperience,
+} from '@/modules/candidate-cvs/candidate-cvs.service';
+import { JobSearchSettingsService } from './job-search-settings.service';
 import { slugify } from '@/shared/slug';
 import { buildMaskedFieldPresence, maskNameToInitials } from '@/shared/mask';
 import {
@@ -59,6 +67,11 @@ export async function ensureUniqueSlug(baseSlug: string, excludeUserId?: string)
 }
 
 export class UserProfileService {
+  constructor(
+    private cvService: CandidateCvService = new CandidateCvService(),
+    private settingsService: JobSearchSettingsService = new JobSearchSettingsService(cvService)
+  ) {}
+
   /**
    * Ẩn contactEmail / contactPhone / cvUrl / website / linkedin / github trên API public trừ khi:
    * - viewer là chủ hồ sơ, hoặc
@@ -430,136 +443,87 @@ export class UserProfileService {
     return result;
   }
 
-  // Get own profile (with full data including email/phone)
+  // Get own profile (with full data including email/phone).
+  // Settings lấy từ UserProfile, nội dung + kinh nghiệm/học vấn lấy từ CV mặc định.
   async getOwnProfile(userId: string): Promise<any | null> {
+    const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!exists) {
+      return null;
+    }
+    await this.cvService.ensureDefaultCv(userId);
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        profile: true,
-        experiences: {
-          orderBy: [
-            { order: 'asc' },
-            { startDate: 'desc' },
-          ],
-        },
-        educations: {
-          orderBy: [
-            { order: 'asc' },
-            { startDate: 'desc' },
-          ],
+        profile: {
+          include: {
+            defaultCv: {
+              include: {
+                experiences: { orderBy: CV_SECTION_ORDER_BY },
+                educations: { orderBy: CV_SECTION_ORDER_BY },
+              },
+            },
+          },
         },
       },
     });
 
-    if (!user) {
+    if (!user?.profile?.defaultCv) {
       return null;
     }
 
-    const result: any = {
+    const { profile } = user;
+    const cv = profile.defaultCv!;
+
+    return {
       id: user.id,
       email: user.email,
-      emailVerified: user.emailVerified, // Include email verification status
+      emailVerified: user.emailVerified,
       phone: user.phone,
       name: user.name,
       slug: user.slug,
       avatar: user.avatar, // Account avatar
       createdAt: user.createdAt,
-      profile: user.profile
-        ? {
-            id: user.profile.id,
-            avatar: user.profile.avatar,
-            fullName: user.profile.fullName,
-            title: user.profile.title,
-            headline: user.profile.headline,
-            bio: user.profile.bio,
-            skills: user.profile.skills,
-            cvUrl: user.profile.cvUrl,
-            locations: user.profile.locations,
-            wardCodes: user.profile.wardCodes,
-            specificAddress: user.profile.specificAddress,
-            ...(user.profile.locations.length > 0 ? { location: getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0] } : {}),
-            website: user.profile.website,
-            linkedin: user.profile.linkedin,
-            github: user.profile.github,
-            // CV contact info (independent from account email/phone)
-            contactEmail: (user.profile as any).contactEmail,
-            contactPhone: (user.profile as any).contactPhone,
-            status: user.profile.status,
-            isPublic: user.profile.isPublic,
-            isSearchingJob: user.profile.isSearchingJob,
-            allowCvFlip: user.profile.allowCvFlip,
-            visibility: user.profile.visibility,
-            knowledge: user.profile.knowledge,
-            attitude: user.profile.attitude,
-            expectedSalaryMin: user.profile.expectedSalaryMin,
-            expectedSalaryMax: user.profile.expectedSalaryMax,
-            salaryCurrency: user.profile.salaryCurrency,
-            workMode: user.profile.workMode,
-            expectedCulture: user.profile.expectedCulture,
-            careerGoals: user.profile.careerGoals,
-            gender: user.profile.gender,
-            dayOfBirth: user.profile.dayOfBirth,
-            monthOfBirth: user.profile.monthOfBirth,
-            yearOfBirth: user.profile.yearOfBirth,
-            educationLevel: user.profile.educationLevel,
-            createdAt: user.profile.createdAt,
-            updatedAt: user.profile.updatedAt,
-          }
-        : null, // Always include profile (null if not exists)
-      experiences: user.experiences.map((exp: any) => ({
-        id: exp.id,
-        role: exp.role,
-        company: exp.company,
-        startDate: exp.startDate,
-        endDate: exp.endDate,
-        period: exp.period,
-        desc: exp.desc,
-        achievements: exp.achievements,
-        order: exp.order,
-      })),
-      educations: user.educations.map((edu: any) => ({
-        id: edu.id,
-        school: edu.school,
-        degree: edu.degree,
-        startDate: edu.startDate,
-        endDate: edu.endDate,
-        period: edu.period,
-        gpa: edu.gpa,
-        honors: edu.honors,
-        order: edu.order,
-      })),
+      profile: {
+        id: profile.id,
+        defaultCvId: cv.id,
+        ...serializeCvContent(cv),
+        status: profile.status,
+        isPublic: profile.isPublic,
+        isSearchingJob: profile.isSearchingJob,
+        allowCvFlip: profile.allowCvFlip,
+        createdAt: profile.createdAt,
+        updatedAt: cv.updatedAt > profile.updatedAt ? cv.updatedAt : profile.updatedAt,
+      },
+      experiences: cv.experiences.map(serializeCvExperience),
+      educations: cv.educations.map(serializeCvEducation),
     };
-
-    return result;
   }
 
-  // Update profile
+  // Update profile (adapter): name/slug → User, settings → toggle tìm việc, nội dung → CV mặc định.
   async updateProfile(userId: string, data: UpdateProfileInput): Promise<any> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true },
     });
 
     if (!user) {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    const { name, slug, ...profileInput } = data;
+    const { name, slug, status, isPublic, isSearchingJob, allowCvFlip, ...content } = data;
 
-    // Update user name and slug
-    const userUpdateData: any = {};
+    const userUpdateData: { name?: string; slug?: string } = {};
     if (typeof name === 'string') {
       userUpdateData.name = name;
-      // Auto-generate slug from name if not provided
       if (!slug && name) {
         const baseSlug = generateSlug(name);
         userUpdateData.slug = await ensureUniqueSlug(baseSlug, userId);
       }
     }
     if (typeof slug === 'string') {
-      const uniqueSlug = await ensureUniqueSlug(slug, userId);
-      userUpdateData.slug = uniqueSlug;
+      userUpdateData.slug = await ensureUniqueSlug(slug, userId);
     }
-
     if (Object.keys(userUpdateData).length > 0) {
       await prisma.user.update({
         where: { id: userId },
@@ -567,80 +531,15 @@ export class UserProfileService {
       });
     }
 
-    // Update or create profile
-    const profileData: any = {
-      updatedAt: new Date(),
-    };
+    const defaultCvId = await this.cvService.ensureDefaultCv(userId);
+    await this.settingsService.applyLegacy(userId, { status, isPublic, isSearchingJob, allowCvFlip });
 
-    // Map all profile fields
-    const profileFields = [
-      'avatar',
-      'fullName',
-      'headline',
-      'bio',
-      'skills',
-      'cvUrl',
-      'website',
-      'linkedin',
-      'github',
-      // CV contact info
-      'contactEmail',
-      'contactPhone',
-      'title',
-      'status',
-      'isPublic',
-      'isSearchingJob',
-      'allowCvFlip',
-      'visibility',
-      'knowledge',
-      'attitude',
-      'expectedSalaryMin',
-      'expectedSalaryMax',
-      'salaryCurrency',
-      'workMode',
-      'expectedCulture',
-      'careerGoals',
-      'gender',
-      'dayOfBirth',
-      'monthOfBirth',
-      'yearOfBirth',
-      'educationLevel',
-      'specificAddress',
-    ];
-
-    for (const field of profileFields) {
-      if (profileInput[field as keyof typeof profileInput] !== undefined) {
-        const value = profileInput[field as keyof typeof profileInput];
-        profileData[field] = value ?? (field === 'skills' || field === 'knowledge' || field === 'attitude' || field === 'careerGoals' ? [] : null);
-      }
+    const hasContent = Object.values(content).some((value) => value !== undefined);
+    if (hasContent) {
+      await this.cvService.update(userId, defaultCvId, content);
+    } else if (userUpdateData.name !== undefined || userUpdateData.slug !== undefined) {
+      void syncCandidateToEs(userId);
     }
-
-    if (
-      profileInput.locations !== undefined ||
-      profileInput.location !== undefined ||
-      profileInput.wardCodes !== undefined
-    ) {
-      const existing = await prisma.userProfile.findUnique({
-        where: { userId },
-        select: { locations: true, wardCodes: true },
-      });
-      const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
-      if (profileInput.locations !== undefined) locInput.locations = profileInput.locations;
-      if (profileInput.location !== undefined) locInput.location = profileInput.location;
-      if (profileInput.wardCodes !== undefined) locInput.wardCodes = profileInput.wardCodes;
-      const resolved = resolveLocationsWithWards(existing, locInput);
-      profileData.locations = resolved.locations;
-      profileData.wardCodes = resolved.wardCodes;
-    }
-
-    await prisma.userProfile.upsert({
-      where: { userId },
-      update: profileData,
-      create: {
-        userId,
-        ...profileData,
-      },
-    });
 
     return await this.getOwnProfile(userId);
   }

@@ -8,6 +8,7 @@ import { emailService } from '@/shared/services/email.service';
 import { hashPassword, verifyPassword } from '@/shared/security/password-hash';
 import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { resolveUniqueUserSlug } from '../users/user-profile.service';
+import { DEFAULT_CV_NAME, normalizeCvName } from '@/modules/candidate-cvs/candidate-cvs.schema';
 import {
   RegisterInput,
   LoginInput,
@@ -69,13 +70,24 @@ export class AuthService {
       },
     });
 
-    // Create user profile with gender
-    await prisma.userProfile.create({
-      data: {
-        userId: user.id,
-        gender: data.gender ?? 'MALE',
-        yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
-      },
+    // Create user profile + CV mặc định (gender/yearOfBirth là nội dung CV)
+    await prisma.$transaction(async (tx) => {
+      const cv = await tx.candidateCv.create({
+        data: {
+          userId: user.id,
+          name: DEFAULT_CV_NAME,
+          nameNormalized: normalizeCvName(DEFAULT_CV_NAME),
+          gender: data.gender ?? 'MALE',
+          yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
+        },
+        select: { id: true },
+      });
+      await tx.userProfile.create({
+        data: {
+          userId: user.id,
+          defaultCvId: cv.id,
+        },
+      });
     });
 
     // Generate verification token
@@ -223,7 +235,7 @@ export class AuthService {
         avatar: true, // Account avatar
         profile: {
           select: {
-            avatar: true, // Profile avatar
+            defaultCv: { select: { avatar: true } }, // Avatar CV mặc định
           },
         },
       },
@@ -242,7 +254,7 @@ export class AuthService {
       accountStatus: user.accountStatus,
       avatar: user.avatar,
       profile: user.profile ? {
-        avatar: user.profile.avatar,
+        avatar: user.profile.defaultCv?.avatar ?? null,
       } : null,
     };
   }

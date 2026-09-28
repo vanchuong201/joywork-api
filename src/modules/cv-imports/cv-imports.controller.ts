@@ -84,6 +84,8 @@ export class CvImportsController {
     }
 
     const job = await this.service.applyImport(userId, jobId, parsed.data);
-    return reply.send({ data: { job: serializeJob(job as unknown as JobLike) } });
+    return reply.send({
+      data: { job: { ...serializeJob(job as unknown as JobLike), targetCvId: job.targetCvId } },
+    });
   }
 }

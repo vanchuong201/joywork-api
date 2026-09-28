@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
+import { CandidateCvService } from '@/modules/candidate-cvs/candidate-cvs.service';
 import { buildS3ObjectUrl, createPresignedUploadUrl, createPresignedDownloadUrl, deleteS3Objects, getS3BucketName, s3Client } from '@/shared/storage/s3';
 import {
   CreatePresignInput,
@@ -47,7 +48,6 @@ const ALLOWED_COURSE_ATTACHMENT_TYPES = new Set<string>([
   'application/zip',
   'application/x-zip-compressed',
 ]);
-const DEFAULT_PROFILE_YEAR_OF_BIRTH = new Date().getFullYear() - 18;
 
 function getExtensionFromMime(mime: string): string | null {
   if (mime === 'image/jpeg') return '.jpg';
@@ -87,6 +87,33 @@ function extractCompanyIdFromKey(key: string): string | null {
 }
 
 export class UploadsService {
+  private cvService = new CandidateCvService();
+
+  /**
+   * Xóa file cũ của user chỉ khi không còn nơi nào tham chiếu: avatar tài khoản,
+   * CV khác (bản nhân bản dùng chung file) hoặc snapshot đơn ứng tuyển đã gửi DN.
+   */
+  private async deleteUnreferencedUserAsset(userId: string, key: string, field: 'avatar' | 'cvUrl'): Promise<void> {
+    const url = buildS3ObjectUrl(key);
+    const [accountRef, cvRef, snapshotRefs] = await Promise.all([
+      field === 'avatar'
+        ? prisma.user.count({ where: { id: userId, avatar: url } })
+        : Promise.resolve(0),
+      prisma.candidateCv.count({ where: { userId, [field]: url } }),
+      prisma.$queryRaw<Array<{ n: number }>>`
+        SELECT COUNT(*)::int AS n FROM applications
+        WHERE "userId" = ${userId} AND "cvSnapshot"->'content'->>${field} = ${url}
+      `,
+    ]);
+    if (accountRef > 0 || cvRef > 0 || (snapshotRefs[0]?.n ?? 0) > 0) return;
+
+    try {
+      await deleteS3Objects([key]);
+    } catch {
+      // Không chặn upload thành công vì lỗi dọn file cũ.
+    }
+  }
+
   private async hasCompanyAssetPermission(userId: string, companyId: string): Promise<boolean> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -396,7 +423,7 @@ export class UploadsService {
   }
 
   async uploadProfileAvatar(userId: string, input: UploadProfileAvatarInput) {
-    const { fileName, fileType, fileData, previousKey, target = 'profile' } = input;
+    const { fileName, fileType, fileData, previousKey, target = 'profile', cvId } = input;
 
     if (!ALLOWED_MIME_TYPES.has(fileType)) {
       throw new AppError('Định dạng ảnh đại diện không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP', 400, 'UNSUPPORTED_FILE_TYPE');
@@ -420,6 +447,7 @@ export class UploadsService {
       return `.${sanitized.slice(idx + 1).toLowerCase()}`;
     })();
     const extension = extFromMime ?? fallbackExt ?? '';
+    const targetCvId = target === 'profile' ? await this.cvService.resolveTargetCvId(userId, cvId) : null;
     const key = `users/${userId}/avatar/${target}/${randomUUID()}${extension}`;
 
     try {
@@ -435,39 +463,19 @@ export class UploadsService {
       throw new AppError('Không thể tải ảnh đại diện, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
-    // Delete previous avatar if exists
-    if (previousKey && previousKey.startsWith(`users/${userId}/avatar/`)) {
-      try {
-        await deleteS3Objects([previousKey]);
-      } catch (error) {
-        // ignore deletion errors to avoid blocking upload success
-        console.error('Failed to delete previous avatar', error);
-      }
-    }
-
     const assetUrl = buildS3ObjectUrl(key);
 
-    // Update database based on target
-    if (target === 'account') {
-      const updated = await prisma.user.update({
+    if (target === 'account' || !targetCvId) {
+      await prisma.user.update({
         where: { id: userId },
         data: { avatar: assetUrl },
-        select: { id: true, avatar: true },
       });
-      console.log(`[Upload] Updated User.avatar for userId=${userId}, avatar=${updated.avatar}`);
     } else {
-      // Update or create profile
-      const updated = await prisma.userProfile.upsert({
-        where: { userId },
-        update: { avatar: assetUrl },
-        create: {
-          userId,
-          avatar: assetUrl,
-          yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
-        },
-        select: { id: true, userId: true, avatar: true },
-      });
-      console.log(`[Upload] Updated UserProfile.avatar for userId=${userId}, avatar=${updated.avatar}`);
+      await this.cvService.update(userId, targetCvId, { avatar: assetUrl });
+    }
+
+    if (previousKey && previousKey.startsWith(`users/${userId}/avatar/`)) {
+      await this.deleteUnreferencedUserAsset(userId, previousKey, 'avatar');
     }
 
     return {
@@ -671,7 +679,7 @@ export class UploadsService {
   }
 
   async uploadProfileCV(userId: string, input: UploadProfileCVInput) {
-    const { fileName, fileType, fileData, previousKey } = input;
+    const { fileName, fileType, fileData, previousKey, cvId } = input;
 
     if (!ALLOWED_CV_MIME_TYPES.has(fileType)) {
       throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận PDF, DOC, DOCX', 400, 'UNSUPPORTED_FILE_TYPE');
@@ -702,6 +710,7 @@ export class UploadsService {
     })();
     
     const extension = extFromMime ?? fallbackExt ?? '.pdf';
+    const targetCvId = await this.cvService.resolveTargetCvId(userId, cvId);
     const key = `users/${userId}/cv/${randomUUID()}${extension}`;
 
     try {
@@ -717,28 +726,12 @@ export class UploadsService {
       throw new AppError('Không thể tải CV lên, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
-    if (previousKey && previousKey.startsWith(`users/${userId}/cv/`)) {
-      try {
-        await deleteS3Objects([previousKey]);
-      } catch (error) {
-        console.error('Failed to delete previous CV', error);
-      }
-    }
-
     const assetUrl = buildS3ObjectUrl(key);
+    await this.cvService.update(userId, targetCvId, { cvUrl: assetUrl });
 
-    // Update database
-    const updated = await prisma.userProfile.upsert({
-      where: { userId },
-      update: { cvUrl: assetUrl },
-      create: {
-        userId,
-        cvUrl: assetUrl,
-        yearOfBirth: DEFAULT_PROFILE_YEAR_OF_BIRTH,
-      },
-      select: { id: true, userId: true, cvUrl: true },
-    });
-    console.log(`[Upload] Updated UserProfile.cvUrl for userId=${userId}, cvUrl=${updated.cvUrl}`);
+    if (previousKey && previousKey.startsWith(`users/${userId}/cv/`)) {
+      await this.deleteUnreferencedUserAsset(userId, previousKey, 'cvUrl');
+    }
 
     return {
       key,

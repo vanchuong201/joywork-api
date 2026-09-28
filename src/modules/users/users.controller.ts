@@ -1,7 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { UsersService } from './users.service';
 import {
-  updateProfileSchema,
   getUserProfileSchema,
   searchUsersSchema,
 } from './users.schema';
@@ -24,18 +23,6 @@ export class UsersController {
       });
     }
 
-    return reply.send({
-      data: { user },
-    });
-  }
-
-  // Update current user profile
-  async updateMyProfile(request: FastifyRequest, reply: FastifyReply) {
-    const userId = (request as any).user?.userId;
-    const data = updateProfileSchema.parse(request.body);
-    
-    const user = await this.usersService.updateProfile(userId, data);
-    
     return reply.send({
       data: { user },
     });

@@ -1,3 +1,4 @@
+import { CV_NAME_MAX_LENGTH } from '@/modules/candidate-cvs/candidate-cvs.schema';
 import { z } from 'zod';
 
 /** Các section ứng viên có thể chọn áp dụng khi confirm import CV. */
@@ -179,9 +180,19 @@ export const createCvImportSchema = z
 
 export type CreateCvImportInput = z.infer<typeof createCvImportSchema>;
 
-export const applyCvImportSchema = z.object({
-  mode: z.enum(['fill_missing', 'overwrite']),
-  sections: z.array(z.enum(CV_IMPORT_SECTIONS)).min(1, 'Chọn ít nhất một mục để áp dụng'),
-});
+export const applyCvImportSchema = z
+  .object({
+    mode: z.enum(['fill_missing', 'overwrite']),
+    sections: z.array(z.enum(CV_IMPORT_SECTIONS)).min(1, 'Chọn ít nhất một mục để áp dụng'),
+    /** CV đích; bỏ trống = CV mặc định. */
+    targetCvId: z.string().min(1).optional(),
+    /** Tạo CV mới từ dữ liệu import (bỏ qua targetCvId). */
+    createNewCv: z.boolean().optional(),
+    newCvName: z.string().trim().min(1).max(CV_NAME_MAX_LENGTH).optional(),
+  })
+  .refine((v) => !(v.createNewCv && v.targetCvId), {
+    message: 'Chỉ chọn một trong targetCvId hoặc createNewCv',
+    path: ['targetCvId'],
+  });
 
 export type ApplyCvImportInput = z.infer<typeof applyCvImportSchema>;

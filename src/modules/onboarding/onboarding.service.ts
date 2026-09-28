@@ -348,13 +348,17 @@ export class OnboardingService {
         phone: true,
         profile: {
           select: {
-            fullName: true,
-            title: true,
-            contactEmail: true,
-            contactPhone: true,
-            locations: true,
-            wardCodes: true,
-            linkedin: true,
+            defaultCv: {
+              select: {
+                fullName: true,
+                title: true,
+                contactEmail: true,
+                contactPhone: true,
+                locations: true,
+                wardCodes: true,
+                linkedin: true,
+              },
+            },
           },
         },
       },
@@ -439,15 +443,15 @@ export class OnboardingService {
         email: user.email,
         name: user.name,
         phone: user.phone,
-        profile: user.profile
+        profile: user.profile?.defaultCv
           ? {
-              fullName: user.profile.fullName,
-              title: user.profile.title,
-              contactEmail: user.profile.contactEmail,
-              contactPhone: user.profile.contactPhone,
-              locations: user.profile.locations,
-              wardCodes: user.profile.wardCodes,
-              linkedin: user.profile.linkedin,
+              fullName: user.profile.defaultCv.fullName,
+              title: user.profile.defaultCv.title,
+              contactEmail: user.profile.defaultCv.contactEmail,
+              contactPhone: user.profile.defaultCv.contactPhone,
+              locations: user.profile.defaultCv.locations,
+              wardCodes: user.profile.defaultCv.wardCodes,
+              linkedin: user.profile.defaultCv.linkedin,
             }
           : null,
       },

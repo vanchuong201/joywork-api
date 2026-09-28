@@ -9,6 +9,7 @@ import { emailService } from '@/shared/services/email.service';
 import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { hashPassword } from '@/shared/security/password-hash';
 import { resolveUniqueUserSlug } from '@/modules/users/user-profile.service';
+import { DEFAULT_CV_NAME, normalizeCvName } from '@/modules/candidate-cvs/candidate-cvs.schema';
 import { resolveProvinceCode } from '@/shared/provinces';
 import { getWardsByProvinceCode } from '@/shared/wards';
 import { CvImportsService } from '@/modules/cv-imports/cv-imports.service';
@@ -627,9 +628,11 @@ export class SystemCandidateImportService {
             },
           });
 
-          await tx.userProfile.create({
+          const cv = await tx.candidateCv.create({
             data: {
               userId: user.id,
+              name: DEFAULT_CV_NAME,
+              nameNormalized: normalizeCvName(DEFAULT_CV_NAME),
               fullName: fallbackName,
               title: row.position,
               contactEmail: row.normalizedEmail,
@@ -637,6 +640,14 @@ export class SystemCandidateImportService {
               locations: provinceCode ? [provinceCode] : [],
               wardCodes,
               linkedin: row.safeSocialLink?.toLowerCase().includes('linkedin.com') ? row.safeSocialLink : null,
+            },
+            select: { id: true },
+          });
+
+          await tx.userProfile.create({
+            data: {
+              userId: user.id,
+              defaultCvId: cv.id,
             },
           });
 

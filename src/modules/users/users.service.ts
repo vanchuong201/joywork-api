@@ -1,14 +1,8 @@
 import { prisma } from '@/shared/database/prisma';
-import { AppError } from '@/shared/errors/errorHandler';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
-import { resolveLocationsWithWards } from '@/shared/wards';
-import {
-  UpdateProfileInput,
-  SearchUsersInput,
-} from './users.schema';
+import { SearchUsersInput } from './users.schema';
 import { getEsClient } from '@/shared/elasticsearch/client';
 import { USERS_INDEX } from '@/shared/elasticsearch/indices';
-import { syncUserToEs } from '@/shared/elasticsearch/sync';
 
 export interface UserProfile {
   id: string;
@@ -38,12 +32,12 @@ export interface UserWithProfile {
 }
 
 export class UsersService {
-  // Get user profile by user ID
+  // Get user profile by user ID (GET /me). Nội dung profile lấy từ CV mặc định.
   async getUserProfile(userId: string): Promise<UserWithProfile | null> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        profile: true,
+        profile: { include: { defaultCv: true } },
       },
     });
 
@@ -60,112 +54,34 @@ export class UsersService {
       avatar: user.avatar || null, // Account avatar - always include (even if null)
       slug: user.slug || null, // User slug - always include (even if null)
     };
-    
+
     if (user.name) result.name = user.name;
-    if (user.profile) {
+    const cv = user.profile?.defaultCv;
+    if (user.profile && cv) {
       result.profile = {
         id: user.profile.id,
         userId: user.profile.userId,
-        skills: user.profile.skills,
+        defaultCvId: cv.id,
+        skills: cv.skills,
         createdAt: user.profile.createdAt,
-        updatedAt: user.profile.updatedAt,
+        updatedAt: cv.updatedAt,
       };
-      if (user.profile.avatar) result.profile.avatar = user.profile.avatar;
-      if (user.profile.headline) result.profile.headline = user.profile.headline;
-      if (user.profile.bio) result.profile.bio = user.profile.bio;
-      if (user.profile.cvUrl) result.profile.cvUrl = user.profile.cvUrl;
-      result.profile.locations = user.profile.locations;
-      result.profile.wardCodes = user.profile.wardCodes;
-      result.profile.specificAddress = user.profile.specificAddress;
-      if (user.profile.locations.length > 0) {
-        result.profile.location = getProvinceNameByCode(user.profile.locations[0]) ?? user.profile.locations[0];
+      if (cv.avatar) result.profile.avatar = cv.avatar;
+      if (cv.headline) result.profile.headline = cv.headline;
+      if (cv.bio) result.profile.bio = cv.bio;
+      if (cv.cvUrl) result.profile.cvUrl = cv.cvUrl;
+      result.profile.locations = cv.locations;
+      result.profile.wardCodes = cv.wardCodes;
+      result.profile.specificAddress = cv.specificAddress;
+      if (cv.locations.length > 0) {
+        result.profile.location = getProvinceNameByCode(cv.locations[0]) ?? cv.locations[0];
       }
-      if (user.profile.website) result.profile.website = user.profile.website;
-      if (user.profile.linkedin) result.profile.linkedin = user.profile.linkedin;
-      if (user.profile.github) result.profile.github = user.profile.github;
+      if (cv.website) result.profile.website = cv.website;
+      if (cv.linkedin) result.profile.linkedin = cv.linkedin;
+      if (cv.github) result.profile.github = cv.github;
     }
-    
+
     return result;
-  }
-
-  // Update user profile
-  async updateProfile(userId: string, data: UpdateProfileInput): Promise<UserWithProfile> {
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
-    }
-
-    const { name, ...profileInput } = data;
-
-    if (typeof name === 'string') {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { name },
-      });
-    }
-
-    // Update or create profile
-    const profileData: any = {
-      updatedAt: new Date(),
-    };
-    
-    if (profileInput.avatar !== undefined) profileData.avatar = profileInput.avatar ?? null;
-    if (profileInput.headline !== undefined) profileData.headline = profileInput.headline ?? null;
-    if (profileInput.bio !== undefined) profileData.bio = profileInput.bio ?? null;
-    if (profileInput.skills !== undefined) profileData.skills = profileInput.skills;
-    if (profileInput.cvUrl !== undefined) profileData.cvUrl = profileInput.cvUrl ?? null;
-    if (
-      profileInput.locations !== undefined ||
-      profileInput.location !== undefined ||
-      profileInput.wardCodes !== undefined
-    ) {
-      const existing = await prisma.userProfile.findUnique({
-        where: { userId },
-        select: { locations: true, wardCodes: true },
-      });
-      const locInput: { locations?: string[]; location?: string | null; wardCodes?: string[] } = {};
-      if (profileInput.locations !== undefined) locInput.locations = profileInput.locations;
-      if (profileInput.location !== undefined) locInput.location = profileInput.location;
-      if (profileInput.wardCodes !== undefined) locInput.wardCodes = profileInput.wardCodes;
-      const resolved = resolveLocationsWithWards(existing, locInput);
-      profileData.locations = resolved.locations;
-      profileData.wardCodes = resolved.wardCodes;
-    }
-    if (profileInput.website !== undefined) profileData.website = profileInput.website ?? null;
-    if (profileInput.linkedin !== undefined) profileData.linkedin = profileInput.linkedin ?? null;
-    if (profileInput.github !== undefined) profileData.github = profileInput.github ?? null;
-    if (profileInput.specificAddress !== undefined) profileData.specificAddress = profileInput.specificAddress ?? null;
-    
-    await prisma.userProfile.upsert({
-      where: { userId },
-      update: profileData,
-      create: {
-        userId,
-        ...profileData,
-      },
-    });
-
-    const updated = await this.getUserProfile(userId);
-
-    if (!updated) {
-      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
-    }
-
-    // Sync to Elasticsearch (fire-and-forget)
-    const userForEs = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true, name: true, email: true, slug: true, createdAt: true,
-        profile: { select: { headline: true, bio: true, skills: true, locations: true, isPublic: true, isSearchingJob: true } },
-      },
-    });
-    if (userForEs) void syncUserToEs(userForEs);
-
-    return updated;
   }
 
   // Search users

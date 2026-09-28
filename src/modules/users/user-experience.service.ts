@@ -1,92 +1,28 @@
-import { prisma } from '@/shared/database/prisma';
-import { AppError } from '@/shared/errors/errorHandler';
+import { CandidateCvService } from '@/modules/candidate-cvs/candidate-cvs.service';
+import type { CvExperiencePatch } from '@/modules/candidate-cvs/candidate-cvs.schema';
 import { ExperienceInput } from './users.schema';
-import { removeUndefined } from '@/shared/utils';
 
+/** Adapter `/api/users/me/experiences` → kinh nghiệm của CV mặc định. */
 export class UserExperienceService {
-  // Get all experiences for a user
+  constructor(private cvService: CandidateCvService = new CandidateCvService()) {}
+
   async getExperiences(userId: string) {
-    return await prisma.userExperience.findMany({
-      where: { userId },
-      orderBy: [
-        { order: 'asc' },
-        { startDate: 'desc' },
-      ],
-    });
+    const cvId = await this.cvService.ensureDefaultCv(userId);
+    return this.cvService.listExperiences(userId, cvId);
   }
 
-  // Create experience
   async createExperience(userId: string, data: ExperienceInput) {
-    // Verify user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
-    }
-
-    return await prisma.userExperience.create({
-      data: {
-        userId,
-        role: data.role,
-        company: data.company,
-        startDate: data.startDate ?? null,
-        endDate: data.endDate ?? null,
-        period: data.period ?? null,
-        desc: data.desc ?? null,
-        achievements: data.achievements ?? [],
-        order: data.order,
-      },
-    });
+    const cvId = await this.cvService.ensureDefaultCv(userId);
+    return this.cvService.createExperience(userId, cvId, data);
   }
 
-  // Update experience
-  async updateExperience(userId: string, experienceId: string, data: Partial<ExperienceInput>) {
-    // Verify ownership
-    const experience = await prisma.userExperience.findUnique({
-      where: { id: experienceId },
-      select: { userId: true },
-    });
-
-    if (!experience) {
-      throw new AppError('Experience not found', 404, 'EXPERIENCE_NOT_FOUND');
-    }
-
-    if (experience.userId !== userId) {
-      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
-    }
-
-    const cleanData = removeUndefined(data);
-
-    return await prisma.userExperience.update({
-      where: { id: experienceId },
-      data: cleanData as any,
-    });
+  async updateExperience(userId: string, experienceId: string, data: CvExperiencePatch) {
+    const cvId = await this.cvService.ensureDefaultCv(userId);
+    return this.cvService.updateExperience(userId, cvId, experienceId, data);
   }
 
-  // Delete experience
   async deleteExperience(userId: string, experienceId: string) {
-    // Verify ownership
-    const experience = await prisma.userExperience.findUnique({
-      where: { id: experienceId },
-      select: { userId: true },
-    });
-
-    if (!experience) {
-      throw new AppError('Experience not found', 404, 'EXPERIENCE_NOT_FOUND');
-    }
-
-    if (experience.userId !== userId) {
-      throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
-    }
-
-    await prisma.userExperience.delete({
-      where: { id: experienceId },
-    });
-
-    return { success: true };
+    const cvId = await this.cvService.ensureDefaultCv(userId);
+    return this.cvService.deleteExperience(userId, cvId, experienceId);
   }
 }
-

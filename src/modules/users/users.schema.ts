@@ -90,6 +90,11 @@ export const updateProfileSchema = z.object({
   specificAddress: z.string().max(255, 'Specific address must be less than 255 characters').optional().nullable().transform((val) => val === '' ? null : val),
 });
 
+export const jobSearchSettingsSchema = z.object({
+  isSearchingJob: z.boolean().optional(),
+  allowCvFlip: z.boolean().optional(),
+});
+
 // Experience schema
 export const experienceSchema = z.object({
   role: z.string().min(1, 'Role is required').max(200, 'Role must be less than 200 characters'),
@@ -144,6 +149,7 @@ export const searchUsersSchema = z.object({
 
 // Types
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type JobSearchSettingsInput = z.infer<typeof jobSearchSettingsSchema>;
 export type GetUserProfileInput = z.infer<typeof getUserProfileSchema>;
 export type GetUserProfileBySlugInput = z.infer<typeof getUserProfileBySlugSchema>;
 export type PublicProfileQuery = z.infer<typeof publicProfileQuerySchema>;

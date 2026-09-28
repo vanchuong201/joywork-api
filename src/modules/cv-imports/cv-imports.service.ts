@@ -13,7 +13,17 @@ import {
   type SupportedCvMime,
 } from './cv-file-extractor';
 import { fetchCvFromExternalLink } from './cv-link-fetcher';
-import { syncUserToEs } from '@/shared/elasticsearch/sync';
+import { syncCandidateToEs } from '@/shared/candidates/candidate-search-sync';
+import {
+  CandidateCvService,
+  CV_SECTION_ORDER_BY,
+  cvLimitReached,
+  cvNameDuplicate,
+  lockUserCvs,
+  pickAvailableCvName,
+  type Tx,
+} from '@/modules/candidate-cvs/candidate-cvs.service';
+import { CV_LIMIT, normalizeCvName } from '@/modules/candidate-cvs/candidate-cvs.schema';
 import { isPlaceholderCandidateAvatarUrl } from '@/shared/candidates/default-avatar';
 import { extractAvatar } from './avatar';
 import {
@@ -75,6 +85,7 @@ interface AvatarUploadResult {
 
 export class CvImportsService {
   private cachedProvider: CvParserProvider | null = null;
+  private readonly cvService = new CandidateCvService();
   private readonly providerOverride: CvParserProvider | null;
 
   /**
@@ -265,29 +276,7 @@ export class CvImportsService {
       sections: [...CV_IMPORT_SECTIONS],
     });
 
-    const userForEs = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        slug: true,
-        createdAt: true,
-        profile: {
-          select: {
-            headline: true,
-            bio: true,
-            skills: true,
-            locations: true,
-            isPublic: true,
-            isSearchingJob: true,
-          },
-        },
-      },
-    });
-    if (userForEs) {
-      await syncUserToEs(userForEs);
-    }
+    await syncCandidateToEs(userId);
 
     return applied;
   }
@@ -368,39 +357,20 @@ export class CvImportsService {
   }
 
   /** Xóa avatar pravatar giả nếu vẫn còn sau apply (để UI dùng initials). */
-  private async clearPlaceholderAvatars(userId: string): Promise<void> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        avatar: true,
-        profile: { select: { avatar: true } },
-      },
-    });
+  private async clearPlaceholderAvatars(userId: string, cvId: string): Promise<void> {
+    const [user, cv] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { avatar: true } }),
+      prisma.candidateCv.findFirst({ where: { id: cvId, userId }, select: { avatar: true } }),
+    ]);
     if (!user) return;
 
     const clearUser = isPlaceholderCandidateAvatarUrl(user.avatar);
-    const clearProfile = isPlaceholderCandidateAvatarUrl(user.profile?.avatar ?? null);
-    if (!clearUser && !clearProfile) return;
+    const clearCv = Boolean(cv) && isPlaceholderCandidateAvatarUrl(cv?.avatar ?? null);
+    if (!clearUser && !clearCv) return;
 
     await prisma.$transaction([
-      ...(clearUser
-        ? [
-            prisma.user.update({
-              where: { id: userId },
-              data: { avatar: null },
-            }),
-          ]
-        : []),
-      ...(clearProfile
-        ? [
-            prisma.userProfile.upsert({
-              where: { userId },
-              update: { avatar: null },
-              create: { userId, avatar: null },
-            }),
-          ]
-        : []),
+      ...(clearUser ? [prisma.user.update({ where: { id: userId }, data: { avatar: null } })] : []),
+      ...(clearCv ? [prisma.candidateCv.update({ where: { id: cvId }, data: { avatar: null } })] : []),
     ]);
   }
 
@@ -412,7 +382,11 @@ export class CvImportsService {
     return job as ImportJobRecord;
   }
 
-  async applyImport(userId: string, jobId: string, input: ApplyCvImportInput): Promise<ImportJobRecord> {
+  async applyImport(
+    userId: string,
+    jobId: string,
+    input: ApplyCvImportInput
+  ): Promise<ImportJobRecord & { targetCvId: string }> {
     const parsedInput = applyCvImportSchema.parse(input);
 
     const job = await this.getImport(userId, jobId);
@@ -424,39 +398,40 @@ export class CvImportsService {
     }
 
     const parsed = this.parsedCvFromJson(job.parsedData);
+    const defaultCvId = await this.cvService.ensureDefaultCv(userId);
+    const existingTargetId = parsedInput.createNewCv
+      ? null
+      : await this.cvService.resolveTargetCvId(userId, parsedInput.targetCvId);
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const existingUser = await tx.user.findUnique({
-        where: { id: userId },
+    const { updated, targetCvId } = await prisma.$transaction(async (tx) => {
+      const cvId = existingTargetId ?? (await this.createImportCv(tx, userId, parsed, parsedInput.newCvName));
+
+      const existingCv = await tx.candidateCv.findFirst({
+        where: { id: cvId, userId },
         include: {
-          profile: true,
-          experiences: { orderBy: [{ order: 'asc' }, { startDate: 'desc' }] },
-          educations: { orderBy: [{ order: 'asc' }, { startDate: 'desc' }] },
+          experiences: { orderBy: CV_SECTION_ORDER_BY },
+          educations: { orderBy: CV_SECTION_ORDER_BY },
         },
       });
-      if (!existingUser) {
-        throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
+      if (!existingCv) {
+        throw new AppError('CV không tồn tại', 404, 'CV_NOT_FOUND');
       }
 
-      const snapshot = this.buildSnapshot(existingUser);
+      const snapshot = this.buildSnapshot(existingCv);
 
-      const profileData = this.buildProfileUpdate({
+      const cvData = this.buildProfileUpdate({
         mode: parsedInput.mode,
         sections: parsedInput.sections,
         parsed,
-        existingProfile: existingUser.profile,
+        existingProfile: existingCv,
       });
 
-      if (profileData !== null) {
-        await tx.userProfile.upsert({
-          where: { userId },
-          update: profileData,
-          create: { ...(profileData as Prisma.UserProfileUncheckedCreateInput), userId },
-        });
+      if (cvData !== null) {
+        await tx.candidateCv.update({ where: { id: cvId }, data: cvData });
 
-        // Đồng bộ User.avatar khi apply avatarUrl từ CV (UI ưu tiên User.avatar).
-        const nextAvatar = profileData.avatar;
-        if (typeof nextAvatar === 'string' && nextAvatar.trim().length > 0) {
+        // Đồng bộ User.avatar khi apply avatar vào CV mặc định (header ưu tiên User.avatar).
+        const nextAvatar = cvData.avatar;
+        if (cvId === defaultCvId && typeof nextAvatar === 'string' && nextAvatar.trim().length > 0) {
           await tx.user.update({
             where: { id: userId },
             data: { avatar: nextAvatar },
@@ -469,16 +444,16 @@ export class CvImportsService {
         section: 'experiences',
         sections: parsedInput.sections,
         parsedHasItems: parsed.experiences.length > 0,
-        existingHasItems: existingUser.experiences.length > 0,
+        existingHasItems: existingCv.experiences.length > 0,
       });
 
       if (shouldReplaceExperiences) {
-        await tx.userExperience.deleteMany({ where: { userId } });
+        await tx.candidateCvExperience.deleteMany({ where: { cvId } });
         const rows = parsed.experiences
-          .map((exp, index) => this.buildExperienceCreate({ userId, exp, order: index }))
-          .filter((row): row is Prisma.UserExperienceCreateManyInput => row !== null);
+          .map((exp, index) => this.buildExperienceCreate({ cvId, exp, order: index }))
+          .filter((row): row is Prisma.CandidateCvExperienceCreateManyInput => row !== null);
         if (rows.length > 0) {
-          await tx.userExperience.createMany({ data: rows });
+          await tx.candidateCvExperience.createMany({ data: rows });
         }
       }
 
@@ -487,20 +462,20 @@ export class CvImportsService {
         section: 'educations',
         sections: parsedInput.sections,
         parsedHasItems: parsed.educations.length > 0,
-        existingHasItems: existingUser.educations.length > 0,
+        existingHasItems: existingCv.educations.length > 0,
       });
 
       if (shouldReplaceEducations) {
-        await tx.userEducation.deleteMany({ where: { userId } });
+        await tx.candidateCvEducation.deleteMany({ where: { cvId } });
         const rows = parsed.educations
-          .map((edu, index) => this.buildEducationCreate({ userId, edu, order: index }))
-          .filter((row): row is Prisma.UserEducationCreateManyInput => row !== null);
+          .map((edu, index) => this.buildEducationCreate({ cvId, edu, order: index }))
+          .filter((row): row is Prisma.CandidateCvEducationCreateManyInput => row !== null);
         if (rows.length > 0) {
-          await tx.userEducation.createMany({ data: rows });
+          await tx.candidateCvEducation.createMany({ data: rows });
         }
       }
 
-      return tx.cvImportJob.update({
+      const updatedJob = await tx.cvImportJob.update({
         where: { id: jobId },
         data: {
           status: 'APPLIED',
@@ -510,12 +485,40 @@ export class CvImportsService {
           appliedAt: new Date(),
         },
       });
+      return { updated: updatedJob, targetCvId: cvId };
     });
 
     // Gỡ avatar giả (pravatar) nếu apply không gắn được ảnh thật từ CV.
-    await this.clearPlaceholderAvatars(userId);
+    await this.clearPlaceholderAvatars(userId, targetCvId);
 
-    return updated as ImportJobRecord;
+    if (targetCvId === defaultCvId) {
+      void syncCandidateToEs(userId);
+    }
+
+    return { ...(updated as ImportJobRecord), targetCvId };
+  }
+
+  /** Tạo CV mới cho import: kiểm tra giới hạn trong cùng lock, tên tự sinh nếu không truyền. */
+  private async createImportCv(tx: Tx, userId: string, parsed: ParsedCv, requestedName?: string): Promise<string> {
+    await lockUserCvs(tx, userId);
+    const existing = await tx.candidateCv.findMany({ where: { userId }, select: { nameNormalized: true } });
+    if (existing.length >= CV_LIMIT) throw cvLimitReached();
+    const taken = new Set(existing.map((cv) => cv.nameNormalized));
+
+    let name: string;
+    if (requestedName) {
+      name = requestedName.normalize('NFC').replace(/\s+/g, ' ');
+      if (taken.has(normalizeCvName(name))) throw cvNameDuplicate();
+    } else {
+      const title = parsed.basicInfo?.title?.trim();
+      name = pickAvailableCvName(title ? `CV ${title}` : 'CV import', taken);
+    }
+
+    const created = await tx.candidateCv.create({
+      data: { userId, name, nameNormalized: normalizeCvName(name) },
+      select: { id: true },
+    });
+    return created.id;
   }
 
   // ----------------------------------------------------------------------
@@ -630,17 +633,14 @@ export class CvImportsService {
     return value as unknown as ParsedCv;
   }
 
-  /** Lưu snapshot tối giản trước khi apply (chỉ profile + experiences + educations). */
-  private buildSnapshot(user: {
-    profile: Prisma.JsonObject | unknown;
-    experiences: unknown[];
-    educations: unknown[];
-  }): Prisma.JsonObject {
-    return {
-      profile: (user.profile as unknown as Prisma.JsonObject) ?? null,
-      experiences: user.experiences as unknown as Prisma.JsonObject[],
-      educations: user.educations as unknown as Prisma.JsonObject[],
-    };
+  /** Lưu snapshot tối giản trước khi apply (CV đích + experiences + educations). */
+  private buildSnapshot(cv: { id: string; experiences: unknown[]; educations: unknown[] }): Prisma.JsonObject {
+    const { experiences, educations, ...content } = cv;
+    return JSON.parse(
+      JSON.stringify({ cvId: cv.id, profile: content, experiences, educations }, (_key, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      )
+    ) as Prisma.JsonObject;
   }
 
   /**
@@ -673,14 +673,14 @@ export class CvImportsService {
       salaryCurrency: string | null;
       workMode: string | null;
     } | null;
-  }): Prisma.UserProfileUncheckedUpdateInput | null {
+  }): Prisma.CandidateCvUncheckedUpdateInput | null {
     const { mode, sections, parsed, existingProfile } = params;
-    const data: Prisma.UserProfileUncheckedUpdateInput = {};
+    const data: Prisma.CandidateCvUncheckedUpdateInput = {};
     const allowSection = (section: CvImportSection): boolean => sections.includes(section);
 
-    const setIfApplicable = <K extends keyof Prisma.UserProfileUncheckedUpdateInput>(
+    const setIfApplicable = <K extends keyof Prisma.CandidateCvUncheckedUpdateInput>(
       key: K,
-      value: Prisma.UserProfileUncheckedUpdateInput[K],
+      value: Prisma.CandidateCvUncheckedUpdateInput[K],
       isMissing: boolean
     ) => {
       if (value === undefined || value === null) return;
@@ -786,16 +786,16 @@ export class CvImportsService {
   }
 
   private buildExperienceCreate(params: {
-    userId: string;
+    cvId: string;
     exp: ParsedCv['experiences'][number];
     order: number;
-  }): Prisma.UserExperienceCreateManyInput | null {
+  }): Prisma.CandidateCvExperienceCreateManyInput | null {
     const role = params.exp.role?.trim();
     const company = params.exp.company?.trim();
     if (!role || !company) return null;
 
     return {
-      userId: params.userId,
+      cvId: params.cvId,
       role,
       company,
       startDate: this.parseDateString(params.exp.startDate),
@@ -808,16 +808,16 @@ export class CvImportsService {
   }
 
   private buildEducationCreate(params: {
-    userId: string;
+    cvId: string;
     edu: ParsedCv['educations'][number];
     order: number;
-  }): Prisma.UserEducationCreateManyInput | null {
+  }): Prisma.CandidateCvEducationCreateManyInput | null {
     const school = params.edu.school?.trim();
     const degree = params.edu.degree?.trim();
     if (!school || !degree) return null;
 
     return {
-      userId: params.userId,
+      cvId: params.cvId,
       school,
       degree,
       startDate: this.parseDateString(params.edu.startDate),
