@@ -121,6 +121,8 @@ export const uploadProfileCVSchema = z.object({
     }, 'Invalid base64 data'),
   previousKey: z.string().optional(),
   cvId: z.string().min(1).optional(), // CV đích, mặc định CV mặc định
+  /** false: chỉ lưu file (dùng để import sang CV mới), không gắn vào CV nào. */
+  attach: z.boolean().optional(),
 });
 
 export const uploadCompanyVerificationSchema = z.object({

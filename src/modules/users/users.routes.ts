@@ -204,6 +204,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                     name: { type: 'string', nullable: true },
                     slug: { type: 'string', nullable: true }, // User slug
                     avatar: { type: 'string', nullable: true }, // Account avatar (User.avatar)
+                    phone: { type: 'string', nullable: true },
                     role: { type: 'string' },
                     createdAt: { type: 'string', format: 'date-time' },
                     profile: {
@@ -212,6 +213,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
                       properties: {
                         id: { type: 'string' },
                         userId: { type: 'string' },
+                        defaultCvId: { type: 'string' },
                         avatar: { type: 'string', nullable: true },
                         headline: { type: 'string', nullable: true },
                         bio: { type: 'string', nullable: true },

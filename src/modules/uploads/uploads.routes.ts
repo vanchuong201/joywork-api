@@ -195,6 +195,7 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
             fileData: { type: 'string', description: 'Dữ liệu file dạng base64' },
             previousKey: { type: 'string' },
             cvId: { type: 'string', description: 'CV đích (mặc định CV mặc định)' },
+            attach: { type: 'boolean', description: 'false: chỉ lưu file, không gắn vào CV (import sang CV mới)' },
           },
         },
         response: {

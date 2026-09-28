@@ -404,7 +404,9 @@ export class CvImportsService {
       : await this.cvService.resolveTargetCvId(userId, parsedInput.targetCvId);
 
     const { updated, targetCvId } = await prisma.$transaction(async (tx) => {
-      const cvId = existingTargetId ?? (await this.createImportCv(tx, userId, parsed, parsedInput.newCvName));
+      const cvId =
+        existingTargetId ??
+        (await this.createImportCv(tx, userId, parsed, parsedInput.newCvName, job.sourceCvUrl));
 
       const existingCv = await tx.candidateCv.findFirst({
         where: { id: cvId, userId },
@@ -499,7 +501,13 @@ export class CvImportsService {
   }
 
   /** Tạo CV mới cho import: kiểm tra giới hạn trong cùng lock, tên tự sinh nếu không truyền. */
-  private async createImportCv(tx: Tx, userId: string, parsed: ParsedCv, requestedName?: string): Promise<string> {
+  private async createImportCv(
+    tx: Tx,
+    userId: string,
+    parsed: ParsedCv,
+    requestedName?: string,
+    sourceCvUrl?: string | null
+  ): Promise<string> {
     await lockUserCvs(tx, userId);
     const existing = await tx.candidateCv.findMany({ where: { userId }, select: { nameNormalized: true } });
     if (existing.length >= CV_LIMIT) throw cvLimitReached();
@@ -515,7 +523,7 @@ export class CvImportsService {
     }
 
     const created = await tx.candidateCv.create({
-      data: { userId, name, nameNormalized: normalizeCvName(name) },
+      data: { userId, name, nameNormalized: normalizeCvName(name), cvUrl: sourceCvUrl ?? null },
       select: { id: true },
     });
     return created.id;

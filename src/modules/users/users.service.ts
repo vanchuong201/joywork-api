@@ -95,6 +95,7 @@ export class UsersService {
       createdAt: user.createdAt,
       avatar: user.avatar || null, // Account avatar - always include (even if null)
       slug: user.slug || null, // User slug - always include (even if null)
+      phone: user.phone ?? null,
     };
 
     if (user.name) result.name = user.name;

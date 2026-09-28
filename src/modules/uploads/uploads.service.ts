@@ -679,7 +679,7 @@ export class UploadsService {
   }
 
   async uploadProfileCV(userId: string, input: UploadProfileCVInput) {
-    const { fileName, fileType, fileData, previousKey, cvId } = input;
+    const { fileName, fileType, fileData, previousKey, cvId, attach = true } = input;
 
     if (!ALLOWED_CV_MIME_TYPES.has(fileType)) {
       throw new AppError('Định dạng tệp không được hỗ trợ. Chỉ chấp nhận PDF, DOC, DOCX', 400, 'UNSUPPORTED_FILE_TYPE');
@@ -710,7 +710,7 @@ export class UploadsService {
     })();
     
     const extension = extFromMime ?? fallbackExt ?? '.pdf';
-    const targetCvId = await this.cvService.resolveTargetCvId(userId, cvId);
+    const targetCvId = attach ? await this.cvService.resolveTargetCvId(userId, cvId) : null;
     const key = `users/${userId}/cv/${randomUUID()}${extension}`;
 
     try {
@@ -727,6 +727,9 @@ export class UploadsService {
     }
 
     const assetUrl = buildS3ObjectUrl(key);
+    if (!targetCvId) {
+      return { key, assetUrl };
+    }
     await this.cvService.update(userId, targetCvId, { cvUrl: assetUrl });
 
     if (previousKey && previousKey.startsWith(`users/${userId}/cv/`)) {
