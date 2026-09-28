@@ -111,7 +111,7 @@ export class OpenAiCvParserProvider implements CvParserProvider {
     ];
 
     let lastValidationIssue: string | undefined;
-    let totalUsage: NonNullable<CvParserResult['usage']> = {};
+    const totalUsage: NonNullable<CvParserResult['usage']> = {};
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const { payload, text } = await this.requestCompletion(messages);

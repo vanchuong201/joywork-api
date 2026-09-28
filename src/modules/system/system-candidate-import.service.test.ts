@@ -17,6 +17,8 @@ vi.mock('@/config/env', () => ({
   config: {
     FRONTEND_ORIGIN: 'http://localhost:3000',
     ONBOARDING_TOKEN_TTL_DAYS: 90,
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'silent',
   },
 }));
 

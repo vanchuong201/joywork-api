@@ -598,7 +598,7 @@ export class InboxService {
   async getUnreadCount(userId: string, data: GetUnreadCountInput): Promise<{
     unreadCount: number;
   }> {
-    let whereClause: any = {
+    const whereClause: any = {
       isRead: false,
       senderId: { not: userId }, // Messages from others
     };

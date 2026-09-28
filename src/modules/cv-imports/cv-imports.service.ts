@@ -538,7 +538,7 @@ export class CvImportsService {
     input: CreateCvImportInput
   ): { sourceKey: string; cvUrl: string | null; mime: SupportedCvMime; fileName: string | null } {
     let sourceKey = input.sourceKey?.trim() || null;
-    let cvUrl = input.cvUrl?.trim() || null;
+    const cvUrl = input.cvUrl?.trim() || null;
 
     if (!sourceKey && cvUrl) {
       sourceKey = extractS3KeyFromPublicObjectUrl(cvUrl);

@@ -56,7 +56,7 @@ Repo này chỉ là **JoyWork API** (Fastify + Prisma). Không có frontend hay 
 - `npm run type-check` — TypeScript (`tsc --noEmit`)
 - `npm test -- --run` — Vitest (mock, không cần DB)
 - `npm run build` — biên dịch `dist/`
-- `npm run lint` — **hiện lỗi cấu hình ESLint** (`@typescript-eslint/recommended` trong `.eslintrc.json` cần prefix `plugin:`); dùng `type-check` + test thay thế cho đến khi sửa config.
+- `npm run lint` — chạy được; 0 error, còn nhiều warning Prettier/`any` có sẵn (chỉ cần không thêm error mới).
 
 ### Dịch vụ ngoài repo (tùy chọn)
 
