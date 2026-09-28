@@ -164,6 +164,13 @@ SELECT
 FROM "user_educations" e
 JOIN "candidate_cvs" c ON c."id" = 'cv_' || e."userId";
 
+-- DataCopy: user chỉ có experience/education (chưa có profile) → tạo profile để giữ CV mặc định
+INSERT INTO "user_profiles" ("id", "userId", "skills", "createdAt", "updatedAt")
+SELECT 'up_' || c."userId", c."userId", ARRAY[]::TEXT[], CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM "candidate_cvs" c
+LEFT JOIN "user_profiles" p ON p."userId" = c."userId"
+WHERE p."id" IS NULL;
+
 -- DataCopy: CV mặc định
 UPDATE "user_profiles" p
 SET "defaultCvId" = c."id"
