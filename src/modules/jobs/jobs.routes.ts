@@ -3,6 +3,7 @@ import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 import { AuthMiddleware } from '@/modules/auth/auth.middleware';
 import { AuthService } from '@/modules/auth/auth.service';
+import { APPLICATION_STATUS_VALUES } from './jobs.schema';
 
 export async function jobsRoutes(fastify: FastifyInstance) {
   const authService = new AuthService();
@@ -672,8 +673,12 @@ export async function jobsRoutes(fastify: FastifyInstance) {
           companyId: { type: 'string', description: 'Filter by company ID' },
           status: {
             type: 'string',
-            enum: ['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE'],
+            enum: [...APPLICATION_STATUS_VALUES],
             description: 'Filter by application status'
+          },
+          responseDue: {
+            type: 'boolean',
+            description: 'Chỉ hồ sơ đến hạn phản hồi (đã 5 ngày, doanh nghiệp chưa cập nhật trạng thái)',
           },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },
           limit: { type: 'number', minimum: 1, maximum: 50, default: 20, description: 'Items per page' },
@@ -695,6 +700,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
                       jobId: { type: 'string' },
                       userId: { type: 'string' },
                       status: { type: 'string' },
+                      responseDue: { type: 'boolean' },
                       coverLetter: { type: 'string', nullable: true },
                       resumeUrl: { type: 'string', nullable: true },
                       notes: { type: 'string', nullable: true },
@@ -876,7 +882,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         properties: {
           status: {
             type: 'string',
-            enum: ['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE'],
+            enum: [...APPLICATION_STATUS_VALUES],
             description: 'New application status'
           },
           notes: { type: 'string', maxLength: 1000, description: 'Notes about the application' },
@@ -910,7 +916,7 @@ export async function jobsRoutes(fastify: FastifyInstance) {
         properties: {
           status: {
             type: 'string',
-            enum: ['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE'],
+            enum: [...APPLICATION_STATUS_VALUES],
             description: 'Filter by application status'
           },
           page: { type: 'number', minimum: 1, default: 1, description: 'Page number' },

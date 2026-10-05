@@ -26,6 +26,25 @@ const workingTimeRangeSchema = z
   )
   .refine((range) => range.timeStart < range.timeEnd, 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc');
 
+export const APPLICATION_STATUS_VALUES = [
+  'RECEIVED',
+  'SUITABLE',
+  'INTERVIEW_SCHEDULED',
+  'OFFER_SENT',
+  'HIRED',
+  'NOT_SUITABLE',
+  'NOT_SUITABLE_SAVED',
+] as const;
+
+const applicationStatusSchema = z.enum(APPLICATION_STATUS_VALUES);
+
+const optionalQueryBoolean = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === true || value === 'true' || value === '1') return true;
+  if (value === false || value === 'false' || value === '0') return false;
+  return value;
+}, z.boolean().optional());
+
 const workingTimeRangesSchema = z
   .array(workingTimeRangeSchema)
   .max(7, 'Tối đa 7 dòng thời gian làm việc');
@@ -182,7 +201,8 @@ export const applyJobSchema = z.object({
 export const getApplicationsSchema = z.object({
   jobId: z.string().cuid('Invalid job ID').optional(),
   companyId: z.string().cuid('Invalid company ID').optional(),
-  status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']).optional(),
+  status: applicationStatusSchema.optional(),
+  responseDue: optionalQueryBoolean,
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });
@@ -194,13 +214,13 @@ export const applicationIdParamsSchema = z.object({
 // Update application status schema
 export const updateApplicationStatusSchema = z.object({
   applicationId: z.string().cuid('Invalid application ID'),
-  status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']),
+  status: applicationStatusSchema,
   notes: z.string().max(1000, 'Notes must be less than 1000 characters').optional(),
 });
 
 // Get my applications schema
 export const getMyApplicationsSchema = z.object({
-  status: z.enum(['RECEIVED', 'SUITABLE', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'HIRED', 'NOT_SUITABLE']).optional(),
+  status: applicationStatusSchema.optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),
 });

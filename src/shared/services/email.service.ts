@@ -1,5 +1,6 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { config } from '@/config/env';
+import { RESPONSE_REMINDER_SUBJECT } from '@/shared/applications/application-response-due';
 
 // Use SES API (same as test script which works)
 const hasValidAwsCredentials = 
@@ -1626,6 +1627,196 @@ Trân trọng,
       to,
       subject: '[JOYWORK] Kết quả yêu cầu mở CV / Phản hồi mở CV',
       html,
+    });
+  }
+
+  async sendApplicationResponseReminderEmail(
+    to: string,
+    payload: {
+      heading: string;
+      leadText: string;
+      showSeeMore: boolean;
+      applications: Array<{
+        candidateName: string;
+        jobTitle: string;
+        jobUrl: string;
+        appliedAtLabel: string;
+      }>;
+      listUrl: string;
+    },
+  ): Promise<void> {
+    const heading = this.escapeHtml(payload.heading);
+    const leadPlain = this.escapeHtml(payload.leadText);
+    const leadHtml = leadPlain.replace('5 ngày', '<b>5 ngày</b>');
+    const listUrl = this.escapeHtml(payload.listUrl);
+    const brandOrigin = (config.FRONTEND_ORIGIN || 'https://joywork.vn').replace(/\/$/, '');
+    const brandLabel = this.escapeHtml(brandOrigin.replace(/^https?:\/\//, ''));
+    const joyworkLogo = this.escapeHtml(`${brandOrigin}/JW-original.png`);
+    const buttonLabel = 'Cập nhật trạng thái phản hồi';
+
+    const cards = payload.applications
+      .map((application) => {
+        const candidateName = this.escapeHtml(application.candidateName);
+        const jobTitle = this.escapeHtml(application.jobTitle);
+        const jobUrl = this.escapeHtml(application.jobUrl);
+        const appliedAtLabel = this.escapeHtml(application.appliedAtLabel);
+        return `<tr>
+<td style="padding:20px 32px 0 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e1e6f0;border-radius:6px;">
+<tr>
+<td style="padding:16px;" valign="middle">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td valign="middle">
+<div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;font-weight:bold;color:#1c1c1c;">${candidateName}</div>
+<div style="font-family:Arial, Helvetica, sans-serif;font-size:13px;color:#666666;padding-top:4px;">Ứng tuyển: <a href="${jobUrl}" style="color:#1c3f8f;text-decoration:underline;">${jobTitle}</a></div>
+<div style="font-family:Arial, Helvetica, sans-serif;font-size:13px;color:#666666;padding-top:4px;">Ngày ứng tuyển: ${appliedAtLabel}</div>
+</td>
+<td valign="middle" align="right" width="230" style="padding-left:12px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="border-radius:5px;" bgcolor="#1c3f8f">
+<a href="${listUrl}" style="display:block;padding:10px 16px;font-family:Arial, Helvetica, sans-serif;font-size:13px;line-height:18px;white-space:nowrap;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:5px;">${buttonLabel}</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>`;
+      })
+      .join('');
+
+    const seeMore = payload.showSeeMore
+      ? `<tr>
+<td style="padding:16px 32px 0 32px;" align="center">
+<a href="${listUrl}" style="font-family:Arial, Helvetica, sans-serif;font-size:14px;font-weight:bold;color:#1c3f8f;text-decoration:underline;">Xem thêm</a>
+</td>
+</tr>`
+      : '';
+
+    const textCards = payload.applications
+      .map(
+        (application) =>
+          `${application.candidateName}\nỨng tuyển: ${application.jobTitle}\nNgày ứng tuyển: ${application.appliedAtLabel}\n${buttonLabel}: ${payload.listUrl}`,
+      )
+      .join('\n\n');
+    const textSeeMore = payload.showSeeMore ? `\nXem thêm: ${payload.listUrl}\n` : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${heading}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#eef1f6;font-family:Arial, Helvetica, sans-serif;">
+<span style="display:none;font-size:1px;color:#eef1f6;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${leadPlain}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef1f6;">
+<tr>
+<td align="center" style="padding:24px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+<tr>
+<td style="background-color:#fdeef1;padding:20px 32px;border-bottom:3px solid #1c3f8f;" bgcolor="#fdeef1">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td valign="middle" width="140">
+<img src="${joyworkLogo}" alt="JOYWORK" width="120" style="display:block;width:120px;max-width:120px;height:auto;border:0;">
+</td>
+<td valign="middle" align="right" style="font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#1c3f8f;font-weight:bold;">
+Nền tảng tuyển dụng của những doanh nghiệp tốt
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding:32px 32px 8px 32px;" align="center">
+<div style="font-family:Arial, Helvetica, sans-serif;font-size:22px;font-weight:bold;color:#1c3f8f;line-height:30px;">${heading}</div>
+</td>
+</tr>
+<tr>
+<td style="padding:16px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#333333;line-height:22px;">
+Kính gửi <span style="color:#1c3f8f;font-weight:bold;">Quý Doanh Nghiệp</span>,
+</td>
+</tr>
+<tr>
+<td style="padding:8px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#333333;line-height:22px;">${leadHtml}</td>
+</tr>
+<tr>
+<td style="padding:8px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#333333;line-height:22px;">
+Vui lòng truy cập nền tảng <a href="${this.escapeHtml(brandOrigin)}/" style="color:#1c3f8f;font-weight:bold;text-decoration:underline;">${brandLabel}</a> để cập nhật trạng thái hồ sơ trong thời gian sớm nhất.
+</td>
+</tr>
+${cards}
+${seeMore}
+<tr>
+<td style="padding:24px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:22px;">
+Việc phản hồi kịp thời không chỉ giúp ứng viên nắm bắt được tiến độ mà còn thể hiện sự chuyên nghiệp của doanh nghiệp và sự tôn trọng dành cho ứng viên, qua đó góp phần quan trọng trong việc nâng cao trải nghiệm ứng tuyển, giúp nâng cao thương hiệu tuyển dụng (Employer Branding) của Quý Doanh Nghiệp.
+</td>
+</tr>
+<tr>
+<td style="padding:12px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:22px;">
+Trong thời đại thông tin ngày nay, những trải nghiệm như trong quá trình ứng tuyển là rất quan trọng. Đôi khi một vài trải nghiệm chưa tốt của ứng viên có thể bị lan truyền và làm giảm sức cạnh tranh của doanh nghiệp trên thị trường tuyển dụng.
+</td>
+</tr>
+<tr>
+<td style="padding:20px 32px 0 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td bgcolor="#fdeef1" style="background-color:#fdeef1;border-radius:6px;padding:14px 16px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:21px;">
+<b style="color:#c0392b;">Lưu ý:</b> Nếu sau <b>3 ngày tiếp theo</b> Quý Doanh Nghiệp vẫn chưa cập nhật trạng thái, hệ thống sẽ tự động chuyển trạng thái hồ sơ thành <b>&quot;Chưa phù hợp và sẽ lưu hồ sơ&quot;</b>.<br><br>Nếu Quý Doanh Nghiệp đã phản hồi trực tiếp với ứng viên qua kênh thông tin khác thì vẫn có thể cập nhật trạng thái hoặc có thể bỏ qua tin này.
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding:24px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:22px;">
+Trân trọng cảm ơn Quý Doanh Nghiệp đã đồng hành cùng JOYWORK!
+</td>
+</tr>
+<tr>
+<td style="padding:16px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:22px;">
+Trân trọng,<br>
+<b style="color:#1c3f8f;">Đội ngũ JOYWORK</b>
+</td>
+</tr>
+<tr><td style="padding:28px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid #e6e9f0;font-size:1px;line-height:1px;">&nbsp;</td></tr></table></td></tr>
+<tr>
+<td style="padding:20px 32px 32px 32px;font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#9aa2b1;line-height:18px;" align="center">
+<a href="${this.escapeHtml(brandOrigin)}/" style="color:#9aa2b1;text-decoration:underline;">${brandLabel}</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>`;
+
+    const text = `${payload.heading}
+
+Kính gửi Quý Doanh Nghiệp,
+
+${payload.leadText}
+
+${textCards}
+${textSeeMore}
+Lưu ý: Nếu sau 3 ngày tiếp theo Quý Doanh Nghiệp vẫn chưa cập nhật trạng thái, hệ thống sẽ tự động chuyển trạng thái hồ sơ thành "Chưa phù hợp và sẽ lưu hồ sơ".
+
+${payload.listUrl}
+`;
+
+    await this.sendEmail({
+      to,
+      subject: RESPONSE_REMINDER_SUBJECT,
+      html,
+      text,
     });
   }
 }

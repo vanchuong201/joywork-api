@@ -21,6 +21,14 @@ import {
 } from '@/modules/candidate-cvs/candidate-cvs.service';
 import { buildCvSnapshot, CV_SNAPSHOT_VERSION, parseCvSnapshot } from '@/modules/candidate-cvs/cv-snapshot';
 import {
+  buildResponseReminderCopy,
+  formatVnDate,
+  isApplicationResponseDue,
+  responseDueAppliedBefore,
+  reminderSentBeforeForClose,
+  selectReminderPreview,
+} from '@/shared/applications/application-response-due';
+import {
   applySnapshotVisibility,
   canReviewCompanyApplications,
   ensureApplicationSnapshot,
@@ -77,12 +85,13 @@ export interface Job {
 }
 
 const APPLICATION_STATUS_LABEL: Record<string, string> = {
-  RECEIVED: 'Tiếp nhận',
+  RECEIVED: 'Doanh nghiệp đã nhận hồ sơ',
   SUITABLE: 'Phù hợp',
   INTERVIEW_SCHEDULED: 'Hẹn phỏng vấn',
   OFFER_SENT: 'Gửi đề nghị',
   HIRED: 'Nhận việc',
-  NOT_SUITABLE: 'Chưa phù hợp',
+  NOT_SUITABLE: 'Không phù hợp',
+  NOT_SUITABLE_SAVED: 'Chưa phù hợp và sẽ lưu hồ sơ',
 };
 
 export interface JobWithApplication extends Job {
@@ -150,7 +159,78 @@ export interface JobFavorite {
   };
 }
 
-const CLOSED_APPLICATION_STATUSES: ApplicationStatus[] = ['NOT_SUITABLE', 'HIRED'];
+const CLOSED_APPLICATION_STATUSES: ApplicationStatus[] = ['NOT_SUITABLE', 'NOT_SUITABLE_SAVED', 'HIRED'];
+
+function notifyApplicantOfStatusUpdate(input: {
+  userId: string;
+  applicantName?: string | null;
+  applicationId: string;
+  jobId: string;
+  jobTitle: string;
+  companyName: string;
+  status: string;
+  statusChanged: boolean;
+  notesChanged: boolean;
+}): Promise<void> {
+  const statusLabel = APPLICATION_STATUS_LABEL[input.status] || input.status;
+  const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/applications`;
+  const notifTitle = 'Đơn ứng tuyển đã được cập nhật';
+  let notifContent = '';
+  if (input.statusChanged && input.notesChanged) {
+    notifContent = `Đơn ứng tuyển vị trí ${input.jobTitle} tại ${input.companyName} đã chuyển sang trạng thái ${statusLabel} và có cập nhật thông tin kèm theo.`;
+  } else if (input.statusChanged) {
+    notifContent = `Đơn ứng tuyển vị trí ${input.jobTitle} tại ${input.companyName} đã chuyển sang trạng thái ${statusLabel}.`;
+  } else {
+    notifContent = `Nhà tuyển dụng đã cập nhật thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí ${input.jobTitle} tại ${input.companyName}.`;
+  }
+
+  return (async () => {
+    try {
+      await notificationService.createNotification({
+        userId: input.userId,
+        type: NotificationType.APPLICATION_STATUS,
+        title: notifTitle,
+        content: notifContent,
+        metadata: {
+          applicationId: input.applicationId,
+          jobId: input.jobId,
+          status: input.status,
+          statusChanged: input.statusChanged,
+          notesChanged: input.notesChanged,
+        },
+        relatedEntityType: 'APPLICATION',
+        relatedEntityId: input.applicationId,
+      });
+    } catch {
+      // Thông báo lỗi không chặn cập nhật trạng thái.
+    }
+
+    try {
+      const verifiedEmail = await getVerifiedEmailForUser(input.userId);
+      if (!verifiedEmail) return;
+      await emailService.sendApplicationStatusUpdateEmail(verifiedEmail, {
+        applicantName: input.applicantName ?? null,
+        jobTitle: input.jobTitle,
+        companyName: input.companyName,
+        newStatus: statusLabel,
+        applicationUrl: myApplicationsUrl,
+        statusChanged: input.statusChanged,
+        notesChanged: input.notesChanged,
+      });
+    } catch {
+      // Email lỗi không chặn cập nhật trạng thái.
+    }
+  })();
+}
+
+export type ApplicationResponseReminderResult = {
+  dryRun: boolean;
+  remindedCompanies: number;
+  remindedApplications: number;
+  skippedCompaniesWithoutEmail: number;
+  failedCompanies: number;
+  closedApplications: number;
+};
 
 export class JobsService {
   constructor(private cvService: CandidateCvService = new CandidateCvService()) {}
@@ -1364,7 +1444,7 @@ export class JobsService {
       totalPages: number;
     };
   }> {
-    const { jobId, companyId, status, page, limit } = data;
+    const { jobId, companyId, status, responseDue, page, limit } = data;
     const skip = (page - 1) * limit;
 
     let scopeCompanyId = companyId;
@@ -1382,10 +1462,26 @@ export class JobsService {
       throw new AppError('You do not have permission to view applications for this company', 403, 'FORBIDDEN');
     }
 
+    const now = new Date();
+    if (responseDue && status && status !== 'RECEIVED') {
+      return {
+        applications: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      };
+    }
+
     const where: Prisma.ApplicationWhereInput = {
       job: { companyId: scopeCompanyId },
       ...(jobId ? { jobId } : {}),
-      ...(status ? { status } : {}),
+      ...(responseDue
+        ? {
+            status: 'RECEIVED',
+            companyRespondedAt: null,
+            appliedAt: { lt: responseDueAppliedBefore(now) },
+          }
+        : status
+          ? { status }
+          : {}),
     };
 
     const [applications, total] = await Promise.all([
@@ -1436,6 +1532,12 @@ export class JobsService {
           jobId: app.jobId,
           userId: app.userId,
           status: app.status,
+          responseDue: isApplicationResponseDue({
+            status: app.status,
+            companyRespondedAt: app.companyRespondedAt,
+            appliedAt: app.appliedAt,
+            now,
+          }),
           ...(app.coverLetter ? { coverLetter: app.coverLetter } : {}),
           ...(app.resumeUrl ? { resumeUrl: app.resumeUrl } : {}),
           ...(app.notes ? { notes: app.notes } : {}),
@@ -1572,6 +1674,7 @@ export class JobsService {
     };
     if (statusChanged) {
       updateData.status = data.status;
+      updateData.companyRespondedAt = new Date();
     }
     if (notesProvided) {
       updateData.notes = nextNotesTrimmed === '' ? null : nextNotesTrimmed;
@@ -1583,53 +1686,17 @@ export class JobsService {
     });
 
     const effectiveStatus = statusChanged ? data.status : application.status;
-    const statusLabel = APPLICATION_STATUS_LABEL[effectiveStatus] || effectiveStatus;
-    const jobTitle = application.job.title;
-    const companyName = application.job.company.name;
-    const myApplicationsUrl = `${config.FRONTEND_ORIGIN}/applications`;
-
-    const notifTitle = 'Đơn ứng tuyển đã được cập nhật';
-    let notifContent = '';
-    if (statusChanged && notesChanged) {
-      notifContent = `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel} và có cập nhật thông tin kèm theo.`;
-    } else if (statusChanged) {
-      notifContent = `Đơn ứng tuyển vị trí ${jobTitle} tại ${companyName} đã chuyển sang trạng thái ${statusLabel}.`;
-    } else {
-      notifContent = `Nhà tuyển dụng đã cập nhật thông tin liên quan đến đơn ứng tuyển của bạn cho vị trí ${jobTitle} tại ${companyName}.`;
-    }
-
-    notificationService
-      .createNotification({
-        userId: application.userId,
-        type: NotificationType.APPLICATION_STATUS,
-        title: notifTitle,
-        content: notifContent,
-        metadata: {
-          applicationId: application.id,
-          jobId: application.jobId,
-          status: effectiveStatus,
-          statusChanged,
-          notesChanged,
-        },
-        relatedEntityType: 'APPLICATION',
-        relatedEntityId: application.id,
-      })
-      .catch(() => {});
-
-    const verifiedEmail = await getVerifiedEmailForUser(application.userId);
-    if (verifiedEmail) {
-      emailService
-        .sendApplicationStatusUpdateEmail(verifiedEmail, {
-          applicantName: application.user.name,
-          jobTitle,
-          companyName,
-          newStatus: statusLabel,
-          applicationUrl: myApplicationsUrl,
-          statusChanged,
-          notesChanged,
-        })
-        .catch(() => {});
-    }
+    void notifyApplicantOfStatusUpdate({
+      userId: application.userId,
+      applicantName: application.user.name,
+      applicationId: application.id,
+      jobId: application.jobId,
+      jobTitle: application.job.title,
+      companyName: application.job.company.name,
+      status: effectiveStatus,
+      statusChanged,
+      notesChanged,
+    });
   }
 
   // Get my applications
@@ -2185,6 +2252,160 @@ export class JobsService {
     }));
 
     return { jobs };
+  }
+
+  async processApplicationResponseReminders(options: {
+    dryRun?: boolean;
+    now?: Date;
+  } = {}): Promise<ApplicationResponseReminderResult> {
+    const dryRun = options.dryRun === true;
+    const now = options.now ?? new Date();
+    const origin = config.FRONTEND_ORIGIN.replace(/\/$/, '');
+    const result: ApplicationResponseReminderResult = {
+      dryRun,
+      remindedCompanies: 0,
+      remindedApplications: 0,
+      skippedCompaniesWithoutEmail: 0,
+      failedCompanies: 0,
+      closedApplications: 0,
+    };
+
+    const dueApplications = await prisma.application.findMany({
+      where: {
+        status: 'RECEIVED',
+        companyRespondedAt: null,
+        responseReminderSentAt: null,
+        appliedAt: { lt: responseDueAppliedBefore(now) },
+      },
+      orderBy: { appliedAt: 'asc' },
+      select: {
+        id: true,
+        appliedAt: true,
+        user: { select: { name: true } },
+        job: {
+          select: {
+            title: true,
+            company: { select: { id: true, slug: true } },
+          },
+        },
+      },
+    });
+
+    const byCompany = new Map<string, typeof dueApplications>();
+    for (const application of dueApplications) {
+      const companyId = application.job.company.id;
+      const group = byCompany.get(companyId);
+      if (group) group.push(application);
+      else byCompany.set(companyId, [application]);
+    }
+
+    const companyIds = [...byCompany.keys()];
+    const members = companyIds.length
+      ? await prisma.companyMember.findMany({
+          where: { companyId: { in: companyIds }, role: { in: ['OWNER', 'ADMIN'] } },
+          select: { companyId: true, userId: true },
+        })
+      : [];
+    const verifiedEmails = await getVerifiedEmailsForUsers(members.map((member) => member.userId));
+    const emailsByCompany = new Map<string, string[]>();
+    for (const member of members) {
+      const email = verifiedEmails.get(member.userId);
+      if (!email) continue;
+      const list = emailsByCompany.get(member.companyId) ?? [];
+      if (!list.includes(email)) list.push(email);
+      emailsByCompany.set(member.companyId, list);
+    }
+
+    for (const [companyId, applications] of byCompany) {
+      const recipients = emailsByCompany.get(companyId) ?? [];
+      if (recipients.length === 0) {
+        result.skippedCompaniesWithoutEmail += 1;
+        continue;
+      }
+
+      const slug = applications[0]!.job.company.slug;
+      const listUrl = `${origin}/companies/${slug}/manage?tab=applications&responseDue=1`;
+      const copy = buildResponseReminderCopy(applications.length);
+      const preview = selectReminderPreview(applications).map((application) => ({
+        candidateName: application.user.name?.trim() || 'Ứng viên',
+        jobTitle: application.job.title,
+        jobUrl: `${origin}/companies/${slug}/manage/applications/${application.id}`,
+        appliedAtLabel: formatVnDate(application.appliedAt),
+      }));
+
+      if (dryRun) {
+        result.remindedCompanies += 1;
+        result.remindedApplications += applications.length;
+        continue;
+      }
+
+      try {
+        for (const to of recipients) {
+          await emailService.sendApplicationResponseReminderEmail(to, {
+            heading: copy.heading,
+            leadText: copy.leadText,
+            showSeeMore: copy.showSeeMore,
+            applications: preview,
+            listUrl,
+          });
+        }
+        await prisma.application.updateMany({
+          where: {
+            id: { in: applications.map((application) => application.id) },
+            status: 'RECEIVED',
+            companyRespondedAt: null,
+            responseReminderSentAt: null,
+          },
+          data: { responseReminderSentAt: now },
+        });
+        result.remindedCompanies += 1;
+        result.remindedApplications += applications.length;
+      } catch {
+        result.failedCompanies += 1;
+      }
+    }
+
+    const readyToClose = await prisma.application.findMany({
+      where: {
+        status: 'RECEIVED',
+        companyRespondedAt: null,
+        responseReminderSentAt: { lt: reminderSentBeforeForClose(now) },
+      },
+      select: {
+        id: true,
+        userId: true,
+        jobId: true,
+        user: { select: { name: true } },
+        job: { select: { title: true, company: { select: { name: true } } } },
+      },
+    });
+
+    if (dryRun) {
+      result.closedApplications = readyToClose.length;
+      return result;
+    }
+
+    for (const application of readyToClose) {
+      const updated = await prisma.application.updateMany({
+        where: { id: application.id, status: 'RECEIVED', companyRespondedAt: null },
+        data: { status: 'NOT_SUITABLE_SAVED', updatedAt: now },
+      });
+      if (updated.count !== 1) continue;
+      result.closedApplications += 1;
+      await notifyApplicantOfStatusUpdate({
+        userId: application.userId,
+        applicantName: application.user.name,
+        applicationId: application.id,
+        jobId: application.jobId,
+        jobTitle: application.job.title,
+        companyName: application.job.company.name,
+        status: 'NOT_SUITABLE_SAVED',
+        statusChanged: true,
+        notesChanged: false,
+      });
+    }
+
+    return result;
   }
 }
 

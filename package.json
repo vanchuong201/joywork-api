@@ -29,6 +29,7 @@
     "metrics:cv-active:seed": "npx tsx scripts/seed-cv-active-snapshots.ts",
     "backfill:user-slugs": "npx tsx scripts/generate-user-slugs.ts",
     "applications:backfill-snapshots": "npx tsx scripts/backfill-application-snapshots.ts",
+    "applications:remind-responses": "npx tsx scripts/remind-application-responses.ts",
     "cv:sync-legacy": "npx tsx scripts/sync-default-cv-to-legacy.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",

@@ -219,6 +219,16 @@ describe('JobsService.applyForJob', () => {
     });
   });
 
+  it('cho phép apply lại cùng CV khi đơn cũ đã đóng (NOT_SUITABLE_SAVED)', async () => {
+    mockApplyTransaction({
+      previous: [{ id: 'app-old', status: 'NOT_SUITABLE_SAVED', sourceCvId: CV_A }],
+    });
+
+    await expect(service.applyForJob(USER_ID, { jobId: JOB_ID })).resolves.toEqual({
+      applicationId: 'app-new',
+    });
+  });
+
   it('400 CV_PROFILE_INCOMPLETE khi CV chưa đủ thông tin', async () => {
     mockApplyTransaction({});
     evaluateCvReadinessMock.mockReturnValue({ isReady: false, missingSections: ['kinh nghiệm'] });

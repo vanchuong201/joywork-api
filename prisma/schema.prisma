@@ -974,6 +974,10 @@ model Application {
   cvSnapshot        Json?
   cvSnapshotVersion Int?
   appliedAt         DateTime          @default(now())
+  /// Thời điểm doanh nghiệp đổi trạng thái. Null = chưa phản hồi.
+  companyRespondedAt DateTime?
+  /// Thời điểm hệ thống đã gửi mail nhắc phản hồi.
+  responseReminderSentAt DateTime?
   updatedAt         DateTime          @updatedAt
 
   // Relations
@@ -985,6 +989,7 @@ model Application {
   @@index([userId, jobId])
   @@index([jobId, userId, status])
   @@index([sourceCvId])
+  @@index([status, appliedAt])
   @@map("applications")
 }
 
@@ -995,6 +1000,7 @@ enum ApplicationStatus {
   OFFER_SENT
   NOT_SUITABLE
   HIRED
+  NOT_SUITABLE_SAVED
 }
 
 // Message types for inbox
