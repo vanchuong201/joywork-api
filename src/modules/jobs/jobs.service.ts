@@ -1323,18 +1323,8 @@ export class JobsService {
       const previous = await tx.application.findMany({
         where: { userId, jobId: job.id },
         orderBy: { appliedAt: 'asc' },
-        select: { id: true, status: true, sourceCvId: true },
+        select: { id: true },
       });
-      const hasOpenWithSameCv = previous.some(
-        (app) => app.sourceCvId === cv.id && !CLOSED_APPLICATION_STATUSES.includes(app.status)
-      );
-      if (hasOpenWithSameCv) {
-        throw new AppError(
-          'Bạn đã ứng tuyển vị trí này bằng CV này. Hãy chọn CV khác hoặc chờ nhà tuyển dụng phản hồi.',
-          409,
-          'ALREADY_APPLIED_SAME_CV'
-        );
-      }
 
       const snapshot = buildCvSnapshot({ cv, account, source: 'apply' });
       const created = await tx.application.create({

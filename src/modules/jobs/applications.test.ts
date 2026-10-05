@@ -186,16 +186,15 @@ describe('JobsService.applyForJob', () => {
     expect(data.cvSnapshot).toMatchObject({ version: 1, source: 'apply', cvId: CV_B, cvName: `CV ${CV_B}` });
   });
 
-  it('409 khi đã có đơn đang mở với cùng CV', async () => {
+  it('cho phép apply lại cùng CV khi đơn cũ còn mở', async () => {
     mockApplyTransaction({
       previous: [{ id: 'app-old', status: 'SUITABLE', sourceCvId: CV_A }],
     });
 
-    await expect(service.applyForJob(USER_ID, { jobId: JOB_ID })).rejects.toMatchObject({
-      statusCode: 409,
-      code: 'ALREADY_APPLIED_SAME_CV',
+    await expect(service.applyForJob(USER_ID, { jobId: JOB_ID })).resolves.toEqual({
+      applicationId: 'app-new',
     });
-    expect(prismaMock.application.create).not.toHaveBeenCalled();
+    expect(prismaMock.application.create).toHaveBeenCalledTimes(1);
   });
 
   it('cho phép apply lại bằng CV khác khi đơn cũ còn mở', async () => {
