@@ -543,8 +543,22 @@ model Company {
   badges              CompanyBadge[]
 
   showcaseSlots CompanyShowcaseSlot[]
+  slugRedirects CompanySlugRedirect[]
 
   @@map("companies")
+}
+
+/// Slug cũ của công ty, dùng để mở URL đã phát hành sau khi đổi slug.
+model CompanySlugRedirect {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  companyId String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_slug_redirects")
 }
 
 enum CompanyBadgeType {

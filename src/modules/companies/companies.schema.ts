@@ -126,10 +126,16 @@ const wardCodeSchema = z
   .regex(WARD_CODE_PATTERN, 'Invalid ward code format')
   .refine((code) => WARD_BY_CODE.has(code), 'Unknown ward code');
 
+const companySlugSchema = z
+  .string()
+  .min(2, 'Slug must be at least 2 characters')
+  .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens')
+  .refine((slug) => !slug.startsWith('http'), 'Slug must not start with http or https');
+
 const baseCompanySchema = {
   name: z.string().min(2, 'Company name must be at least 2 characters'),
   legalName: optionalString(200),
-  slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  slug: companySlugSchema,
   tagline: optionalString(150),
   description: optionalString(10000),
   logoUrl: optionalUrl(),

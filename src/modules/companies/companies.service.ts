@@ -31,6 +31,12 @@ import { config } from '@/config/env';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { buildS3ObjectUrl, getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
 import { companyBadgesSelect, parseCompanyBadgeTypes, toBadgeTypes } from '@/shared/company-badges';
+import {
+  findRedirectCompanyId,
+  HTTP_COMPANY_SLUG_MESSAGE,
+  isHttpDerivedCompanySlug,
+  resolveCompanyBySlug,
+} from './company-slug';
 
 export interface Company {
   id: string;
@@ -249,12 +255,22 @@ export class CompaniesService {
 
   // Create company
   async createCompany(userId: string, data: CreateCompanyInput): Promise<Company> {
-    // Check if slug already exists
-    const existingCompany = await prisma.company.findUnique({
-      where: { slug: data.slug },
-    });
+    if (isHttpDerivedCompanySlug(data.slug)) {
+      throw new AppError(HTTP_COMPANY_SLUG_MESSAGE, 400, 'INVALID_SLUG');
+    }
 
-    if (existingCompany) {
+    // Check if slug already exists on a company or a previous slug redirect
+    const [existingCompany, existingRedirect] = await Promise.all([
+      prisma.company.findUnique({
+        where: { slug: data.slug },
+      }),
+      prisma.companySlugRedirect.findUnique({
+        where: { slug: data.slug },
+        select: { id: true },
+      }),
+    ]);
+
+    if (existingCompany || existingRedirect) {
       throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
     }
 
@@ -425,6 +441,8 @@ export class CompaniesService {
 
     // Handle re-verification request first
     const { requestReVerification, ...dataWithoutFlag } = data;
+    let previousSlugForRedirect: string | null = null;
+    let reclaimRedirectSlug: string | null = null;
 
     // Normalize and check if new slug conflicts (if provided)
     if ('slug' in dataWithoutFlag && dataWithoutFlag.slug) {
@@ -446,16 +464,38 @@ export class CompaniesService {
         throw new AppError('Slug must be at least 2 characters and contain only lowercase letters, numbers, and hyphens', 400, 'INVALID_SLUG');
       }
 
-      // Check if slug conflicts with existing company
-      const existingCompany = await prisma.company.findFirst({
-        where: {
-          slug: normalizedSlug,
-          id: { not: companyId },
-        },
+      if (isHttpDerivedCompanySlug(normalizedSlug)) {
+        throw new AppError(HTTP_COMPANY_SLUG_MESSAGE, 400, 'INVALID_SLUG');
+      }
+
+      const currentCompany = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { slug: true },
       });
 
-      if (existingCompany) {
-        throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
+      if (currentCompany && normalizedSlug !== currentCompany.slug) {
+        const [existingCompany, redirectRow] = await Promise.all([
+          prisma.company.findFirst({
+            where: {
+              slug: normalizedSlug,
+              id: { not: companyId },
+            },
+            select: { id: true },
+          }),
+          prisma.companySlugRedirect.findUnique({
+            where: { slug: normalizedSlug },
+            select: { companyId: true },
+          }),
+        ]);
+
+        if (existingCompany || (redirectRow && redirectRow.companyId !== companyId)) {
+          throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
+        }
+
+        if (redirectRow && redirectRow.companyId === companyId) {
+          reclaimRedirectSlug = normalizedSlug;
+        }
+        previousSlugForRedirect = currentCompany.slug;
       }
 
       // Update slug with normalized value
@@ -514,16 +554,27 @@ export class CompaniesService {
       verificationUpdate['verificationSubmittedAt'] = new Date();
     }
 
-    const company = await prisma.company.update({
-      where: { id: companyId },
-      data: {
-        ...(updateBase as any),
-        ...(metrics !== undefined ? { metrics: metrics as Prisma.InputJsonValue } : {}),
-        ...(profileStory !== undefined ? { profileStory: profileStory as Prisma.InputJsonValue } : {}),
-        ...(highlights !== undefined ? { highlights: highlights as Prisma.InputJsonValue } : {}),
-        ...verificationUpdate,
-        updatedAt: new Date(),
-      },
+    const company = await prisma.$transaction(async (tx) => {
+      if (reclaimRedirectSlug) {
+        await tx.companySlugRedirect.delete({ where: { slug: reclaimRedirectSlug } });
+      }
+      if (previousSlugForRedirect) {
+        await tx.companySlugRedirect.create({
+          data: { slug: previousSlugForRedirect, companyId },
+        });
+      }
+
+      return tx.company.update({
+        where: { id: companyId },
+        data: {
+          ...(updateBase as any),
+          ...(metrics !== undefined ? { metrics: metrics as Prisma.InputJsonValue } : {}),
+          ...(profileStory !== undefined ? { profileStory: profileStory as Prisma.InputJsonValue } : {}),
+          ...(highlights !== undefined ? { highlights: highlights as Prisma.InputJsonValue } : {}),
+          ...verificationUpdate,
+          updatedAt: new Date(),
+        },
+      });
     });
 
     // Send Lark notification and email for re-verification request
@@ -631,39 +682,51 @@ export class CompaniesService {
   async getCompanyBySlug(slug: string): Promise<CompanyWithMembers | null> {
     const now = new Date();
 
-    const company = await prisma.company.findUnique({
-      where: { slug },
-      include: {
-        profile: true, // Include profile
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                name: true,
-                avatar: true,
-                profile: { select: { defaultCv: { select: { avatar: true } } } },
-              },
+    const include = {
+      profile: true, // Include profile
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              avatar: true,
+              profile: { select: { defaultCv: { select: { avatar: true } } } },
             },
           },
         },
-        // Active invitations (not expired)
-        invitations: {
-          where: {
-            expiresAt: { gt: now },
-          },
-        },
-        badges: companyBadgesSelect,
-        _count: {
-          select: {
-            posts: true,
-            jobs: true,
-            follows: true,
-          },
+      },
+      // Active invitations (not expired)
+      invitations: {
+        where: {
+          expiresAt: { gt: now },
         },
       },
+      badges: companyBadgesSelect,
+      _count: {
+        select: {
+          posts: true,
+          jobs: true,
+          follows: true,
+        },
+      },
+    };
+
+    let company = await prisma.company.findUnique({
+      where: { slug },
+      include,
     });
+
+    if (!company) {
+      const redirectedId = await findRedirectCompanyId(slug);
+      if (redirectedId) {
+        company = await prisma.company.findUnique({
+          where: { id: redirectedId },
+          include,
+        });
+      }
+    }
 
     if (!company) {
       return null;
@@ -1514,6 +1577,24 @@ export class CompaniesService {
     }
 
     if (!company) {
+      const redirectedId = await findRedirectCompanyId(companyIdOrSlug);
+      if (redirectedId) {
+        company = await prisma.company.findUnique({
+          where: { id: redirectedId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            badges: companyBadgesSelect,
+            tagline: true,
+            location: true,
+          },
+        });
+      }
+    }
+
+    if (!company) {
       return null;
     }
 
@@ -2002,10 +2083,7 @@ export class CompaniesService {
   // =========================
 
   async getStatementsForVerificationView(slug: string, token: string) {
-    const company = await prisma.company.findUnique({
-      where: { slug },
-      select: { id: true, name: true, slug: true },
-    });
+    const company = await resolveCompanyBySlug(slug);
 
     if (!company) {
       throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
@@ -2073,10 +2151,7 @@ export class CompaniesService {
   }
 
   async submitStatementsVerification(slug: string, body: any) {
-    const company = await prisma.company.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
+    const company = await resolveCompanyBySlug(slug);
 
     if (!company) {
       throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
@@ -2178,10 +2253,7 @@ export class CompaniesService {
   }
 
   async getPublicCompanyStatements(slug: string) {
-    const company = await prisma.company.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
+    const company = await resolveCompanyBySlug(slug);
 
     if (!company) {
       throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
