@@ -73,13 +73,14 @@ describe('application response due dates', () => {
 
   it('một hồ sơ viết “một”, từ 2 hồ sơ dùng chữ số và chỉ hiện Xem thêm khi hơn 2', () => {
     expect(responseCountPhrase(1)).toBe('một');
-    expect(buildResponseReminderCopy(1).heading).toBe('Bạn có một ứng tuyển cần phản hồi');
-    expect(buildResponseReminderCopy(1).leadText).toContain('đang có một hồ sơ');
-    expect(buildResponseReminderCopy(1).leadText).toContain('đã 5 ngày');
-    expect(buildResponseReminderCopy(1).showSeeMore).toBe(false);
-    expect(buildResponseReminderCopy(2).heading).toBe('Bạn có 2 ứng tuyển cần phản hồi');
-    expect(buildResponseReminderCopy(2).showSeeMore).toBe(false);
-    expect(buildResponseReminderCopy(3).showSeeMore).toBe(true);
+    expect(buildResponseReminderCopy(1, 'Bác Tôm').heading).toBe('Bạn có một ứng tuyển cần phản hồi');
+    expect(buildResponseReminderCopy(1, 'Bác Tôm').leadText).toContain('Hiện Bác Tôm đang có một hồ sơ');
+    expect(buildResponseReminderCopy(1, 'Bác Tôm').leadText).not.toContain('Quý Doanh Nghiệp');
+    expect(buildResponseReminderCopy(1, 'Bác Tôm').leadText).toContain('đã 5 ngày');
+    expect(buildResponseReminderCopy(1, 'Bác Tôm').showSeeMore).toBe(false);
+    expect(buildResponseReminderCopy(2, 'Bác Tôm').heading).toBe('Bạn có 2 ứng tuyển cần phản hồi');
+    expect(buildResponseReminderCopy(2, 'Bác Tôm').showSeeMore).toBe(false);
+    expect(buildResponseReminderCopy(3, 'Bác Tôm').showSeeMore).toBe(true);
     expect(selectReminderPreview(['a', 'b', 'c'])).toEqual(['a', 'b']);
   });
 });

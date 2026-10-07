@@ -73,7 +73,7 @@ function dueApp(id: string, appliedAt: string) {
     user: { name: `Ứng viên ${id}` },
     job: {
       title: `Vị trí ${id}`,
-      company: { id: 'company-1', slug: 'joy' },
+      company: { id: 'company-1', name: 'Joy', slug: 'joy' },
     },
   };
 }

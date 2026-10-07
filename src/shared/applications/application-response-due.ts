@@ -54,15 +54,16 @@ export function responseCountPhrase(count: number): string {
   return count === 1 ? 'một' : String(count);
 }
 
-export function buildResponseReminderCopy(count: number): {
+export function buildResponseReminderCopy(count: number, companyName: string): {
   heading: string;
   leadText: string;
   showSeeMore: boolean;
 } {
   const phrase = responseCountPhrase(count);
+  const company = companyName.trim() || 'doanh nghiệp';
   return {
     heading: `Bạn có ${phrase} ứng tuyển cần phản hồi`,
-    leadText: `Hiện Quý Doanh Nghiệp đang có ${phrase} hồ sơ ứng tuyển đã 5 ngày nhưng chưa được cập nhật trạng thái phản hồi trên JOYWORK. Có lẽ ứng viên đang rất mong chờ phản hồi từ bạn.`,
+    leadText: `Hiện ${company} đang có ${phrase} hồ sơ ứng tuyển đã 5 ngày nhưng chưa được cập nhật trạng thái phản hồi trên JOYWORK. Có lẽ ứng viên đang rất mong chờ phản hồi từ bạn.`,
     showSeeMore: count > REMINDER_EMAIL_PREVIEW_LIMIT,
   };
 }

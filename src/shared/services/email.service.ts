@@ -1635,6 +1635,7 @@ Trân trọng,
     payload: {
       heading: string;
       leadText: string;
+      companyName: string;
       showSeeMore: boolean;
       applications: Array<{
         candidateName: string;
@@ -1646,6 +1647,7 @@ Trân trọng,
     },
   ): Promise<void> {
     const heading = this.escapeHtml(payload.heading);
+    const companyName = this.escapeHtml(payload.companyName.trim() || 'doanh nghiệp');
     const leadPlain = this.escapeHtml(payload.leadText);
     const leadHtml = leadPlain.replace('5 ngày', '<b>5 ngày</b>');
     const listUrl = this.escapeHtml(payload.listUrl);
@@ -1741,7 +1743,7 @@ Nền tảng tuyển dụng của những doanh nghiệp tốt
 </tr>
 <tr>
 <td style="padding:16px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#333333;line-height:22px;">
-Kính gửi <span style="color:#1c3f8f;font-weight:bold;">Quý Doanh Nghiệp</span>,
+Kính gửi <span style="color:#1c3f8f;font-weight:bold;">${companyName}</span>,
 </td>
 </tr>
 <tr>
@@ -1756,7 +1758,7 @@ ${cards}
 ${seeMore}
 <tr>
 <td style="padding:24px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:22px;">
-Việc phản hồi kịp thời không chỉ giúp ứng viên nắm bắt được tiến độ mà còn thể hiện sự chuyên nghiệp của doanh nghiệp và sự tôn trọng dành cho ứng viên, qua đó góp phần quan trọng trong việc nâng cao trải nghiệm ứng tuyển, giúp nâng cao thương hiệu tuyển dụng (Employer Branding) của Quý Doanh Nghiệp.
+Việc phản hồi kịp thời không chỉ giúp ứng viên nắm bắt được tiến độ mà còn thể hiện sự chuyên nghiệp của doanh nghiệp và sự tôn trọng dành cho ứng viên, qua đó góp phần quan trọng trong việc nâng cao trải nghiệm ứng tuyển, giúp nâng cao thương hiệu tuyển dụng (Employer Branding) của ${companyName}.
 </td>
 </tr>
 <tr>
@@ -1769,7 +1771,7 @@ Trong thời đại thông tin ngày nay, những trải nghiệm như trong qu�
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td bgcolor="#fdeef1" style="background-color:#fdeef1;border-radius:6px;padding:14px 16px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:21px;">
-<b style="color:#c0392b;">Lưu ý:</b> Nếu sau <b>3 ngày tiếp theo</b> Quý Doanh Nghiệp vẫn chưa cập nhật trạng thái, hệ thống sẽ tự động chuyển trạng thái hồ sơ thành <b>&quot;Chưa phù hợp và sẽ lưu hồ sơ&quot;</b>.<br><br>Nếu Quý Doanh Nghiệp đã phản hồi trực tiếp với ứng viên qua kênh thông tin khác thì vẫn có thể cập nhật trạng thái hoặc có thể bỏ qua tin này.
+<b style="color:#c0392b;">Lưu ý:</b> Nếu sau <b>3 ngày tiếp theo</b> ${companyName} vẫn chưa cập nhật trạng thái, hệ thống sẽ tự động chuyển trạng thái hồ sơ thành <b>&quot;Chưa phù hợp và sẽ lưu hồ sơ&quot;</b>.<br><br>Nếu ${companyName} đã phản hồi trực tiếp với ứng viên qua kênh thông tin khác thì vẫn có thể cập nhật trạng thái hoặc có thể bỏ qua tin này.
 </td>
 </tr>
 </table>
@@ -1777,7 +1779,7 @@ Trong thời đại thông tin ngày nay, những trải nghiệm như trong qu�
 </tr>
 <tr>
 <td style="padding:24px 32px 0 32px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;line-height:22px;">
-Trân trọng cảm ơn Quý Doanh Nghiệp đã đồng hành cùng JOYWORK!
+Trân trọng cảm ơn ${companyName} đã đồng hành cùng JOYWORK!
 </td>
 </tr>
 <tr>
@@ -1801,13 +1803,13 @@ Trân trọng,<br>
 
     const text = `${payload.heading}
 
-Kính gửi Quý Doanh Nghiệp,
+Kính gửi ${payload.companyName.trim() || 'doanh nghiệp'},
 
 ${payload.leadText}
 
 ${textCards}
 ${textSeeMore}
-Lưu ý: Nếu sau 3 ngày tiếp theo Quý Doanh Nghiệp vẫn chưa cập nhật trạng thái, hệ thống sẽ tự động chuyển trạng thái hồ sơ thành "Chưa phù hợp và sẽ lưu hồ sơ".
+Lưu ý: Nếu sau 3 ngày tiếp theo ${payload.companyName.trim() || 'doanh nghiệp'} vẫn chưa cập nhật trạng thái, hệ thống sẽ tự động chuyển trạng thái hồ sơ thành "Chưa phù hợp và sẽ lưu hồ sơ".
 
 ${payload.listUrl}
 `;

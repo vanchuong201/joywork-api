@@ -2275,7 +2275,7 @@ export class JobsService {
         job: {
           select: {
             title: true,
-            company: { select: { id: true, slug: true } },
+            company: { select: { id: true, name: true, slug: true } },
           },
         },
       },
@@ -2313,9 +2313,10 @@ export class JobsService {
         continue;
       }
 
-      const slug = applications[0]!.job.company.slug;
+      const company = applications[0]!.job.company;
+      const slug = company.slug;
       const listUrl = `${origin}/companies/${slug}/manage?tab=applications&responseDue=1`;
-      const copy = buildResponseReminderCopy(applications.length);
+      const copy = buildResponseReminderCopy(applications.length, company.name);
       const preview = selectReminderPreview(applications).map((application) => ({
         candidateName: application.user.name?.trim() || 'Ứng viên',
         jobTitle: application.job.title,
@@ -2334,6 +2335,7 @@ export class JobsService {
           await emailService.sendApplicationResponseReminderEmail(to, {
             heading: copy.heading,
             leadText: copy.leadText,
+            companyName: company.name,
             showSeeMore: copy.showSeeMore,
             applications: preview,
             listUrl,
