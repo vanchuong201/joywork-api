@@ -1339,7 +1339,7 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       legalName: { type: ['string', 'null'] },
                       slug: { type: 'string' },
                       verificationStatus: { type: 'string' },
-                      verificationFileUrl: { type: ['string', 'null'] },
+                      hasVerificationFile: { type: 'boolean' },
                       verificationSubmittedAt: { type: ['string', 'null'] },
                       verificationReviewedAt: { type: ['string', 'null'] },
                       verificationReviewedById: { type: ['string', 'null'] },

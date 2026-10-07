@@ -169,7 +169,7 @@ export interface CompanyVerificationItem {
   legalName: string | null;
   slug: string;
   verificationStatus: string;
-  verificationFileUrl: string | null;
+  hasVerificationFile: boolean;
   verificationSubmittedAt: Date | null;
   verificationReviewedAt: Date | null;
   verificationReviewedById: string | null;
@@ -1858,7 +1858,7 @@ export class SystemService {
         legalName: true,
         slug: true,
         verificationStatus: true,
-        verificationFileUrl: true,
+        verificationFileKey: true,
         verificationSubmittedAt: true,
         verificationReviewedAt: true,
         verificationReviewedById: true,
@@ -1873,7 +1873,7 @@ export class SystemService {
       legalName: c.legalName ?? null,
       slug: c.slug,
       verificationStatus: c.verificationStatus,
-      verificationFileUrl: c.verificationFileUrl ?? null,
+      hasVerificationFile: Boolean(c.verificationFileKey),
       verificationSubmittedAt: c.verificationSubmittedAt ?? null,
       verificationReviewedAt: c.verificationReviewedAt ?? null,
       verificationReviewedById: c.verificationReviewedById ?? null,

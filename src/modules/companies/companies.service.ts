@@ -29,7 +29,7 @@ import crypto from 'crypto';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { buildS3ObjectUrl, getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
+import { getS3BucketName, resolveReadableS3ObjectUrl, s3Client } from '@/shared/storage/s3';
 import { companyBadgesSelect, parseCompanyBadgeTypes, toBadgeTypes } from '@/shared/company-badges';
 import {
   findRedirectCompanyId,
@@ -61,8 +61,7 @@ export interface Company {
   highlights?: CompanyHighlight[];
   isVerified: boolean;
   verificationStatus?: string;
-  verificationFileKey?: string | null;
-  verificationFileUrl?: string | null;
+  hasVerificationFile?: boolean;
   verificationSubmittedAt?: Date | null;
   verificationReviewedAt?: Date | null;
   verificationReviewedById?: string | null;
@@ -164,8 +163,8 @@ export interface CompanyWithMembers {
   isVerified: boolean;
   badges: CompanyBadgeType[];
   verificationStatus?: string;
-  verificationFileKey?: string | null;
-  verificationFileUrl?: string | null;
+  hasVerificationFile?: boolean;
+  activeJobCount?: number;
   verificationSubmittedAt?: Date | null;
   verificationReviewedAt?: Date | null;
   verificationReviewedById?: string | null;
@@ -351,8 +350,7 @@ export class CompaniesService {
       ...(company.highlights != null ? { highlights: company.highlights as unknown as CompanyHighlight[] } : {}),
       isVerified: company.isVerified,
       verificationStatus: company.verificationStatus,
-      ...(company.verificationFileKey != null ? { verificationFileKey: company.verificationFileKey } : {}),
-      ...(company.verificationFileUrl != null ? { verificationFileUrl: company.verificationFileUrl } : {}),
+      hasVerificationFile: Boolean(company.verificationFileKey),
       ...(company.verificationSubmittedAt != null ? { verificationSubmittedAt: company.verificationSubmittedAt } : {}),
       ...(company.verificationReviewedAt != null ? { verificationReviewedAt: company.verificationReviewedAt } : {}),
       ...(company.verificationReviewedById != null ? { verificationReviewedById: company.verificationReviewedById } : {}),
@@ -774,6 +772,10 @@ export class CompaniesService {
         }
       : null;
 
+    const activeJobCount = await prisma.job.count({
+      where: { companyId: company.id, isActive: true },
+    });
+
     const [resolvedLogoUrl, resolvedCoverUrl] = await Promise.all([
       resolveReadableS3ObjectUrl(company.logoUrl ?? null),
       resolveReadableS3ObjectUrl(company.coverUrl ?? null),
@@ -805,8 +807,8 @@ export class CompaniesService {
       isVerified: company.isVerified,
       badges: toBadgeTypes(company.badges),
       verificationStatus: company.verificationStatus,
-      ...(company.verificationFileKey != null ? { verificationFileKey: company.verificationFileKey } : {}),
-      ...(company.verificationFileUrl != null ? { verificationFileUrl: company.verificationFileUrl } : {}),
+      hasVerificationFile: Boolean(company.verificationFileKey),
+      activeJobCount,
       ...(company.verificationSubmittedAt != null ? { verificationSubmittedAt: company.verificationSubmittedAt } : {}),
       ...(company.verificationReviewedAt != null ? { verificationReviewedAt: company.verificationReviewedAt } : {}),
       ...(company.verificationReviewedById != null ? { verificationReviewedById: company.verificationReviewedById } : {}),
@@ -1743,8 +1745,6 @@ export class CompaniesService {
       );
     }
 
-    const fileUrl = buildS3ObjectUrl(key);
-
     const result = await prisma.$transaction(async (tx) => {
       const list = await tx.companyVerificationList.create({
         data: {
@@ -1796,8 +1796,6 @@ export class CompaniesService {
         list: {
           id: list.id,
           name: list.name,
-          fileKey: list.fileKey,
-          fileUrl,
           createdAt: list.createdAt,
         },
         contactsCount: createdContacts,
@@ -1825,8 +1823,6 @@ export class CompaniesService {
       lists: lists.map((l: any) => ({
         id: l.id,
         name: l.name,
-        fileKey: l.fileKey,
-        fileUrl: buildS3ObjectUrl(l.fileKey),
         createdAt: l.createdAt,
         contactsCount: l.items.length,
       })),

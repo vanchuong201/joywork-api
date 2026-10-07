@@ -18,6 +18,7 @@ import { inboxRoutes } from '@/modules/inbox/inbox.routes';
 import { systemRoutes } from '@/modules/system/system.routes';
 import { bannersAdminRoutes, bannersRoutes } from '@/modules/banners/banners.routes';
 import { seoUrlsAdminRoutes, seoUrlsRoutes } from '@/modules/seo-urls/seo-urls.routes';
+import { sitemapRoutes } from '@/modules/sitemap/sitemap.routes';
 import { uploadsRoutes } from '@/modules/uploads/uploads.routes';
 import { ticketsRoutes } from '@/modules/tickets/tickets.routes';
 import notificationsRoutes from '@/modules/notifications/notifications.routes';
@@ -225,6 +226,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await app.register(bannersRoutes, { prefix: '/api/banners' });
   await app.register(seoUrlsAdminRoutes, { prefix: '/api/system/seo-urls' });
   await app.register(seoUrlsRoutes, { prefix: '/api/seo-urls' });
+  await app.register(sitemapRoutes, { prefix: '/api/sitemap' });
   await app.register(uploadsRoutes, { prefix: '/api/uploads' });
   await app.register(ticketsRoutes, { prefix: '/api/tickets' });
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });

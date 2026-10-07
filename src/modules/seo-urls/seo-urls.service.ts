@@ -71,7 +71,7 @@ export type AdminSeoUrlDto = {
 /** Thông tin nhóm mapping cùng `destinationKey` để dựng DTO admin. */
 type DestinationGroup = { canonicalPath: string | null; total: number };
 
-function parseStoredParams(value: Prisma.JsonValue): DestinationParams {
+export function parseStoredParams(value: Prisma.JsonValue): DestinationParams {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new AppError('Bộ lọc đích của SEO URL không hợp lệ', 500, 'INVALID_DESTINATION');
   }

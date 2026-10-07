@@ -3,6 +3,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { CandidateCvService } from '@/modules/candidate-cvs/candidate-cvs.service';
+import { previousVerificationObjectKey } from '@/modules/uploads/verification-files';
 import { buildS3ObjectUrl, createPresignedUploadUrl, createPresignedDownloadUrl, deleteS3Objects, getS3BucketName, s3Client } from '@/shared/storage/s3';
 import {
   CreatePresignInput,
@@ -743,7 +744,7 @@ export class UploadsService {
   }
 
   async uploadCompanyVerificationDocument(userId: string, input: UploadCompanyVerificationInput) {
-    const { companyId, fileName, fileType, fileData, previousKey } = input;
+    const { companyId, fileName, fileType, fileData } = input;
 
     const membership = await prisma.companyMember.findFirst({
       where: {
@@ -780,6 +781,11 @@ export class UploadsService {
     })();
     const extension = extFromMime ?? fallbackExt ?? '';
     const key = `companies/${companyId}/verification/${randomUUID()}${extension}`;
+    const existing = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { verificationFileKey: true },
+    });
+    const previousKey = previousVerificationObjectKey(companyId, existing?.verificationFileKey, key);
 
     try {
       await s3Client.send(new PutObjectCommand({
@@ -795,7 +801,7 @@ export class UploadsService {
         data: {
           verificationStatus: 'PENDING',
           verificationFileKey: key,
-          verificationFileUrl: buildS3ObjectUrl(key),
+          verificationFileUrl: null,
           verificationSubmittedAt: new Date(),
           verificationReviewedAt: null,
           verificationReviewedById: null,
@@ -808,15 +814,13 @@ export class UploadsService {
       throw new AppError('Không thể tải hồ sơ xác thực, vui lòng thử lại.', 500, 'UPLOAD_FAILED');
     }
 
-    if (previousKey && previousKey.startsWith(`companies/${companyId}/verification/`)) {
+    if (previousKey) {
       try {
         await deleteS3Objects([previousKey]);
       } catch (error) {
         console.error('Failed to delete previous verification document', error);
       }
     }
-
-    const assetUrl = buildS3ObjectUrl(key);
 
     // Get company info and owner email for notifications
     const company = await prisma.company.findUnique({
@@ -833,7 +837,7 @@ export class UploadsService {
           body: JSON.stringify({
             msg_type: 'text',
             content: {
-              text: `DN đã nộp hồ sơ xác thực DKKD.\nCompany: ${company?.name ?? 'N/A'}\nLegal name: ${company?.legalName ?? 'N/A'}\nSlug: ${company?.slug ?? 'N/A'}\nCompanyId: ${companyId}\nFile: ${assetUrl}`,
+              text: `DN đã nộp hồ sơ xác thực DKKD.\nCompany: ${company?.name ?? 'N/A'}\nLegal name: ${company?.legalName ?? 'N/A'}\nSlug: ${company?.slug ?? 'N/A'}\nCompanyId: ${companyId}\nĐã có file. Tải qua trang quản trị, không dùng link public.`,
             },
           }),
         });
@@ -872,7 +876,7 @@ export class UploadsService {
       // Don't throw - email failure shouldn't block the upload
     }
 
-    return { key, assetUrl };
+    return { hasVerificationFile: true };
   }
 
   async getCompanyVerificationDownloadUrl(userId: string, companyId: string) {

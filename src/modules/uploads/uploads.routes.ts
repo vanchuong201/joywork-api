@@ -234,7 +234,7 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
             fileName: { type: 'string', description: 'Tên tệp gốc', minLength: 1 },
             fileType: { type: 'string', description: 'MIME type của tệp', minLength: 1 },
             fileData: { type: 'string', description: 'Dữ liệu file dạng base64' },
-            previousKey: { type: 'string' },
+            previousKey: { type: 'string', description: 'Bỏ qua. Server tự xóa file cũ.' },
           },
         },
         response: {
@@ -244,8 +244,7 @@ export async function uploadsRoutes(fastify: FastifyInstance) {
               data: {
                 type: 'object',
                 properties: {
-                  key: { type: 'string' },
-                  assetUrl: { type: 'string' },
+                  hasVerificationFile: { type: 'boolean' },
                 },
               },
             },
