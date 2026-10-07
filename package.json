@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy && npx tsx scripts/repair-http-company-slugs.ts",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:provinces": "tsx prisma/seed-provinces.ts",
     "db:seed:wards": "tsx scripts/seed-wards-from-vn-units.ts",
