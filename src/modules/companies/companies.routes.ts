@@ -478,6 +478,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
 
   // Get company by slug
   fastify.get('/:slug', {
+    preHandler: [authMiddleware.optionalAuth.bind(authMiddleware)],
     schema: {
       description: 'Get company by slug',
       tags: ['Companies'],
@@ -797,6 +798,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
                           size: { type: 'string', nullable: true },
                           foundedYear: { type: 'number', nullable: true },
                           isVerified: { type: 'boolean' },
+                          visibilityStatus: { type: 'string', enum: ['ACTIVE', 'HIDDEN'] },
                           verificationStatus: { type: 'string', nullable: true },
                           hasVerificationFile: { type: 'boolean' },
                           activeJobCount: { type: 'integer' },

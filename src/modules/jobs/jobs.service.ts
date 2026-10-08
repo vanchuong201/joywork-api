@@ -7,6 +7,11 @@ import { resolveLocationsWithWards } from '@/shared/wards';
 import { getEsClient } from '@/shared/elasticsearch/client';
 import { JOBS_INDEX } from '@/shared/elasticsearch/indices';
 import { syncJobToEs, deleteJobFromEs } from '@/shared/elasticsearch/sync';
+import {
+  assertCompanyManageableById,
+  isCompanyPublic,
+  publicCompanyWhere,
+} from '@/modules/companies/company-visibility';
 import { emailService } from '@/shared/services/email.service';
 import { sendEmailInBackground } from '@/shared/services/send-email-async';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
@@ -259,6 +264,7 @@ export class JobsService {
     if (!membership) {
       throw new AppError('You do not have permission to create jobs for this company', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     // Create job
     const deadline = data.applicationDeadline ? new Date(data.applicationDeadline) : null;
@@ -445,6 +451,7 @@ export class JobsService {
     if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
       throw new AppError('You do not have permission to update this job', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(job.companyId);
 
     // Update job
     const updateData: any = {
@@ -653,6 +660,7 @@ export class JobsService {
     if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
       throw new AppError('You do not have permission to refresh this job', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(job.companyId);
 
     const refreshData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -679,6 +687,7 @@ export class JobsService {
             logoUrl: true,
             website: true,
             badges: companyBadgesSelect,
+            visibilityStatus: true,
           },
         },
         _count: {
@@ -689,7 +698,7 @@ export class JobsService {
       },
     });
 
-    if (!job) {
+    if (!job || !isCompanyPublic(job.company)) {
       return null;
     }
 
@@ -806,6 +815,7 @@ export class JobsService {
     const relatedWhere: any = {
       id: { not: jobId },
       isActive: true,
+      company: publicCompanyWhere(),
     };
     if (relatedConditions.length > 0) {
       relatedWhere.OR = relatedConditions;
@@ -866,6 +876,7 @@ export class JobsService {
         where: {
           id: { notIn: [jobId, ...initialRelated.map((job) => job.id)] },
           isActive: true,
+          company: publicCompanyWhere(),
         },
         take: missingCount,
         orderBy: { createdAt: 'desc' },
@@ -977,12 +988,19 @@ export class JobsService {
       totalPages: number;
     };
   }> {
+    if (data.companyId) {
+      await assertCompanyManageableById(data.companyId);
+    }
+
     const badgeTypes = parseCompanyBadgeTypes(data.companyBadges);
     let badgeCompanyIds: string[] | undefined;
 
     if (badgeTypes.length > 0) {
       const badgeCompanies = await prisma.company.findMany({
-        where: { badges: { some: { type: { in: badgeTypes } } } },
+        where: {
+          badges: { some: { type: { in: badgeTypes } } },
+          ...(data.companyId ? {} : publicCompanyWhere()),
+        },
         select: { id: true },
       });
       badgeCompanyIds = badgeCompanies.map((c) => c.id);
@@ -999,7 +1017,14 @@ export class JobsService {
       try {
         const esResult = await this.searchJobsInEs(data, badgeCompanyIds);
         if (esResult !== null) {
-          return await this.fetchJobsByIds(esResult.ids, data.page, data.limit, userId, esResult.total);
+          return await this.fetchJobsByIds(
+            esResult.ids,
+            data.page,
+            data.limit,
+            userId,
+            esResult.total,
+            !data.companyId,
+          );
         }
       } catch (err) {
         console.warn('[ES] Job search failed, falling back to Prisma:', err);
@@ -1019,6 +1044,9 @@ export class JobsService {
       if (!companyId) {
         where.isActive = true;
       }
+    }
+    if (!companyId) {
+      where.company = publicCompanyWhere();
     }
 
     if (q) {
@@ -1279,12 +1307,13 @@ export class JobsService {
             id: true,
             name: true,
             slug: true,
+            visibilityStatus: true,
           },
         },
       },
     });
 
-    if (!job) {
+    if (!job || !isCompanyPublic(job.company)) {
       throw new AppError('Job not found', 404, 'JOB_NOT_FOUND');
     }
 
@@ -1453,6 +1482,7 @@ export class JobsService {
     if (!(await canReviewCompanyApplications(userId, scopeCompanyId))) {
       throw new AppError('You do not have permission to view applications for this company', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(scopeCompanyId);
 
     const now = new Date();
     if (responseDue && status && status !== 'RECEIVED') {
@@ -1582,6 +1612,7 @@ export class JobsService {
   // Chi tiết đơn (DN): snapshot CV tại thời điểm ứng tuyển + các đơn trước của cùng job.
   async getApplicationDetail(applicationId: string, userId: string) {
     const application = await findReviewableApplication(applicationId, userId);
+    await assertCompanyManageableById(application.job.companyId);
 
     const [snapshot, history] = await Promise.all([
       ensureApplicationSnapshot(application),
@@ -1650,6 +1681,7 @@ export class JobsService {
     if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
       throw new AppError('You do not have permission to update this application', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(application.job.companyId);
 
     const prevNotes = (application.notes ?? '').trim();
     const notesProvided = data.notes !== undefined;
@@ -1812,7 +1844,7 @@ export class JobsService {
 
     const [favorites, total] = await Promise.all([
       prisma.jobFavorite.findMany({
-        where: { userId },
+        where: { userId, job: { company: publicCompanyWhere() } },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -1832,7 +1864,7 @@ export class JobsService {
           },
         },
       }),
-      prisma.jobFavorite.count({ where: { userId } }),
+      prisma.jobFavorite.count({ where: { userId, job: { company: publicCompanyWhere() } } }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -1941,6 +1973,7 @@ export class JobsService {
     if (!membership || !['OWNER', 'ADMIN', 'MEMBER'].includes(membership.role)) {
       throw new AppError('You do not have permission to delete this job', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(job.companyId);
 
     // Delete job
     await prisma.job.delete({
@@ -2068,13 +2101,17 @@ export class JobsService {
     limit: number,
     userId?: string,
     total = ids.length,
+    publicOnly = true,
   ): Promise<{ jobs: JobWithApplication[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     if (ids.length === 0) {
       return { jobs: [], pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
     }
 
     const jobs = await prisma.job.findMany({
-      where: { id: { in: ids } },
+      where: {
+        id: { in: ids },
+        ...(publicOnly ? { company: publicCompanyWhere() } : {}),
+      },
       include: {
         company: {
           select: { id: true, name: true, legalName: true, slug: true, logoUrl: true, badges: companyBadgesSelect },
@@ -2208,6 +2245,7 @@ export class JobsService {
       FROM jobs j
       JOIN companies c ON c.id = j."companyId"
       WHERE j."isActive" = true
+        AND c."visibilityStatus" = 'ACTIVE'
         AND j.embedding IS NOT NULL
         AND ($2::text IS NULL OR j.locations @> ARRAY[$2]::text[])
         AND ($3::text IS NULL OR j."employmentType"::text = $3)

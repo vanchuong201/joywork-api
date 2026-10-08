@@ -6,6 +6,10 @@ import { notificationService } from '@/shared/services/notification.service';
 import { getVerifiedEmailForUser, getVerifiedEmailsForUsers } from '@/shared/services/email-helper.service';
 import { config } from '@/config/env';
 import {
+  assertCompanyManageableById,
+  isCompanyPublic,
+} from '@/modules/companies/company-visibility';
+import {
   CreateTicketInput,
   ListTicketsInput,
   GetTicketMessagesInput,
@@ -29,6 +33,7 @@ export class TicketsService {
           id: true,
           name: true,
           slug: true,
+          visibilityStatus: true,
         },
       }),
       prisma.user.findUnique({
@@ -40,7 +45,7 @@ export class TicketsService {
       }),
     ]);
 
-    if (!company) {
+    if (!company || !isCompanyPublic(company)) {
       throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
     }
 
@@ -149,6 +154,7 @@ export class TicketsService {
       });
 
       if (membership) {
+        await assertCompanyManageableById(companyId);
         // User is a company member - can see all tickets for this company
         isCompanyContext = true;
         where = { companyId };
@@ -378,6 +384,9 @@ export class TicketsService {
 
     if (!isApplicant && !companyMembership) {
       throw new AppError('Bạn không có quyền truy cập ticket này', 403, 'FORBIDDEN');
+    }
+    if (!isApplicant && companyMembership) {
+      await assertCompanyManageableById(ticket.companyId);
     }
 
     return { ticket, isApplicant, companyMembership };

@@ -113,7 +113,10 @@ describe('CompaniesService.searchCompanies badges', () => {
       });
 
       expect(prismaMock.company.findMany).toHaveBeenCalledWith({
-        where: { badges: { some: { type: { in: ['GOOD_COMPANY'] } } } },
+        where: {
+          visibilityStatus: 'ACTIVE',
+          badges: { some: { type: { in: ['GOOD_COMPANY'] } } },
+        },
         select: { id: true },
       });
 

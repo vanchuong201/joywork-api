@@ -18,6 +18,7 @@ import {
   adminPostFeedVisibilityPatchSchema,
   adminPostsQuerySchema,
   adminCompanyPremiumPatchSchema,
+  adminCompanyVisibilityPatchSchema,
   adminCompanyCvFlipPatchSchema,
   adminCompanyBadgePatchSchema,
   adminOverviewQuerySchema,
@@ -183,6 +184,20 @@ export class SystemController {
     }
     const data = await this.systemService.setFeaturedCompanyShowcaseCover(companyId, parsed.data.coverUrl);
     return reply.send({ data });
+  }
+
+  async patchCompanyVisibility(request: AuthenticatedRequest, reply: FastifyReply) {
+    const adminId = request.user?.userId;
+    if (!adminId) {
+      throw new AppError('Vui lòng đăng nhập', 401, 'AUTH_REQUIRED');
+    }
+    const { companyId } = request.params as { companyId: string };
+    const parsed = adminCompanyVisibilityPatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new AppError('Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const company = await this.systemService.setCompanyVisibility(companyId, adminId, parsed.data);
+    return reply.send({ data: { company } });
   }
 
   async patchCompanyPremiumStatus(request: AuthenticatedRequest, reply: FastifyReply) {

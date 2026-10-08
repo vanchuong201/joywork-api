@@ -183,6 +183,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
               highlights: { type: ['array', 'null'], items: { type: 'object', additionalProperties: true } },
               verificationStatus: { type: 'string' },
               isVerified: { type: 'boolean' },
+              visibilityStatus: { type: 'string', enum: ['ACTIVE', 'HIDDEN'] },
+              hiddenAt: { type: ['string', 'null'] },
+              hiddenById: { type: ['string', 'null'] },
+              hiddenReason: { type: ['string', 'null'] },
               createdAt: { type: 'string' },
               updatedAt: { type: 'string' },
               profile: {
@@ -507,6 +511,9 @@ export async function systemRoutes(fastify: FastifyInstance) {
                       legalName: { type: ['string', 'null'] },
                       verificationStatus: { type: 'string' },
                       isVerified: { type: 'boolean' },
+                      visibilityStatus: { type: 'string', enum: ['ACTIVE', 'HIDDEN'] },
+                      hiddenAt: { type: ['string', 'null'] },
+                      hiddenReason: { type: ['string', 'null'] },
                       badges: { type: 'array', items: { type: 'string', enum: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } },
                       isPremium: { type: 'boolean' },
                       cvFlipEnabled: { type: 'boolean' },
@@ -703,6 +710,52 @@ export async function systemRoutes(fastify: FastifyInstance) {
       },
     },
   }, systemController.patchFeaturedShowcaseCover.bind(systemController));
+
+  fastify.patch('/companies/:companyId/visibility', {
+    preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],
+    schema: {
+      description: 'Ẩn hoặc khôi phục công ty. Ẩn yêu cầu lý do. Dữ liệu không bị xóa.',
+      tags: ['System'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['companyId'],
+        properties: {
+          companyId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['visibilityStatus'],
+        properties: {
+          visibilityStatus: { type: 'string', enum: ['ACTIVE', 'HIDDEN'] },
+          reason: { type: 'string', minLength: 1, maxLength: 500 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    visibilityStatus: { type: 'string', enum: ['ACTIVE', 'HIDDEN'] },
+                    hiddenAt: { type: ['string', 'null'] },
+                    hiddenById: { type: ['string', 'null'] },
+                    hiddenReason: { type: ['string', 'null'] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, systemController.patchCompanyVisibility.bind(systemController));
 
   fastify.patch('/companies/:companyId/premium', {
     preHandler: [authMiddleware.verifyToken.bind(authMiddleware), authMiddleware.requireAdmin.bind(authMiddleware)],

@@ -6,6 +6,17 @@ import {
   CompanyVerificationStatus,
   UserAccountStatus,
 } from '@prisma/client';
+import {
+  deleteCompanyFromEs,
+  deleteJobFromEs,
+  syncCompanyToEs,
+  syncJobToEs,
+} from '@/shared/elasticsearch/sync';
+import {
+  assertHideReason,
+  hideCompanyData,
+  restoreCompanyData,
+} from '@/modules/companies/company-visibility';
 import { AppError } from '@/shared/errors/errorHandler';
 import { emailService } from '@/shared/services/email.service';
 import { config } from '@/config/env';
@@ -114,6 +125,9 @@ export interface AdminCompanyListItem {
   cvFlipCycleCount: number;
   cvFlipRemainingCycles: number;
   cvFlipExpired: boolean;
+  visibilityStatus: string;
+  hiddenAt: Date | null;
+  hiddenReason: string | null;
   createdAt: Date;
   memberCount: number;
   jobCount: number;
@@ -143,6 +157,10 @@ export interface AdminCompanyDetail {
   highlights: Prisma.JsonValue | null;
   verificationStatus: string;
   isVerified: boolean;
+  visibilityStatus: string;
+  hiddenAt: Date | null;
+  hiddenById: string | null;
+  hiddenReason: string | null;
   createdAt: Date;
   updatedAt: Date;
   profile: Prisma.CompanyProfileGetPayload<{ select: { companyId: true; stats: true; vision: true; mission: true; coreValues: true; leadershipPhilosophy: true; products: true; recruitmentPrinciples: true; benefits: true; hrJourney: true; careerPath: true; salaryAndBonus: true; training: true; gallery: true; leaders: true; story: true; culture: true; awards: true; sectionVisibility: true; updatedAt: true } }> | null;
@@ -505,6 +523,9 @@ export class SystemService {
           legalName: true,
           verificationStatus: true,
           isVerified: true,
+          visibilityStatus: true,
+          hiddenAt: true,
+          hiddenReason: true,
           badges: companyBadgesSelect,
           createdAt: true,
           _count: {
@@ -540,6 +561,9 @@ export class SystemService {
         legalName: c.legalName ?? null,
         verificationStatus: c.verificationStatus,
         isVerified: c.isVerified,
+        visibilityStatus: c.visibilityStatus,
+        hiddenAt: c.hiddenAt,
+        hiddenReason: c.hiddenReason,
         badges: toBadgeTypes(c.badges),
         isPremium: premiumEntitlement?.enabled ?? false,
         cvFlipEnabled: (cvFlipEntitlement?.enabled ?? false) && !cvFlipExpired,
@@ -593,6 +617,10 @@ export class SystemService {
         highlights: true,
         verificationStatus: true,
         isVerified: true,
+        visibilityStatus: true,
+        hiddenAt: true,
+        hiddenById: true,
+        hiddenReason: true,
         createdAt: true,
         updatedAt: true,
         profile: {
@@ -1586,6 +1614,154 @@ export class SystemService {
       latest,
       points,
     };
+  }
+
+  async setCompanyVisibility(
+    companyId: string,
+    adminId: string,
+    input: { visibilityStatus: 'ACTIVE' | 'HIDDEN'; reason?: string },
+  ) {
+    const select = {
+      id: true,
+      slug: true,
+      name: true,
+      legalName: true,
+      tagline: true,
+      description: true,
+      industry: true,
+      location: true,
+      size: true,
+      isVerified: true,
+      createdAt: true,
+      visibilityStatus: true,
+      hiddenAt: true,
+      hiddenById: true,
+      hiddenReason: true,
+    } as const;
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select,
+    });
+    if (!company) {
+      throw new AppError('Không tìm thấy công ty', 404, 'COMPANY_NOT_FOUND');
+    }
+
+    if (input.visibilityStatus === 'ACTIVE') {
+      if (company.visibilityStatus === 'ACTIVE') {
+        return this.toVisibilityCompany(company);
+      }
+      const updated = await prisma.company.update({
+        where: { id: companyId },
+        data: restoreCompanyData(),
+        select,
+      });
+      await this.syncCompanyVisibilitySearch(updated, 'restore');
+      return this.toVisibilityCompany(updated);
+    }
+
+    const reason = assertHideReason(input.reason);
+    const updated = await prisma.company.update({
+      where: { id: companyId },
+      data: hideCompanyData(adminId, reason),
+      select,
+    });
+    await this.syncCompanyVisibilitySearch(updated, 'hide');
+    return this.toVisibilityCompany(updated);
+  }
+
+  private toVisibilityCompany(company: {
+    id: string;
+    visibilityStatus: string;
+    hiddenAt: Date | null;
+    hiddenById: string | null;
+    hiddenReason: string | null;
+  }) {
+    return {
+      id: company.id,
+      visibilityStatus: company.visibilityStatus,
+      hiddenAt: company.hiddenAt,
+      hiddenById: company.hiddenById,
+      hiddenReason: company.hiddenReason,
+    };
+  }
+
+  private async syncCompanyVisibilitySearch(
+    company: {
+      id: string;
+      slug: string;
+      name: string;
+      legalName: string | null;
+      tagline: string | null;
+      description: string | null;
+      industry: string | null;
+      location: string | null;
+      size: string | null;
+      isVerified: boolean;
+      createdAt: Date;
+    },
+    mode: 'hide' | 'restore',
+  ) {
+    try {
+      if (mode === 'hide') {
+        await deleteCompanyFromEs(company.id);
+        const jobs = await prisma.job.findMany({
+          where: { companyId: company.id },
+          select: { id: true },
+        });
+        await Promise.all(jobs.map((job) => deleteJobFromEs(job.id)));
+        return;
+      }
+
+      await syncCompanyToEs({
+        id: company.id,
+        slug: company.slug,
+        name: company.name,
+        legalName: company.legalName,
+        tagline: company.tagline,
+        description: company.description,
+        industry: company.industry,
+        location: company.location,
+        size: company.size,
+        isVerified: company.isVerified,
+        createdAt: company.createdAt,
+      });
+      const jobs = await prisma.job.findMany({
+        where: { companyId: company.id, isActive: true },
+        select: {
+          id: true,
+          companyId: true,
+          slug: true,
+          title: true,
+          generalInfo: true,
+          mission: true,
+          tasks: true,
+          knowledge: true,
+          skills: true,
+          attitude: true,
+          locations: true,
+          wardCodes: true,
+          remote: true,
+          isActive: true,
+          worksOnSaturday: true,
+          employmentType: true,
+          experienceLevel: true,
+          jobLevel: true,
+          educationLevel: true,
+          gender: true,
+          salaryMin: true,
+          salaryMax: true,
+          currency: true,
+          tags: true,
+          applicationDeadline: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      await Promise.all(jobs.map((job) => syncJobToEs(job)));
+    } catch (err) {
+      console.error(`[ES] Failed to sync visibility for company ${company.id}:`, err);
+    }
   }
 
   async setCompanyPremiumStatus(

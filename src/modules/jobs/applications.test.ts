@@ -26,6 +26,9 @@ const { prismaMock, evaluateCvReadinessMock } = vi.hoisted(() => {
       findFirst: vi.fn(),
       findMany: vi.fn(),
     },
+    company: {
+      findUnique: vi.fn(),
+    },
   };
   return { prismaMock, evaluateCvReadinessMock: vi.fn() };
 });
@@ -139,7 +142,7 @@ function mockActiveJob() {
     companyId: 'company-1',
     isActive: true,
     applicationDeadline: null,
-    company: { id: 'company-1', name: 'JoyWork', slug: 'joywork' },
+    company: { id: 'company-1', name: 'JoyWork', slug: 'joywork', visibilityStatus: 'ACTIVE' },
   });
 }
 
@@ -184,6 +187,23 @@ describe('JobsService.applyForJob', () => {
     expect(data.sourceCvId).toBe(CV_B);
     expect(data.cvSnapshotVersion).toBe(1);
     expect(data.cvSnapshot).toMatchObject({ version: 1, source: 'apply', cvId: CV_B, cvName: `CV ${CV_B}` });
+  });
+
+  it('từ chối ứng tuyển khi công ty đang ẩn và không tạo đơn', async () => {
+    prismaMock.job.findUnique.mockResolvedValue({
+      id: JOB_ID,
+      isActive: true,
+      deadline: null,
+      title: 'Backend',
+      companyId: 'company-1',
+      company: { id: 'company-1', name: 'Joy', slug: 'joy', visibilityStatus: 'HIDDEN' },
+    });
+
+    await expect(service.applyForJob(USER_ID, { jobId: JOB_ID, cvId: CV_A })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'JOB_NOT_FOUND',
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('cho phép apply lại cùng CV khi đơn cũ còn mở', async () => {
@@ -283,6 +303,7 @@ describe('JobsService.getApplications authz', () => {
 
   it('trả "lần n" và đơn trước theo cùng (userId, jobId)', async () => {
     prismaMock.companyMember.findFirst.mockResolvedValue({ id: 'member-1' });
+    prismaMock.company.findUnique.mockResolvedValue({ visibilityStatus: 'ACTIVE' });
     const appliedAt = new Date('2026-09-28T10:00:00.000Z');
     prismaMock.application.findMany
       .mockResolvedValueOnce([
@@ -346,5 +367,78 @@ describe('JobsService.getApplicationDetail authz', () => {
       statusCode: 404,
       code: 'APPLICATION_NOT_FOUND',
     });
+  });
+
+  it('403 COMPANY_HIDDEN khi thành viên mở đơn của công ty đang ẩn', async () => {
+    prismaMock.application.findUnique.mockResolvedValue({
+      id: 'app-1',
+      userId: 'candidate-1',
+      jobId: JOB_ID,
+      job: {
+        id: JOB_ID,
+        slug: 'backend',
+        title: 'Backend',
+        companyId: 'company-1',
+        company: { id: 'company-1', name: 'Joy', slug: 'joy', logoUrl: null },
+      },
+    });
+    prismaMock.companyMember.findFirst.mockResolvedValue({ id: 'member-1' });
+    prismaMock.company.findUnique.mockResolvedValue({ visibilityStatus: 'HIDDEN' });
+
+    await expect(service.getApplicationDetail('app-1', USER_ID)).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'COMPANY_HIDDEN',
+    });
+  });
+});
+
+describe('JobsService.getMyApplications', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('vẫn trả đơn khi công ty đang ẩn', async () => {
+    const appliedAt = new Date('2026-09-28T10:00:00.000Z');
+    const row = {
+      id: 'app-1',
+      jobId: JOB_ID,
+      userId: USER_ID,
+      status: 'RECEIVED',
+      coverLetter: null,
+      resumeUrl: null,
+      notes: null,
+      appliedAt,
+      updatedAt: appliedAt,
+      sourceCvId: null,
+      cvSnapshot: null,
+      job: {
+        id: JOB_ID,
+        slug: 'backend',
+        title: 'Backend',
+        company: { id: 'company-1', name: 'Joy ẩn', slug: 'joy', logoUrl: null, badges: [] },
+      },
+      user: { id: USER_ID, name: 'A', email: 'a@example.com', slug: null, profile: null },
+    };
+    prismaMock.application.findMany.mockResolvedValueOnce([row]).mockResolvedValueOnce([
+      {
+        id: 'app-1',
+        userId: USER_ID,
+        jobId: JOB_ID,
+        appliedAt,
+        status: 'RECEIVED',
+        sourceCvId: null,
+        cvSnapshot: null,
+        sourceCv: null,
+      },
+    ]);
+    prismaMock.application.count.mockResolvedValue(1);
+
+    const result = await service.getMyApplications(USER_ID, { page: 1, limit: 20 });
+
+    expect(prismaMock.application.findMany.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ where: { userId: USER_ID } }),
+    );
+    expect(JSON.stringify(prismaMock.application.findMany.mock.calls[0]?.[0])).not.toContain('visibilityStatus');
+    expect(result.applications[0]?.job.company.name).toBe('Joy ẩn');
   });
 });

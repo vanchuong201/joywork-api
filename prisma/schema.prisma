@@ -66,6 +66,7 @@ model User {
   talentPoolLogs             TalentPoolLog[]     @relation("TalentPoolLogUser")
   talentPoolLogsActed        TalentPoolLog[]     @relation("TalentPoolLogActor")
   courseEnrollments          CourseEnrollment[]
+  companiesHidden            Company[]            @relation("CompanyHiddenBy")
 
   // Brevo CRM sync tracking (payload hash of mapped whitelist attrs)
   brevoSyncedAt DateTime?
@@ -487,6 +488,11 @@ model UserEducation {
 }
 
 // Company model
+enum CompanyVisibilityStatus {
+  ACTIVE
+  HIDDEN
+}
+
 model Company {
   id                       String                    @id @default(cuid())
   name                     String
@@ -520,8 +526,13 @@ model Company {
   verificationRejectReason String?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
+  visibilityStatus         CompanyVisibilityStatus   @default(ACTIVE)
+  hiddenAt                 DateTime?
+  hiddenById               String?
+  hiddenReason             String?
 
   // Relations
+  hiddenBy    User?             @relation("CompanyHiddenBy", fields: [hiddenById], references: [id], onDelete: SetNull)
   profile     CompanyProfile?
   members     CompanyMember[]
   posts       Post[]
@@ -545,6 +556,7 @@ model Company {
   showcaseSlots CompanyShowcaseSlot[]
   slugRedirects CompanySlugRedirect[]
 
+  @@index([visibilityStatus])
   @@map("companies")
 }
 

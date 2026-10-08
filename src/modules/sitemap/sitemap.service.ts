@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { buildJobUrl } from '@/shared/job-slug';
+import { publicCompanyWhere } from '@/modules/companies/company-visibility';
 import { JobsService } from '@/modules/jobs/jobs.service';
 import { searchJobsSchema } from '@/modules/jobs/jobs.schema';
 import { toJobSearchQuery } from '@/modules/seo-urls/seo-urls.destinations';
@@ -8,6 +9,7 @@ import { parseStoredParams } from '@/modules/seo-urls/seo-urls.service';
 
 export function companySitemapWhere(): Prisma.CompanyWhereInput {
   return {
+    ...publicCompanyWhere(),
     NOT: { slug: { startsWith: 'http', mode: 'insensitive' } },
     jobs: { some: { isActive: true } },
   };
@@ -16,6 +18,7 @@ export function companySitemapWhere(): Prisma.CompanyWhereInput {
 export function jobSitemapWhere(now: Date): Prisma.JobWhereInput {
   return {
     isActive: true,
+    company: publicCompanyWhere(),
     OR: [{ applicationDeadline: null }, { applicationDeadline: { gt: now } }],
   };
 }

@@ -125,6 +125,18 @@ export const adminCompanyPremiumPatchSchema = z.object({
   isPremium: z.boolean(),
 });
 
+export const adminCompanyVisibilityPatchSchema = z.discriminatedUnion('visibilityStatus', [
+  z.object({
+    visibilityStatus: z.literal('HIDDEN'),
+    reason: z.string().trim().min(1).max(500),
+  }),
+  z.object({
+    visibilityStatus: z.literal('ACTIVE'),
+  }),
+]);
+
+export type AdminCompanyVisibilityPatch = z.infer<typeof adminCompanyVisibilityPatchSchema>;
+
 export type AdminCompanyPremiumPatch = z.infer<typeof adminCompanyPremiumPatchSchema>;
 
 export const adminCompanyCvFlipPatchSchema = z.object({

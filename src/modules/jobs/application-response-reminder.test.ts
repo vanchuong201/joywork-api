@@ -11,6 +11,9 @@ const { prismaMock, emailMock, verifiedEmailsMock, notificationMock } = vi.hoist
     companyMember: {
       findMany: vi.fn(),
     },
+    company: {
+      findUnique: vi.fn(),
+    },
   },
   emailMock: {
     sendApplicationResponseReminderEmail: vi.fn(),
@@ -88,6 +91,7 @@ describe('JobsService.processApplicationResponseReminders', () => {
     prismaMock.companyMember.findMany.mockResolvedValue([
       { companyId: 'company-1', userId: 'admin-1' },
     ]);
+    prismaMock.company.findUnique.mockResolvedValue({ visibilityStatus: 'ACTIVE' });
     verifiedEmailsMock.mockResolvedValue(new Map([['admin-1', 'admin@example.com']]));
   });
 
@@ -204,7 +208,11 @@ describe('JobsService.processApplicationResponseReminders', () => {
       notes: null,
       userId: 'candidate-1',
       jobId: 'job-1',
-      job: { title: 'Editor', company: { name: 'Joy', members: [{ role: 'OWNER' }] } },
+      job: {
+        title: 'Editor',
+        companyId: 'company-1',
+        company: { name: 'Joy', members: [{ role: 'OWNER' }] },
+      },
       user: { id: 'candidate-1', name: 'Mai', email: 'mai@example.com' },
     });
     prismaMock.application.update.mockResolvedValue({});

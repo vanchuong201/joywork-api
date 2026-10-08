@@ -8,6 +8,7 @@ const { prismaMock, esSearchMock, getEsClientMock } = vi.hoisted(() => ({
     },
     company: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
     },
     application: {
       findUnique: vi.fn(),
@@ -133,6 +134,7 @@ beforeEach(() => {
   prismaMock.job.findMany.mockResolvedValue([buildJob()]);
   prismaMock.job.count.mockResolvedValue(1);
   prismaMock.company.findMany.mockResolvedValue([{ id: 'company-1' }]);
+  prismaMock.company.findUnique.mockResolvedValue({ visibilityStatus: 'ACTIVE' });
   prismaMock.application.findUnique.mockResolvedValue(null);
 });
 
@@ -294,7 +296,10 @@ describe('JobsService.searchJobs companyBadges', () => {
       });
 
       expect(prismaMock.company.findMany).toHaveBeenCalledWith({
-        where: { badges: { some: { type: { in: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } } } },
+        where: {
+          visibilityStatus: 'ACTIVE',
+          badges: { some: { type: { in: ['GOOD_COMPANY', 'BASIC_COMMITMENT'] } } },
+        },
         select: { id: true },
       });
 

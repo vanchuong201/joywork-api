@@ -2,6 +2,11 @@ import { CompanyBadgeType, PostAuditAction } from '@prisma/client';
 import { prisma } from '@/shared/database/prisma';
 import { AppError } from '@/shared/errors/errorHandler';
 import { companyBadgesSelect, toBadgeTypes } from '@/shared/company-badges';
+import {
+  assertCompanyManageableById,
+  isCompanyPublic,
+  publicCompanyWhere,
+} from '@/modules/companies/company-visibility';
 import { deleteS3Objects } from '@/shared/storage/s3';
 import {
   CreatePostInput,
@@ -185,6 +190,7 @@ export class PostsService {
     if (!membership) {
       throw new AppError('You do not have permission to create posts for this company', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     const normalizedImages = images?.map((image, index) => ({
       url: image.url,
@@ -363,6 +369,7 @@ export class PostsService {
     if (!(isOwnerOrAdmin || isMemberEditingOwnPost)) {
       throw new AppError('You do not have permission to update this post', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(post.companyId);
 
     // Update post
     const updateData: any = {
@@ -609,6 +616,7 @@ export class PostsService {
             slug: true,
             logoUrl: true,
             badges: companyBadgesSelect,
+            visibilityStatus: true,
           },
         },
         createdBy: {
@@ -650,7 +658,7 @@ export class PostsService {
     if (!post) {
       return null;
     }
-    if ((post as any).deletedByJoyworkAt) {
+    if ((post as any).deletedByJoyworkAt || !isCompanyPublic(post.company)) {
       return null;
     }
 
@@ -724,6 +732,18 @@ export class PostsService {
 
       if (!membership) {
         throw new AppError('Bạn không có quyền truy cập', 403, 'FORBIDDEN');
+      }
+      await assertCompanyManageableById(companyId);
+    } else {
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { visibilityStatus: true },
+      });
+      if (!company || !isCompanyPublic(company)) {
+        return {
+          posts: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        };
       }
     }
 
@@ -874,6 +894,7 @@ export class PostsService {
       hiddenFromFeed: false,
       deletedByJoyworkAt: null,
       publishedAt: { not: null }, // Only published posts
+      company: publicCompanyWhere(),
     };
 
     if (type) {
@@ -1262,6 +1283,7 @@ export class PostsService {
     if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
       throw new AppError('You do not have permission to publish this post', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(post.companyId);
 
     // Publish post
     await prisma.post.update({
@@ -1308,6 +1330,7 @@ export class PostsService {
     if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
       throw new AppError('You do not have permission to unpublish this post', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(post.companyId);
 
     // Unpublish post
     await prisma.post.update({
@@ -1364,6 +1387,7 @@ export class PostsService {
     if (!(isOwnerOrAdmin || isMemberDeletingOwnPost)) {
       throw new AppError('You do not have permission to delete this post', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(post.companyId);
 
     const imageKeys = ((post as any).images || [])
       .map((image: any) => image.storageKey)

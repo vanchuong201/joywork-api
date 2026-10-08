@@ -67,10 +67,10 @@ export async function findRedirectCompanyId(slug: string): Promise<string | null
 
 export async function resolveCompanyBySlug(
   slug: string,
-): Promise<{ id: string; slug: string; name: string } | null> {
+): Promise<{ id: string; slug: string; name: string; visibilityStatus: 'ACTIVE' | 'HIDDEN' } | null> {
   const direct = await prisma.company.findUnique({
     where: { slug },
-    select: { id: true, slug: true, name: true },
+    select: { id: true, slug: true, name: true, visibilityStatus: true },
   });
   if (direct) return direct;
 
@@ -79,6 +79,6 @@ export async function resolveCompanyBySlug(
 
   return prisma.company.findUnique({
     where: { id: companyId },
-    select: { id: true, slug: true, name: true },
+    select: { id: true, slug: true, name: true, visibilityStatus: true },
   });
 }

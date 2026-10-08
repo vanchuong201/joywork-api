@@ -12,6 +12,11 @@ import { getEsClient } from '@/shared/elasticsearch/client';
 import { COMPANIES_INDEX } from '@/shared/elasticsearch/indices';
 import { syncCompanyToEs } from '@/shared/elasticsearch/sync';
 import {
+  assertCompanyManageableById,
+  isCompanyPublic,
+  publicCompanyWhere,
+} from '@/modules/companies/company-visibility';
+import {
   CreateCompanyInput,
   UpdateCompanyInput,
   SearchCompaniesInput,
@@ -161,6 +166,7 @@ export interface CompanyWithMembers {
   profileStory?: CompanyStoryBlock[];
   highlights?: CompanyHighlight[];
   isVerified: boolean;
+  visibilityStatus?: 'ACTIVE' | 'HIDDEN';
   badges: CompanyBadgeType[];
   verificationStatus?: string;
   hasVerificationFile?: boolean;
@@ -246,6 +252,8 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You do not have permission to manage this company', 403, 'FORBIDDEN');
     }
+
+    await assertCompanyManageableById(companyId);
   }
 
   private sanitizeFileName(name: string): string {
@@ -380,6 +388,7 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You do not have permission to view followers', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     const [total, items] = await Promise.all([
       prisma.follow.count({ where: { companyId } }),
@@ -436,6 +445,7 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You do not have permission to update this company', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     // Handle re-verification request first
     const { requestReVerification, ...dataWithoutFlag } = data;
@@ -677,7 +687,7 @@ export class CompaniesService {
   }
 
   // Get company by slug
-  async getCompanyBySlug(slug: string): Promise<CompanyWithMembers | null> {
+  async getCompanyBySlug(slug: string, userId?: string): Promise<CompanyWithMembers | null> {
     const now = new Date();
 
     const include = {
@@ -727,6 +737,14 @@ export class CompaniesService {
     }
 
     if (!company) {
+      return null;
+    }
+
+    if (!isCompanyPublic(company)) {
+      const isMember = Boolean(userId && company.members.some((member) => member.userId === userId));
+      if (isMember) {
+        throw new AppError('Company is hidden', 403, 'COMPANY_HIDDEN');
+      }
       return null;
     }
 
@@ -858,6 +876,7 @@ export class CompaniesService {
     if (!membership) {
         throw new AppError('You do not have permission to update profile', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     // Omit undefined
     const cleanData = Object.fromEntries(
@@ -941,7 +960,7 @@ export class CompaniesService {
             return { companies: [], pagination: { page: data.page, limit: data.limit, total: 0, totalPages: 0 } };
           }
           const companies = await prisma.company.findMany({
-            where: { id: { in: ids } },
+            where: { id: { in: ids }, ...publicCompanyWhere() },
             include: {
               badges: companyBadgesSelect,
             },
@@ -967,7 +986,7 @@ export class CompaniesService {
               ...(company.foundedYear != null ? { foundedYear: company.foundedYear } : {}),
               isVerified: company.isVerified, createdAt: company.createdAt, updatedAt: company.updatedAt,
             })),
-            pagination: { page: data.page, limit: data.limit, total: ids.length, totalPages: Math.ceil(ids.length / data.limit) },
+            pagination: { page: data.page, limit: data.limit, total: ordered.length, totalPages: Math.ceil(ordered.length / data.limit) },
           };
         }
       } catch (err) {
@@ -979,7 +998,7 @@ export class CompaniesService {
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: any = {};
+    const where: any = { ...publicCompanyWhere() };
 
     if (q) {
       where.OR = [
@@ -1099,6 +1118,7 @@ export class CompaniesService {
         ...(membership.company.profileStory != null ? { profileStory: membership.company.profileStory as unknown as CompanyStoryBlock[] } : {}),
         ...(membership.company.highlights != null ? { highlights: membership.company.highlights as unknown as CompanyHighlight[] } : {}),
         isVerified: membership.company.isVerified,
+        visibilityStatus: membership.company.visibilityStatus,
         createdAt: membership.company.createdAt,
         updatedAt: membership.company.updatedAt,
       },
@@ -1109,7 +1129,7 @@ export class CompaniesService {
     const listType =
       query.type === 'FEATURED' ? CompanyShowcaseListType.FEATURED : CompanyShowcaseListType.TOP;
     const slots = await prisma.companyShowcaseSlot.findMany({
-      where: { listType },
+      where: { listType, company: publicCompanyWhere() },
       orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
       take: query.limit,
       include: {
@@ -1215,6 +1235,7 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You do not have permission to invite members', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     // Role constraints: Admin cannot invite Owner or another Admin (depending on rules)
     // Here we allow Admin to invite Member, Owner to invite Admin/Member
@@ -1405,6 +1426,7 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You do not have permission to update members', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
     
     const targetMember = await prisma.companyMember.findUnique({
         where: { id: memberId }
@@ -1455,6 +1477,7 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You do not have permission to remove members', 403, 'FORBIDDEN');
     }
+    await assertCompanyManageableById(companyId);
 
     const targetMember = await prisma.companyMember.findUnique({
         where: { id: memberId }
@@ -1493,6 +1516,7 @@ export class CompaniesService {
     if (!membership) {
       throw new AppError('You are not a member of this company', 404, 'MEMBER_NOT_FOUND');
     }
+    await assertCompanyManageableById(companyId);
 
     if (membership.role === 'OWNER') {
       throw new AppError('Owners cannot leave the company. Please transfer ownership or delete the company.', 400, 'OWNER_CANNOT_LEAVE');
@@ -1505,7 +1529,7 @@ export class CompaniesService {
 
   async followCompany(companyId: string, userId: string): Promise<void> {
     const company = await prisma.company.findUnique({ where: { id: companyId } });
-    if (!company) {
+    if (!company || !isCompanyPublic(company)) {
       throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
     }
 
@@ -1560,6 +1584,7 @@ export class CompaniesService {
         badges: companyBadgesSelect,
         tagline: true,
         location: true,
+        visibilityStatus: true,
       },
     });
 
@@ -1574,6 +1599,7 @@ export class CompaniesService {
           badges: companyBadgesSelect,
           tagline: true,
           location: true,
+          visibilityStatus: true,
         },
       });
     }
@@ -1591,12 +1617,13 @@ export class CompaniesService {
             badges: companyBadgesSelect,
             tagline: true,
             location: true,
+            visibilityStatus: true,
           },
         });
       }
     }
 
-    if (!company) {
+    if (!company || !isCompanyPublic(company)) {
       return null;
     }
 
@@ -2251,7 +2278,7 @@ export class CompaniesService {
   async getPublicCompanyStatements(slug: string) {
     const company = await resolveCompanyBySlug(slug);
 
-    if (!company) {
+    if (!company || !isCompanyPublic(company)) {
       throw new AppError('Company not found', 404, 'COMPANY_NOT_FOUND');
     }
 
@@ -2368,7 +2395,7 @@ export class CompaniesService {
     // Badges are not indexed in ES — resolve company IDs via Prisma first
     if (badgeTypes.length > 0) {
       const badgeCompanies = await prisma.company.findMany({
-        where: { badges: { some: { type: { in: badgeTypes } } } },
+        where: { ...publicCompanyWhere(), badges: { some: { type: { in: badgeTypes } } } },
         select: { id: true },
       });
       if (badgeCompanies.length === 0) return [];

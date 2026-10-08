@@ -74,7 +74,8 @@ export class CompaniesController {
     // Mutable profile JSON — never edge-cache (Cloudflare / shared proxies).
     reply.header('Cache-Control', 'private, no-store');
 
-    const company = await this.companiesService.getCompanyBySlug(slug);
+    const userId = (request as { user?: { userId?: string } }).user?.userId;
+    const company = await this.companiesService.getCompanyBySlug(slug, userId);
     
     if (!company) {
       return reply.status(404).send({
