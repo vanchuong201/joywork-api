@@ -278,7 +278,7 @@ export class CompaniesService {
     ]);
 
     if (existingCompany || existingRedirect) {
-      throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
+      throw new AppError('Đường dẫn này đã tồn tại', 409, 'SLUG_EXISTS');
     }
 
     // Create company
@@ -497,7 +497,7 @@ export class CompaniesService {
         ]);
 
         if (existingCompany || (redirectRow && redirectRow.companyId !== companyId)) {
-          throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
+          throw new AppError('Đường dẫn này đã tồn tại', 409, 'SLUG_EXISTS');
         }
 
         if (redirectRow && redirectRow.companyId === companyId) {

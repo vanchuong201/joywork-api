@@ -189,7 +189,7 @@ describe('JobsService.applyForJob', () => {
     expect(data.cvSnapshot).toMatchObject({ version: 1, source: 'apply', cvId: CV_B, cvName: `CV ${CV_B}` });
   });
 
-  it('từ chối ứng tuyển khi công ty đang ẩn và không tạo đơn', async () => {
+  it('báo công ty không còn hoạt động khi công ty đang ẩn và không tạo đơn', async () => {
     prismaMock.job.findUnique.mockResolvedValue({
       id: JOB_ID,
       isActive: true,
@@ -200,8 +200,9 @@ describe('JobsService.applyForJob', () => {
     });
 
     await expect(service.applyForJob(USER_ID, { jobId: JOB_ID, cvId: CV_A })).rejects.toMatchObject({
-      statusCode: 404,
-      code: 'JOB_NOT_FOUND',
+      statusCode: 400,
+      code: 'COMPANY_INACTIVE',
+      message: 'Bạn không thể ứng tuyển do công ty này không còn hoạt động trên hệ thống',
     });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });

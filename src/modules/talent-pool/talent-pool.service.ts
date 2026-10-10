@@ -16,6 +16,7 @@ function flattenDefaultCvBrief<T extends { profile: { defaultCv: unknown } | nul
   return { ...rest, profile: (profile?.defaultCv ?? null) as NonNullable<T['profile']>['defaultCv'] | null };
 }
 import { AppError } from '@/shared/errors/errorHandler';
+import { publicCompanyWhere } from '@/modules/companies/company-visibility';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { emailService } from '@/shared/services/email.service';
 import { notificationService } from '@/shared/services/notification.service';
@@ -546,7 +547,7 @@ export class TalentPoolService {
 
   async checkAccess(userId: string): Promise<{ hasAccess: boolean; reason?: string }> {
     const eligibleMemberships = await prisma.companyMember.findMany({
-      where: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+      where: { userId, role: { in: ['OWNER', 'ADMIN'] }, company: publicCompanyWhere() },
       select: { companyId: true },
     });
 

@@ -1313,8 +1313,16 @@ export class JobsService {
       },
     });
 
-    if (!job || !isCompanyPublic(job.company)) {
-      throw new AppError('Job not found', 404, 'JOB_NOT_FOUND');
+    if (!job) {
+      throw new AppError('Không tìm thấy việc làm', 404, 'JOB_NOT_FOUND');
+    }
+
+    if (!isCompanyPublic(job.company)) {
+      throw new AppError(
+        'Bạn không thể ứng tuyển do công ty này không còn hoạt động trên hệ thống',
+        400,
+        'COMPANY_INACTIVE',
+      );
     }
 
     if (!job.isActive) {

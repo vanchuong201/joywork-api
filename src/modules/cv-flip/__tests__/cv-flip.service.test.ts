@@ -16,6 +16,10 @@ vi.mock('@/shared/database/prisma', () => ({
     },
     companyMember: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+    company: {
+      findUnique: vi.fn(),
     },
     cvFlipRequest: {
       updateMany: vi.fn(),
@@ -37,6 +41,7 @@ vi.mock('@/shared/database/prisma', () => ({
     companyFeatureEntitlement: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     $queryRaw: vi.fn(),
     $executeRaw: vi.fn(),
@@ -106,6 +111,22 @@ const baseUser = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(prisma.company.findUnique).mockResolvedValue({ visibilityStatus: 'ACTIVE' } as never);
+});
+
+describe('CvFlipService.checkAccess', () => {
+  it('chỉ trả công ty đang hiện', async () => {
+    vi.mocked(prisma.companyMember.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.companyFeatureEntitlement.updateMany).mockResolvedValue({ count: 0 } as never);
+
+    await service.checkAccess('hr-1');
+
+    expect(prisma.companyMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ company: { visibilityStatus: 'ACTIVE' } }),
+      }),
+    );
+  });
 });
 
 describe('CvFlipService.listCandidates', () => {
@@ -251,6 +272,24 @@ describe('CvFlipService.listCompanyRequests', () => {
     ).rejects.toMatchObject({
       statusCode: 403,
       code: 'COMPANY_PERMISSION_DENIED',
+    });
+
+    expect(prisma.cvFlipRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it('403 COMPANY_HIDDEN khi công ty đang ẩn', async () => {
+    vi.mocked(prisma.companyMember.findFirst).mockResolvedValue({ id: 'member-1' } as never);
+    vi.mocked(prisma.company.findUnique).mockResolvedValueOnce({ visibilityStatus: 'HIDDEN' } as never);
+
+    await expect(
+      service.listCompanyRequests(actorId, {
+        companyId,
+        page: 1,
+        limit: 20,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'COMPANY_HIDDEN',
     });
 
     expect(prisma.cvFlipRequest.findMany).not.toHaveBeenCalled();

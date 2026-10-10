@@ -18,6 +18,10 @@ import {
   parseCvFlipLimitMetadata,
 } from '@/shared/cv-flip-cycle';
 import { AppError } from '@/shared/errors/errorHandler';
+import {
+  assertCompanyManageableById,
+  publicCompanyWhere,
+} from '@/modules/companies/company-visibility';
 import { buildMaskedFieldPresence, maskNameToInitials } from '@/shared/mask';
 import { getProvinceNameByCode, resolveProvinceCode } from '@/shared/provinces';
 import { buildJobUrl } from '@/shared/job-slug';
@@ -213,6 +217,7 @@ export class CvFlipService {
     if (!membership) {
       throw new AppError('Bạn không có quyền thao tác với doanh nghiệp này', 403, 'COMPANY_PERMISSION_DENIED');
     }
+    await assertCompanyManageableById(companyId);
   }
 
   private async expirePendingRequestsForCompany(
@@ -294,6 +299,7 @@ export class CvFlipService {
       where: {
         userId,
         role: { in: ['OWNER', 'ADMIN'] },
+        company: publicCompanyWhere(),
       },
       select: {
         companyId: true,

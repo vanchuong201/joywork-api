@@ -709,7 +709,7 @@ export class SystemService {
       });
 
       if (existingCompany) {
-        throw new AppError('Company with this slug already exists', 409, 'SLUG_EXISTS');
+        throw new AppError('Đường dẫn này đã tồn tại', 409, 'SLUG_EXISTS');
       }
 
       (dataWithoutFlag as Record<string, unknown>)['slug'] = normalizedSlug;
